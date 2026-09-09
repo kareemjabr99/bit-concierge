@@ -15,7 +15,10 @@ services:
       timeout: 3s
       retries: 30
     volumes:
-      - bitc-pgdata:/var/lib/postgresql/data
+      # Postgres 18 expects a single mount at /var/lib/postgresql and puts the
+      # cluster in a version-specific subdirectory. Mounting the old
+      # /var/lib/postgresql/data path makes the container exit on boot.
+      - bitc-pgdata:/var/lib/postgresql
 
 volumes:
   bitc-pgdata:

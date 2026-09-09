@@ -13,7 +13,7 @@ out rather than absorbed, because "how long does a phase like this take" and
 
 ## Phase 0 — Foundation
 
-**Wall clock: 0.93 h** (2026-09-10, 00:18 – 01:14)
+**Wall clock: 1.10 h** (2026-09-10, 00:18 – 01:24)
 
 | Activity                                                         | Hours    |
 | ---------------------------------------------------------------- | -------- |
@@ -32,9 +32,14 @@ out rather than absorbed, because "how long does a phase like this take" and
   188 MB free, which broke the Docker daemon's containerd metadata store and
   blocked both dependency install and the database. Resolved by clearing
   regenerable caches. It is logged because it was real elapsed time.
-- Two planned decisions were overturned by verification and cost rework:
-  TypeScript 7 (blocked by typescript-eslint) and the initial `.js` import
-  convention (incompatible with Node's native type stripping).
+- Three planned decisions were overturned by verification and cost rework:
+  TypeScript 7 (blocked by typescript-eslint), the initial `.js` import
+  convention (incompatible with Node's native type stripping), and the
+  Compose volume mount path (Postgres 18 moved it).
+- Running the README's own setup sequence, rather than the ad-hoc container
+  used during development, is what caught the Compose bug. Worth keeping as a
+  habit at every checkpoint: verify the documented path, not the one you
+  happen to have running.
 - Phase 0 was estimated at 2 days in the plan. It came in far under, because
   the plan's estimate assumed scaffolding from the Shopify template and wiring
   OAuth — that work moved to Phase 4 where it belongs, and Phase 0 reduced to
