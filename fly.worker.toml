@@ -1,0 +1,18 @@
+# Queue consumer: ingestion, embedding, re-index, escalation, usage rollup.
+# No public service. Never scales to zero — pg-boss must keep draining.
+app = 'bit-concierge-worker'
+primary_region = 'fra'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+
+[processes]
+  worker = 'node apps/worker/dist/index.js'
+
+[[vm]]
+  size = 'shared-cpu-2x'
+  memory = '2gb'
+  processes = ['worker']

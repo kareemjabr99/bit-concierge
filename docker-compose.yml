@@ -1,0 +1,21 @@
+# Local development database only. Production is managed Postgres — see
+# docs/adr/0002-datastore.md. Nothing here ships.
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: bitc-pg
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bitconcierge
+    ports:
+      - '55432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d bitconcierge']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - bitc-pgdata:/var/lib/postgresql/data
+
+volumes:
+  bitc-pgdata:

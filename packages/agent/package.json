@@ -1,0 +1,16 @@
+{
+  "name": "@bitc/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@bitc/core": "workspace:*",
+    "@bitc/db": "workspace:*",
+    "@bitc/models": "workspace:*",
+    "ai": "7.0.97",
+    "zod": "4.6.0"
+  }
+}

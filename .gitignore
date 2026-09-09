@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.react-router/
+coverage/
+*.tsbuildinfo
+
+# Secrets — only .env.example is ever tracked
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log
+.pnpm-store/
+.drizzle-generated/

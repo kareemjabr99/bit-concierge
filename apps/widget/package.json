@@ -1,0 +1,12 @@
+{
+  "name": "@bitc/widget",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'Phase 3: esbuild IIFE bundle'"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@bitc/rag",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@bitc/core": "workspace:*",
+    "@bitc/db": "workspace:*",
+    "@bitc/models": "workspace:*",
+    "zod": "4.6.0"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@bitc/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "chat": "node src/chat.ts"
+  },
+  "dependencies": {
+    "@bitc/core": "workspace:*",
+    "@bitc/agent": "workspace:*",
+    "@bitc/db": "workspace:*"
+  }
+}

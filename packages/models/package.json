@@ -1,0 +1,16 @@
+{
+  "name": "@bitc/models",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@bitc/core": "workspace:*",
+    "ai": "7.0.97",
+    "@ai-sdk/google": "4.0.67",
+    "@ai-sdk/anthropic": "4.0.52",
+    "zod": "4.6.0"
+  }
+}

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Local throwaway database. No secret is required to run CI.
+  DATABASE_URL_MIGRATOR: postgres://postgres:postgres@localhost:5432/bitconcierge
+  DATABASE_URL: postgres://bitc_app_local:localdev@localhost:5432/bitconcierge
+
+jobs:
+  verify:
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Must carry pgvector >= 0.8.0; migration 0001 asserts it.
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bitconcierge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bitconcierge"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - run: pnpm format
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      - name: Create the local application login role
+        # Migrations create bitc_app as a NOLOGIN group role. CI adds a member
+        # that can connect, exactly as a developer's machine does.
+        run: psql "$DATABASE_URL_MIGRATOR" -v ON_ERROR_STOP=1 -f packages/db/scripts/bootstrap-local.sql
+
+      - run: pnpm test
+
+  # The eval suite lands in Phase 2 together with the golden set. It runs as a
+  # separate workflow because it needs a model key and costs money per run.

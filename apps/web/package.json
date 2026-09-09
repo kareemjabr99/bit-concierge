@@ -1,0 +1,14 @@
+{
+  "name": "@bitc/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'Phase 4: react-router build' && mkdir -p build/server && echo '' > build/server/index.js",
+    "dev": "echo 'Phase 3/4'"
+  },
+  "dependencies": {
+    "@bitc/core": "workspace:*",
+    "@bitc/db": "workspace:*"
+  }
+}
