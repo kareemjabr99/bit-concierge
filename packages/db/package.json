@@ -1,0 +1,26 @@
+{
+  "name": "@bitc/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./unsafe": "./src/unsafe.ts"
+  },
+  "scripts": {
+    "migrate": "node src/cli.ts up",
+    "rollback": "node src/cli.ts down",
+    "status": "node src/cli.ts status",
+    "reset": "node src/cli.ts reset"
+  },
+  "dependencies": {
+    "@bitc/core": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "postgres": "3.4.9",
+    "zod": "4.6.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.10"
+  }
+}
