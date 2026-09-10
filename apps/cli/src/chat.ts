@@ -11,7 +11,7 @@ import { MockShopifyClient } from '@bitc/shopify';
  * knowledge. Shows what the customer would see, and with --debug, what the
  * system did to produce it.
  *
- *   pnpm --filter @bitc/cli chat -- [--tenant pk_dev_1886] [--new] [--debug]
+ *   pnpm --filter @bitc/cli chat -- [--tenant pk_dev_1886] [--new] [--debug] [--pace 8]
  */
 const args = new Set(process.argv.slice(2));
 const flag = (name: string, fallback: string): string => {
@@ -23,6 +23,9 @@ const base = readEnv('base');
 const models = readEnv('models');
 const widgetKey = flag('--tenant', 'pk_dev_1886');
 let debug = args.has('--debug');
+// Seconds between turns when a transcript is piped in — the free tier allows
+// twenty requests a minute and a turn is two or three.
+const paceMs = Number(flag('--pace', '0')) * 1000;
 let externalId = args.has('--new')
   ? `cli-${Date.now()}`
   : (process.env.BITC_CLI_SESSION ?? `cli-${Date.now()}`);
@@ -127,6 +130,7 @@ try {
     } catch (error) {
       console.error('turn failed:', error instanceof Error ? error.message : error);
     }
+    if (!interactive && paceMs > 0) await new Promise((resolve) => setTimeout(resolve, paceMs));
     prompt();
   }
 } finally {

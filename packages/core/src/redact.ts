@@ -44,8 +44,23 @@ const SENSITIVE_KEYS = new Set([
   'trackingnumber',
 ]);
 
-export const redactText = (value: string): string =>
-  value.replace(EMAIL, '[email]').replace(PHONE, '[phone]').replace(LONG_DIGITS, '[number]');
+// Identifiers we trace by. A UUID group that happens to be all digits must
+// survive the long-digit rule, or logs stop being searchable by conversation.
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
+export const redactText = (value: string): string => {
+  const ids: string[] = [];
+  const shielded = value.replace(UUID, (id) => {
+    ids.push(id);
+    // Private-use characters: never in real text, and not control characters.
+    return `\uE000${ids.length - 1}\uE001`;
+  });
+  return shielded
+    .replace(EMAIL, '[email]')
+    .replace(PHONE, '[phone]')
+    .replace(LONG_DIGITS, '[number]')
+    .replace(/\uE000(\d+)\uE001/g, (_, i: string) => ids[Number(i)]!);
+};
 
 const isSensitiveKey = (key: string): boolean =>
   SENSITIVE_KEYS.has(key.toLowerCase().replace(/[_-]/g, ''));

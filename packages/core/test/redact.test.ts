@@ -17,6 +17,13 @@ describe('redaction', () => {
     expect(redactText('order 1886204155')).toBe('order [number]');
   });
 
+  it('keeps UUIDs intact, even one whose first group is all digits', () => {
+    const id = '12345678-8679-45f6-845c-263e572ba30b';
+    expect(redactText(`conversation ${id} order 1886204155`)).toBe(
+      `conversation ${id} order [number]`,
+    );
+  });
+
   it('leaves ordinary numbers alone', () => {
     expect(redactText('14 days, size 42')).toBe('14 days, size 42');
   });
