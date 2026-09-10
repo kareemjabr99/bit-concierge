@@ -10,9 +10,11 @@ const tokens = (text: string): string[] =>
 
 /** In-memory implementation over the fixtures. Deterministic, no network. */
 export class MockShopifyClient implements ShopifyReadClient {
-  constructor(
-    private readonly data: { orders: Order[]; products: Product[] } = { orders, products },
-  ) {}
+  private readonly data: { orders: Order[]; products: Product[] };
+
+  constructor(data: { orders: Order[]; products: Product[] } = { orders, products }) {
+    this.data = data;
+  }
 
   async getOrderByName(name: string): Promise<Order | null> {
     const wanted = normalizeOrderName(name);

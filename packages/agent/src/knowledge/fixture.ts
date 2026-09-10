@@ -255,7 +255,11 @@ const tokens = (text: string): string[] =>
  * the retrieval spec requires.
  */
 export class FixtureKnowledge implements KnowledgeSearcher {
-  constructor(private readonly chunks: FixtureChunk[] = FIXTURE_CHUNKS) {}
+  private readonly chunks: FixtureChunk[];
+
+  constructor(chunks: FixtureChunk[] = FIXTURE_CHUNKS) {
+    this.chunks = chunks;
+  }
 
   async search({ query, lang, topK, minScore }: KnowledgeQuery): Promise<KnowledgeHit[]> {
     const terms = tokens(query);

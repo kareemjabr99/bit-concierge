@@ -9,6 +9,16 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
+      // Packages run under plain `node file.ts` (strip-only). Syntax that needs
+      // a transform, not a strip, is rejected here rather than at runtime.
+      '@typescript-eslint/parameter-properties': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSEnumDeclaration',
+          message: 'Node cannot strip enums; use a const object or a union type.',
+        },
+      ],
     },
   },
   {
