@@ -24,6 +24,14 @@ echo "→ clean clone into $WORK"
 git clone --quiet "$ROOT" "$WORK/repo"
 cd "$WORK/repo"
 
+# Docker Desktop keeps its socket under the real HOME (~/.docker/run/) and the
+# CLI finds it through the user's context. Resolve the endpoint before HOME
+# changes, or the CLI falls back to /var/run/docker.sock and finds nothing.
+if [ -z "${DOCKER_HOST:-}" ]; then
+  DOCKER_HOST="$(docker context inspect --format '{{(index .Endpoints "docker").Host}}' 2>/dev/null || true)"
+  [ -n "$DOCKER_HOST" ] && export DOCKER_HOST
+fi
+
 echo "→ fresh HOME: fresh pnpm store, fresh verification cache, no cached verdicts"
 # pnpm caches "this lockfile passed policy" under ~/Library/Caches (macOS) or
 # ~/.cache (Linux) and reuses it on every install. No install flag bypasses
