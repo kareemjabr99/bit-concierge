@@ -19,7 +19,8 @@
     "db:reset": "pnpm --filter @bitc/db run reset",
     "verify": "pnpm lint && pnpm typecheck && pnpm test",
     "verify:clean": "bash scripts/verify-clean.sh",
-    "db:seed": "pnpm --filter @bitc/db run seed"
+    "db:seed": "pnpm --filter @bitc/db run seed",
+    "evals": "pnpm --filter @bitc/evals run evals"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

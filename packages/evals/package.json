@@ -10,6 +10,13 @@
     "@bitc/core": "workspace:*",
     "@bitc/db": "workspace:*",
     "@bitc/agent": "workspace:*",
+    "@bitc/models": "workspace:*",
+    "@bitc/rag": "workspace:*",
+    "@bitc/shopify": "workspace:*",
+    "drizzle-orm": "0.45.2",
     "zod": "4.5.4"
+  },
+  "scripts": {
+    "evals": "node --env-file-if-exists=../../.env.local src/cli.ts"
   }
 }

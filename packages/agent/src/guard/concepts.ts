@@ -44,7 +44,7 @@ const PATTERNS: Record<Concept, RegExp> = {
   discounts: /\b(?:discount\w*|voucher\w*|coupon\w*|promo\w*)\b|خصم|خصومات|كوبون|قسيمة/iu,
   // A bare "size" names a variant. Only guidance counts.
   sizing:
-    /\b(?:size guide|size chart|sizing|runs (?:large|small|big|true)|true to size|fits? (?:large|small|true))\b|دليل المقاسات|جدول المقاسات|مقاسات/iu,
+    /\b(?:size guide|size chart|sizing|runs (?:large|small|big|true)|true to size|fits? (?:large|small|true))\b|دليل المقاسات|جدول المقاسات|جدول القياسات/iu,
   care: /\b(?:wash|washes|washing|launder\w*|tumble dry|dry clean|iron|ironing|bleach)\b|غسيل|الغسيل|كوي|تنظيف جاف|مبيض/iu,
   // Any commitment about when. The prompt forbids making one; the gate makes
   // sure that if one is made it came from somewhere.

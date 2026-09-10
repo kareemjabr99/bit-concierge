@@ -113,6 +113,71 @@ describe('grounding gate — literals', () => {
     expect(ok.ok).toBe(true);
   });
 
+  describe('false positives found by the first eval run', () => {
+    // All three withheld correct answers. None was a model fabrication.
+    const knowledge = {
+      ok: true,
+      results: [
+        {
+          id: 'fx-1',
+          url: 'https://1886riyadh.com/policies/refund-policy#returns-exchanges-policy',
+          content: 'You are eligible for returns within 7 days.',
+        },
+      ],
+    };
+
+    it('accepts a source URL with its anchor', () => {
+      // The general normaliser strips '#', so a URL run through it never
+      // matched the anchored URL a chunk carries.
+      const v = checkGrounding({
+        reply:
+          'Full details: https://1886riyadh.com/policies/refund-policy#returns-exchanges-policy',
+        toolResults: [knowledge],
+        toolsCalled: ['search_knowledge'],
+      });
+      expect(v.ok).toBe(true);
+    });
+
+    it('still rejects a URL no tool returned', () => {
+      const v = checkGrounding({
+        reply: 'Start here: https://1886riyadh.com/pages/refund-now',
+        toolResults: [knowledge],
+        toolsCalled: ['search_knowledge'],
+      });
+      expect(v.ok).toBe(false);
+      expect(v.misses[0]?.kind).toBe('url');
+    });
+
+    it('does not read the bare word "available" as a stock claim', () => {
+      const v = checkGrounding({
+        reply: 'Express delivery is available to every GCC country.',
+        toolResults: [knowledge],
+        toolsCalled: ['search_knowledge'],
+      });
+      expect(v.ok).toBe(true);
+    });
+
+    it('accepts the brand name when the brand name is a number', () => {
+      // The store is called 1886. Without alwaysGrounded, its own name reads
+      // as a fabricated four-digit figure.
+      const reply = 'I am 1886\u2019s assistant and can help with orders.';
+      expect(checkGrounding({ reply, toolResults: [], toolsCalled: [] }).ok).toBe(false);
+      expect(
+        checkGrounding({ reply, toolResults: [], toolsCalled: [], alwaysGrounded: ['1886'] }).ok,
+      ).toBe(true);
+    });
+
+    it('does not let alwaysGrounded launder an unrelated number', () => {
+      const v = checkGrounding({
+        reply: 'Your order 1886204155 shipped.',
+        toolResults: [],
+        toolsCalled: [],
+        alwaysGrounded: ['1886'],
+      });
+      expect(v.ok).toBe(false);
+    });
+  });
+
   it('leaves small numbers and plain prose alone', () => {
     const v = checkGrounding({
       reply: 'Returns are accepted within 14 days, and sizes run large.',

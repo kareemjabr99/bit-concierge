@@ -275,6 +275,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     reply: text,
     toolResults: recorder.toolCalls.map((t) => t.output),
     toolsCalled: recorder.toolCalls.map((t) => t.name),
+    alwaysGrounded: [config.brandName],
   });
   const citations = checkCitations({
     reply: text,
