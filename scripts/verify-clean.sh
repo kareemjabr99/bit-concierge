@@ -45,6 +45,9 @@ done
 
 export DATABASE_URL_MIGRATOR="postgres://postgres:postgres@localhost:$PORT/bitconcierge"
 export DATABASE_URL="postgres://bitc_app_local:localdev@localhost:$PORT/bitconcierge"
+# The suite owns its own database and reads only these.
+export TEST_DATABASE_URL_MIGRATOR="postgres://postgres:postgres@localhost:$PORT/bitconcierge_test"
+export TEST_DATABASE_URL="postgres://bitc_app_local:localdev@localhost:$PORT/bitconcierge_test"
 
 echo "→ the README sequence"
 pnpm db:migrate
