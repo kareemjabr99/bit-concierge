@@ -76,6 +76,8 @@ export const dropTenant = async (tenantId: TenantId): Promise<void> => {
 
 export interface ScriptStep {
   text?: string;
+  /** Simulate the provider failing on this call. */
+  throws?: string;
   tools?: { name: string; input: Record<string, unknown> }[];
 }
 
@@ -92,6 +94,7 @@ export const scripted = (steps: ScriptStep[]): MockLanguageModelV4 => {
     doGenerate: async () => {
       const step = steps[i] ?? { text: '(script exhausted)' };
       i += 1;
+      if (step.throws) throw new Error(step.throws);
       const content: Array<Record<string, unknown>> = [];
       if (step.text) content.push({ type: 'text', text: step.text });
       (step.tools ?? []).forEach((t, k) =>

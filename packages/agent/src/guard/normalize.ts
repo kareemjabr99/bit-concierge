@@ -22,6 +22,7 @@ export const normalizeForMatch = (text: string): string =>
     .replace(CURRENCY, ' sar ')
     .replace(/(\d)[,٬](?=\d{3}\b)/g, '$1')
     .replace(/#/g, '')
+    .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();

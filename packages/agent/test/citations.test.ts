@@ -63,6 +63,78 @@ describe('grounding gate — policy citations', () => {
     expect(v.misses[0]?.reason).toBe('no_marker');
   });
 
+  it('exempts sentences that quote values another tool returned — the real-model false suppressions', () => {
+    const order = {
+      ok: true,
+      order: {
+        number: '#1886-2041',
+        shipments: [{ carrier: 'SMSA Express', status: 'in_transit' }],
+        items: [{ title: 'Najd Cargo Pant', variant: '32' }],
+      },
+    };
+    const stock = {
+      ok: true,
+      product: 'Sadu Hoodie',
+      variants: [{ title: 'M', available: false }],
+    };
+    const shipping = {
+      ok: true,
+      destination: 'United Arab Emirates',
+      carrier: 'Aramex',
+      published_range: '3–6 business days',
+      cost: '45 SAR',
+    };
+    for (const [reply, results] of [
+      [
+        'Your order is on its way. It has been shipped via SMSA Express and is currently in transit.',
+        [order],
+      ],
+      ['يتضمن الطلب:\n- Najd Cargo Pant (مقاس 32)', [order]],
+      ['The Sadu Hoodie in size M is currently out of stock.', [stock]],
+      [
+        'Shipping to the United Arab Emirates is 45 SAR via Aramex, with a published delivery range of 3–6 business days.',
+        [shipping],
+      ],
+    ] as const) {
+      const v = checkCitations({
+        reply,
+        retrieved: [],
+        searchCalled: false,
+        otherToolResults: [...results],
+      });
+      expect(v.ok, reply).toBe(true);
+    }
+  });
+
+  it('still withholds an invented duration after a successful lookup', () => {
+    const order = {
+      ok: true,
+      order: {
+        number: '#1886-2041',
+        shipments: [{ carrier: 'SMSA Express', status: 'in_transit' }],
+      },
+    };
+    const v = checkCitations({
+      reply: 'It shipped via SMSA Express and should arrive within 2–4 days.',
+      retrieved: [],
+      searchCalled: false,
+      otherToolResults: [order],
+    });
+    expect(v.ok).toBe(false);
+    expect(v.misses[0]?.reason).toBe('no_retrieval');
+  });
+
+  it('does not let a short tool value like "paid" exempt a policy claim', () => {
+    const order = { ok: true, order: { payment_status: 'paid' } };
+    const v = checkCitations({
+      reply: 'Refunds are paid within 30 days.',
+      retrieved: [],
+      searchCalled: false,
+      otherToolResults: [order],
+    });
+    expect(v.ok).toBe(false);
+  });
+
   it('fails a policy sentence with no marker', () => {
     const v = checkCitations({
       reply: 'You can return within 30 days.',

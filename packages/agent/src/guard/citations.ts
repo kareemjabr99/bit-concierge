@@ -72,6 +72,37 @@ const URL_IN_TEXT = /https?:\/\/[^\s<>()"'\]]+/gi;
 const trimUrl = (url: string): string => url.replace(/[.,;:!?)\]]+$/, '').toLowerCase();
 
 const isQuestion = (s: string): boolean => /[?؟]\s*$/.test(s.trim());
+
+// Instructions to the model that ride along in tool results. Not facts.
+const NON_FACT_KEYS = new Set(['note', 'message', 'next']);
+
+/**
+ * String values the other tools returned — carrier names, product titles,
+ * statuses, published ranges. A sentence that quotes one is reporting a tool
+ * result, not stating a policy. Short values ("paid") are left out because
+ * they occur in ordinary prose.
+ */
+const collectFactValues = (value: unknown, out: Set<string>): void => {
+  if (typeof value === 'string') {
+    if (/^https?:\/\//i.test(value)) return;
+    const norm = normalizeForMatch(value);
+    if (norm.length >= 6) out.add(norm);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const v of value) collectFactValues(v, out);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value))
+      if (!NON_FACT_KEYS.has(k)) collectFactValues(v, out);
+  }
+};
+
+// "2–4 business days", "within 14 days", "خلال 3 أيام". A timing statement is
+// cited, quoted from a tool, or withheld — whatever else the sentence says.
+const DURATION =
+  /(?:\d+\s*[–—-]\s*\d+|\b\d+)\s*(?:business\s|working\s)?(?:days?|hours?|weeks?)\b|\bwithin\s+\d+\b|(?:\d+\s*(?:إلى|-|–)\s*)?\d+\s*(?:أيام|يوم|ساعات|ساعة|أسابيع|أسبوع)|خلال\s+\d+/iu;
 const isPolicyClaim = (s: string): boolean => POLICY_TERMS_EN.test(s) || POLICY_TERMS_AR.test(s);
 const isConversational = (s: string): boolean => CONVERSATIONAL.test(s.trim());
 
@@ -90,6 +121,17 @@ export const checkCitations = ({
   otherToolResults,
 }: CitationInput): CitationVerdict => {
   const known = new Set(retrieved.map((r) => r.chunkId));
+  const factValues = new Set<string>();
+  for (const result of otherToolResults) collectFactValues(result, factValues);
+  const quotesToolValue = (sentence: string): boolean => {
+    const norm = normalizeForMatch(sentence);
+    for (const v of factValues) if (norm.includes(v)) return true;
+    return false;
+  };
+  const durationGrounded = (sentence: string): boolean => {
+    const found = sentence.match(DURATION);
+    return !found || factCorpus.includes(normalizeForMatch(found[0]));
+  };
   const byUrl = new Map<string, string[]>();
   for (const r of retrieved) {
     if (!r.url) continue;
@@ -123,7 +165,12 @@ export const checkCitations = ({
         misses.push({ sentence: stripCitations(sentence), reason: 'unknown_chunk', chunkId: id });
     }
     if (markers.length > 0) continue;
+    if (!durationGrounded(sentence)) {
+      misses.push({ sentence, reason: searchCalled ? 'no_marker' : 'no_retrieval' });
+      continue;
+    }
     if (!isPolicyClaim(sentence) || isConversational(sentence)) continue;
+    if (quotesToolValue(sentence)) continue;
 
     const linked = linkedChunks(sentence);
     if (linked.length > 0) {

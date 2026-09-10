@@ -253,6 +253,24 @@ describe('agent turn', () => {
     expect(model.doGenerateCalls).toHaveLength(0);
   });
 
+  it('a provider failure after a successful escalation is still an escalation', async () => {
+    const model = scripted([
+      {
+        tools: [
+          {
+            name: 'escalate_to_human',
+            input: { reason: 'wants_human', summary: 'Wants a manager.' },
+          },
+        ],
+      },
+      { throws: 'provider 503' },
+    ]);
+    const r = await turn('let me talk to a manager', model);
+    expect(r.status).toBe('escalated');
+    expect(r.recorder.escalation?.reason).toBe('wants_human');
+    expect(r.reply).not.toMatch(/went wrong/i);
+  });
+
   it('tool failure: says so and escalates rather than improvising', async () => {
     const model = scripted([
       {

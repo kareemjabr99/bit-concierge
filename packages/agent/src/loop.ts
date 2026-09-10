@@ -216,6 +216,13 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     finishReason = result.finishReason;
   } catch (error) {
     logger.error('model call failed', { error });
+    // The model already handed the thread over before failing; that stands.
+    if (recorder.escalation) {
+      return finish('escalated', systemMessage('escalated', lang, config.messages), {
+        steps,
+        modelKey: deps.chat.spec.key,
+      });
+    }
     await escalate(ctx, {
       reason: 'system_error',
       summary: 'The assistant could not complete the reply.',

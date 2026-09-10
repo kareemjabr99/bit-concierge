@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { recorded, toolError, type ToolResult, type TurnContext } from '../context.ts';
 import { escalate } from '../escalation.ts';
 import { verifyOrderIdentity } from './identity-gate.ts';
+import { findShippingRule } from './shipping.ts';
 
 /**
  * The six tools. Each is a factory bound to the turn so it can read tenant
@@ -197,13 +198,7 @@ export const makeTools = (ctx: TurnContext) => ({
     }),
     execute: (input) =>
       recorded(ctx, 'get_shipping_estimate', input, async () => {
-        const want = input.country.trim().toLowerCase();
-        const rule = ctx.config.shipping.find(
-          (r) =>
-            r.country.toLowerCase() === want ||
-            r.label.toLowerCase() === want ||
-            r.label.toLowerCase().includes(want),
-        );
+        const rule = findShippingRule(ctx.config.shipping, input.country, input.city);
         if (!rule)
           return toolError(
             'unknown_destination',

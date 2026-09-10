@@ -1,6 +1,6 @@
 # 0005 — The two halves of the hallucination bar
 
-**Status:** accepted, Phase 0 (design) · implemented Phase 1–2
+**Status:** accepted · both deterministic halves implemented in Phase 1
 **Date:** 2026-09-10
 
 ## Context
@@ -119,3 +119,69 @@ Never one number. Never "99.6% accurate".
   was reformatted. Normalise before comparing (currency symbols, digit forms —
   Arabic-Indic included, thousands separators) and treat a false suppression as
   a bug in the gate, not a reason to weaken it.
+
+---
+
+## Implementation notes (Phase 1)
+
+Both deterministic halves are live in `packages/agent/src/guard/` and run on
+every reply in `loop.ts`. The semantic half (sampled human review) arrives with
+the eval harness in Phase 2.
+
+### Marker contract
+
+The prompt's SOURCES section requires `[[c:ID]]` after every policy sentence,
+where ID is the `id` field of a `search_knowledge` result received _this
+turn_. The gate accepts the marker on either side of the terminating
+punctuation and folds it into the sentence before splitting, so the customer
+sees neither the marker nor a stray space.
+
+### What counts as a policy sentence
+
+Sentences are split on `.` `!` `?` and the Arabic `؟` `۔`. A sentence is a
+policy claim if it contains a term from a fixed English/Arabic lexicon —
+returns, refunds, exchanges, shipping, delivery, warranty, sizing, care,
+fees, duties, cancellation, discounts. Three exemptions:
+
+1. **Questions** — a sentence ending in `?`/`؟` asserts nothing.
+2. **Offers and pleasantries** — sentences opening with _I can_, _Let me_,
+   _Would you_, _أقدر_, _خلني_ and the like state no policy even when they
+   name one.
+3. **Facts grounded elsewhere** — a sentence carrying a literal (order number,
+   tracking reference, URL, long number) _or quoting a value_ (carrier name,
+   product title, status, published range — six characters or more) that a
+   _non-knowledge_ tool returned is reporting that tool, not stating a policy.
+   The first real-model run withheld four correct answers before this rule
+   existed: order facts spread across sentences, and the sentence with
+   "shipped via SMSA Express" carried no literal of its own.
+4. **A link to the source** — a sentence containing the URL of a retrieved
+   chunk's page is attributed to that chunk, exactly as a marker would be. The
+   first real-model run produced _"You can read the full policy details on
+   our returns page (https://…/policies/returns)"_ after three correctly
+   cited sentences and was withheld for it; the link is the attribution.
+
+**Durations are always attributed.** "2–4 business days", "within 14 days",
+"خلال 3 أيام" — a timing statement in any sentence is cited, quoted verbatim
+from a tool result, or withheld, regardless of the exemptions above. This is
+the gate's enforcement of the prompt's no-timing-commitment rule.
+
+Everything else that reads as a policy claim must carry a marker that resolves
+to a chunk retrieved this turn. `no_marker`, `unknown_chunk` and
+`no_retrieval` are the three miss reasons, recorded on `messages.grounding`.
+
+### Known precision limits
+
+The lexicon is deliberately over-inclusive. A conversational sentence that
+mentions shipping without stating a rule can be flagged; when it is, the reply
+is withheld and escalated — the safe direction. Two consequences:
+
+- A rising suppression rate is a signal to tune the lexicon or the prompt,
+  and is worth alerting on. It is visible per turn in the CLI's `--debug`
+  output and per message on `messages.grounding`.
+- Phase 2's eval harness measures the false-suppression rate directly. That
+  number, not intuition, decides what leaves the lexicon.
+
+The order-fact exemption relies on the model including a literal in the
+sentence. _"Your order has shipped"_ with no order number is flagged; the
+prompt asks for the number, and the fixture transcripts show the model
+supplying it.
