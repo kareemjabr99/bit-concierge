@@ -136,58 +136,89 @@ turn_. The gate accepts the marker on either side of the terminating
 punctuation and folds it into the sentence before splitting, so the customer
 sees neither the marker nor a stray space.
 
-### What counts as a policy sentence
+### What counts as a claim that needs a source
 
-Sentences are split on `.` `!` `?` and the Arabic `؟` `۔`. A sentence is a
-policy claim if it contains a term from a fixed English/Arabic lexicon —
-returns, refunds, exchanges, shipping, delivery, warranty, sizing, care,
-fees, duties, cancellation, discounts. Three exemptions:
+Sentences are split on `.` `!` `?` and the Arabic `؟` `۔`. A sentence needs a
+citation when it asserts anything in one of nine **concepts** — returns,
+shipping, fees, warranty, cancellation, discounts, sizing, care, timing —
+each matched by one English/Arabic pattern in `guard/concepts.ts`.
 
-1. **Questions** — a sentence ending in `?`/`؟` asserts nothing.
-2. **Offers and pleasantries** — sentences opening with _I can_, _Let me_,
-   _Would you_, _أقدر_, _خلني_ and the like state no policy even when they
-   name one.
-3. **Facts grounded elsewhere** — a sentence carrying a literal (order number,
-   tracking reference, URL, long number) _or quoting a value_ (carrier name,
-   product title, status, published range — six characters or more) that a
-   _non-knowledge_ tool returned is reporting that tool, not stating a policy.
-   The first real-model run withheld four correct answers before this rule
-   existed: order facts spread across sentences, and the sentence with
-   "shipped via SMSA Express" carried no literal of its own.
-4. **A link to the source** — a sentence containing the URL of a retrieved
-   chunk's page is attributed to that chunk, exactly as a marker would be. The
-   first real-model run produced _"You can read the full policy details on
-   our returns page (https://…/policies/returns)"_ after three correctly
-   cited sentences and was withheld for it; the link is the attribution.
+The exclusions are as load-bearing as the inclusions:
 
-**Escalation copy is system copy.** Once `escalate_to_human` succeeds, the
-customer receives the fixed hand-over message in their own language. The
-model's prose after handing over is kept on `messages.grounding.rawModelText`
-for audit and never delivered — on the real model it arrived in the wrong
-language and promised "soon".
+- **"shipped", "dispatched", "delivered" are not shipping.** Present and gerund
+  forms state a rule; past participles report an event about one order, which
+  the literal gate already checks against the tool result.
+- **A bare "size" is not sizing.** It names a variant. Only guidance counts —
+  "size guide", "runs large", "true to size", "مقاسات".
+- **Markers and URLs are stripped before matching.** Reading concepts out of
+  them let a sentence's own citation vouch for its topic:
+  `[[c:fx-returns-exclusions]]` contains the word "returns". A tool result's
+  `id`, `note` and `next` are stripped for the same reason — `t:shipping` must
+  not make a shipping result vouch for shipping. Both found by the tests below,
+  not in production.
 
-**Durations are always attributed.** "2–4 business days", "within 14 days",
-"خلال 3 أيام" — a timing statement in any sentence is cited, quoted verbatim
-from a tool result, or withheld, regardless of the exemptions above. This is
-the gate's enforcement of the prompt's no-timing-commitment rule.
+### There are no exemptions
 
-Everything else that reads as a policy claim must carry a marker that resolves
-to a chunk retrieved this turn. `no_marker`, `unknown_chunk` and
-`no_retrieval` are the three miss reasons, recorded on `messages.grounding`.
+An earlier version had five sentence-level exemptions — questions, offers,
+quoted tool values, embedded literals, source links — each added because a real
+transcript was withheld without it. **An adversarial suite got fabricated
+policies past four of them**, by wrapping the claim in something the gate had a
+reason to trust. Run against that version, 11 Sep 2026:
 
-### Known precision limits
+| attack                                                                          | result                   |
+| ------------------------------------------------------------------------------- | ------------------------ |
+| Fabricated fee waiver riding on a real destination name                         | **passed the gate**      |
+| Fabricated policy riding on "business days", a word pair from a published range | **passed the gate**      |
+| Fabricated return window riding on a real order number                          | **passed the gate**      |
+| Fabricated duty claim riding on a real tracking number                          | **passed the gate**      |
+| Policy stated as a rhetorical question                                          | **passed the gate**      |
+| Fabricated refund policy riding on a real carrier name                          | rejected — duration rule |
+| Fabricated exchange policy riding on a product-title word pair                  | rejected — duration rule |
+| Policy behind a conversational opener                                           | rejected — duration rule |
+| Fabricated policy linked to an unrelated retrieved page                         | rejected — duration rule |
 
-The lexicon is deliberately over-inclusive. A conversational sentence that
-mentions shipping without stating a rule can be flagged; when it is, the reply
-is withheld and escalated — the safe direction. Two consequences:
+Five of nine. The other four were caught only by the always-attributed duration
+rule, and incidentally: every one of those attacks works with the number
+removed.
 
-- A rising suppression rate is a signal to tune the lexicon or the prompt,
-  and is worth alerting on. It is visible per turn in the CLI's `--debug`
-  output and per message on `messages.grounding`.
-- Phase 2's eval harness measures the false-suppression rate directly. That
-  number, not intuition, decides what leaves the lexicon.
+The pattern is the same each time — **an exemption meant for the reporting part
+of a sentence was applied to the whole sentence**, so a fabricated policy
+sitting next to a real carrier name inherited the carrier's credibility.
 
-The order-fact exemption relies on the model including a literal in the
-sentence. _"Your order has shipped"_ with no order number is flagged; the
-prompt asks for the number, and the fixture transcripts show the model
-supplying it.
+All five are gone. One rule replaces them:
+
+> A sentence asserting one of the nine concepts must carry a citation, and the
+> cited source must cover **every** concept the sentence asserts.
+
+Both halves matter. The citation proves the claim came from somewhere; the
+concept check proves it came from somewhere _about that_. Citing the shipping
+page for a returns claim resolves, and is still rejected — which closed the link
+attack without removing link attribution.
+
+**Tool results are citable**, with ids: `t:order`, `t:shipping`, `t:stock`,
+`t:products`. That is what makes zero exemptions affordable — an order-status
+sentence that mentions shipping cites the order lookup rather than needing an
+exemption. It was also always required: `get_shipping_estimate` is the brief's
+own source for shipping ranges, so it must be citable for a shipping claim.
+
+Three miss reasons, recorded on `messages.grounding`: `no_citation`,
+`unknown_source`, `source_mismatch`.
+
+### What removing the exemptions cost
+
+Nothing measurable. Six scenarios on the real model, 11 Sep 2026,
+`gemini-3.5-flash-lite`: **six answered, zero suppressed.** The model cited
+`t:shipping` for a shipping cost and `t:order` for both order-status answers
+without being shown an example — the Arabic one, which the previous gate had
+withheld, now passes because it cites its source.
+
+That is one run of six on one model, not a rate. The false-suppression rate is
+a Phase 2 eval metric, measured against the golden set, and it is the number
+that decides whether any concept pattern needs narrowing.
+
+### Known limit: attribution is not faithfulness
+
+A citation that resolves and covers the right concept can still misrepresent
+what the source says — "returns within 60 days" citing a chunk that says 14.
+The concept check narrows this to _within_ a topic; it cannot close it. That is
+half two's job, and it is why half two exists.
