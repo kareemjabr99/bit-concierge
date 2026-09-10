@@ -9,9 +9,11 @@ tool call, not a retrieval.** Order, price and stock facts come from live
 Shopify calls. Policies, sizing and care come from retrieval. The two never
 cross, and a deterministic gate checks that before any reply is sent.
 
-> Status: **Phase 1 complete.** The agent loop, six tools, both grounding
-> gates and a CLI harness — running against a synthetic store and a fixture
-> knowledge base. No real retrieval, no Shopify connection, English-first.
+> Status: **Phase 2 in progress.** Retrieval is real — 37 documents and 121
+> chunks indexed from 1886riyadh.com's public pages, hybrid search over
+> pgvector — and an eval harness runs a 33-case provisional golden set. No
+> Shopify connection yet, English only, and the golden set is drafted rather
+> than client-validated, so it does not measure the ship bar.
 
 ---
 
@@ -75,13 +77,18 @@ for the ship bar alike. `gemini-3.8-flash` is not in the registry: twenty free
 requests a day cannot run an eval suite. See
 [ADR 0006](docs/adr/0006-model-abstraction.md).
 
-| Command                | Does                                     |
-| ---------------------- | ---------------------------------------- |
-| `pnpm verify`          | lint + typecheck + tests                 |
-| `pnpm db:migrate`      | apply pending migrations                 |
-| `pnpm db:rollback [n]` | revert the last n migrations (default 1) |
-| `pnpm db:reset`        | revert everything                        |
-| `pnpm db:status`       | which migrations are applied             |
+| Command                                       | Does                                     |
+| --------------------------------------------- | ---------------------------------------- |
+| `pnpm verify`                                 | lint + typecheck + tests                 |
+| `pnpm db:migrate`                             | apply pending migrations                 |
+| `pnpm db:rollback [n]`                        | revert the last n migrations (default 1) |
+| `pnpm db:reset`                               | revert everything                        |
+| `pnpm db:status`                              | which migrations are applied             |
+| `pnpm db:seed`                                | create or refresh the development tenant |
+| `pnpm --filter @bitc/rag ingest`              | crawl and index a public storefront      |
+| `pnpm --filter @bitc/rag probe -- "question"` | show what the retriever returns          |
+| `pnpm evals run`                              | run the golden set, print the report     |
+| `pnpm evals diff --model K --against K2`      | compare two models case by case          |
 
 ---
 
@@ -99,10 +106,10 @@ packages/core      env, redacting logger, errors, identifiers
 packages/db        Drizzle schema, migrations, RLS, withTenant()
 packages/models    chat / embedding / reranker provider abstraction
 packages/agent     tool-calling loop, six tools, both grounding gates
-packages/rag       chunking, ingestion, hybrid retrieval            (Phase 2)
+packages/rag       chunking, ingestion, hybrid retrieval, gap report
 packages/shopify   read-only store interface; mock now, Admin GraphQL in Phase 4
 packages/channels  message envelope and channel adapters            (Phase 6)
-packages/evals     eval harness and golden sets                     (Phase 2)
+packages/evals     eval harness, golden sets, baselines, model diff
 ```
 
 Internal packages are consumed as TypeScript source — there is no build step for

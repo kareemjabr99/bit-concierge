@@ -61,3 +61,90 @@ The grounding gate found a fact with no source, or a policy claim with no
 resolvable chunk id. The verdict is on `messages.grounding`. A rising
 suppression rate means the prompt or retrieval has degraded — it is a signal
 worth alerting on, not noise to filter. See ADR 0005.
+
+---
+
+## Swapping the chat model
+
+Assume this happens before the client demo. It is designed to cost an hour.
+Nothing in the agent loop or the eval runner branches on which tier a key
+belongs to — pacing and quota live in `ChatModelSpec.quota`, which only the
+harness reads — so this is a registry edit and a measurement, not a rewrite.
+
+**Before you start**, know which model the current baseline was recorded on:
+
+```bash
+ls packages/evals/baselines/
+```
+
+### 1. Put the key in place
+
+`GOOGLE_GENERATIVE_AI_API_KEY` in `.env.local`. Nothing else changes.
+
+> A paid key is what allows real customer data near the model at all. On the
+> free tier Google uses submitted content for training, which is why Phases 1–3
+> run on synthetic and public data only. See ADR 0006.
+
+### 2. Add the model to the registry
+
+`packages/models/src/chat.ts`, and a pricing row in `pricing.ts` with the date
+you checked the rate. A model with no pricing row reports as `unpriced`, which
+is honest; a model with a stale one reports a wrong number, which is not.
+
+Fill in `quota` from the provider's published limits. The eval runner paces
+itself from it, assuming three model calls per turn.
+
+### 3. Run the suite on the new model
+
+```bash
+pnpm evals run --suite en-core --model google:the-new-model
+```
+
+Query embeddings are cached, so this measures the chat model rather than the
+embedding endpoint's variance.
+
+### 4. Diff it against the baseline
+
+```bash
+pnpm evals diff --suite en-core --model google:the-new-model \
+                --against google:gemini-3.5-flash-lite
+```
+
+**Read the case list, not the totals.** A suppressed-correct answer and a
+passed fabrication move the pass count by the same amount in opposite
+directions. The diff prints which cases flipped and in which direction, and
+every citation-gate suppression that appeared or disappeared.
+
+### 5. Review every suppression that appeared
+
+This is the step that cannot be skipped. A gate that starts withholding correct
+answers on a new model looks identical in the totals to one that started
+catching real fabrications. For each new suppression, read
+`messages.grounding.rawModelText` and decide which it was:
+
+```sql
+SELECT c.external_id, m.grounding->'literal'->'misses', m.grounding->'citations'->'misses',
+       m.grounding->>'rawModelText'
+FROM messages m JOIN conversations c ON c.id = m.conversation_id
+WHERE c.external_id LIKE 'eval-%' AND m.grounding->>'status' = 'suppressed'
+ORDER BY m.created_at DESC;
+```
+
+The first eval run produced eight "fabricated literals" and every one was the
+gate withholding a correct answer — an anchored source URL, the word
+"available", and the store's own name, which is a four-digit number. Assume the
+gate is as likely to be wrong as the model until you have read the text.
+
+### 6. Re-baseline, and update the tenant
+
+```bash
+pnpm evals run --suite en-core --model google:the-new-model --baseline
+```
+
+Then set both `tenant_config.chat_model` **and** `production_chat_model`. Until
+`production_chat_model` matches the model a run was measured on,
+`meets_ship_bar` fails closed and says why — that is deliberate, and it is what
+stops a number from outliving the model that produced it.
+
+Keep the old baseline file. It is the record of what the previous model did,
+and the only way to answer "was this always like that?".

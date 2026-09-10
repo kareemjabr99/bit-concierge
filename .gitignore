@@ -15,4 +15,3 @@ coverage/
 .pnpm-store/
 .drizzle-generated/
 .embed-cache/
-baselines/

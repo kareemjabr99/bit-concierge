@@ -66,5 +66,21 @@ jobs:
 
       - run: pnpm test
 
-  # The eval suite lands in Phase 2 together with the golden set. It runs as a
-  # separate workflow because it needs a model key and costs money per run.
+  # The full eval suite needs a model key and provider quota, so it does not run
+  # on every pull request. What runs here is everything about it that does not:
+  # the case files parse, the golden set covers the categories section 9 names,
+  # and the recorded baselines are readable. The suite itself runs on a
+  # schedule and before a gate — see docs/runbook.md.
+  evals-deterministic:
+    name: eval suite integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Enable corepack
+        run: corepack enable
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run packages/evals
