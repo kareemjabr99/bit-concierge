@@ -33,6 +33,12 @@ export const makeTools = (ctx: TurnContext) => ({
         for (const h of hits)
           ctx.recorder.retrievalHits.push({ chunkId: h.chunkId, score: h.score, url: h.url });
         if (hits.length === 0) {
+          // The knowledge gap report is a commercial deliverable: the list of
+          // things this merchant's customers ask that their own site does not
+          // answer. Recording it must never fail a customer's turn.
+          await ctx.gaps
+            ?.record({ question: input.query, lang: input.lang ?? ctx.lang, bestScore: null })
+            .catch((error: unknown) => ctx.logger.warn('knowledge gap not recorded', { error }));
           return toolError(
             'no_results',
             'Nothing relevant was found. Do not guess — tell the customer you will check with the team and escalate.',

@@ -6,7 +6,7 @@ import type { TurnContext, TurnRecorder } from './context.ts';
 import { escalate } from './escalation.ts';
 import { checkCitations, sourcesFromToolCalls, type CitationVerdict } from './guard/citations.ts';
 import { checkGrounding, type GroundingVerdict } from './guard/grounding.ts';
-import type { KnowledgeSearcher } from './knowledge/types.ts';
+import type { GapRecorder, KnowledgeSearcher } from './knowledge/types.ts';
 import { detectLanguage } from './lang/detect.ts';
 import {
   getOrCreateConversation,
@@ -35,6 +35,8 @@ export interface TurnDeps {
   chat: ChatModelHandle;
   shopify: ShopifyReadClient;
   knowledge: KnowledgeSearcher;
+  /** Optional. Without it, unanswerable questions go unreported. */
+  gaps?: GapRecorder | undefined;
   logger: Logger;
   now?: () => Date;
   /** Wall-clock budget for the model loop. */
@@ -98,6 +100,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     config,
     shopify: deps.shopify,
     knowledge: deps.knowledge,
+    gaps: deps.gaps,
     recorder,
     logger,
     now,

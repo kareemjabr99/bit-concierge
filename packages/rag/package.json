@@ -10,6 +10,12 @@
     "@bitc/core": "workspace:*",
     "@bitc/db": "workspace:*",
     "@bitc/models": "workspace:*",
+    "@bitc/agent": "workspace:*",
+    "drizzle-orm": "0.45.2",
     "zod": "4.5.4"
+  },
+  "scripts": {
+    "ingest": "node --env-file-if-exists=../../.env.local scripts/ingest-storefront.ts",
+    "probe": "node --env-file-if-exists=../../.env.local scripts/probe.ts"
   }
 }

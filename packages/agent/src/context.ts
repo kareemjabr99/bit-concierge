@@ -1,6 +1,6 @@
 import type { Channel, Language, Logger, TenantId } from '@bitc/core';
 import type { ShopifyReadClient } from '@bitc/shopify';
-import type { KnowledgeSearcher } from './knowledge/types.ts';
+import type { GapRecorder, KnowledgeSearcher } from './knowledge/types.ts';
 
 export interface ShippingRule {
   country: string;
@@ -76,6 +76,8 @@ export interface TurnContext {
   config: TenantRuntimeConfig;
   shopify: ShopifyReadClient;
   knowledge: KnowledgeSearcher;
+  /** Optional: without it, unanswerable questions are simply not reported. */
+  gaps?: GapRecorder | undefined;
   recorder: TurnRecorder;
   logger: Logger;
   now: () => Date;

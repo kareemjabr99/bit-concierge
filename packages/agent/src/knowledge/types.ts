@@ -25,3 +25,12 @@ export interface KnowledgeQuery {
 export interface KnowledgeSearcher {
   search(query: KnowledgeQuery): Promise<KnowledgeHit[]>;
 }
+
+/**
+ * Where an unanswerable question goes. Implemented over the database in
+ * @bitc/rag; the agent only needs somewhere to put it, so the dependency
+ * points one way — agent declares, rag implements.
+ */
+export interface GapRecorder {
+  record(gap: { question: string; lang: Language; bestScore: number | null }): Promise<void>;
+}
