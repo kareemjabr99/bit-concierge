@@ -11,6 +11,11 @@
     "@bitc/db": "workspace:*",
     "@bitc/models": "workspace:*",
     "ai": "7.0.97",
-    "zod": "4.6.0"
+    "zod": "4.6.0",
+    "@bitc/shopify": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "postgres": "3.4.9"
   }
 }
