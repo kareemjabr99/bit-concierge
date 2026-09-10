@@ -14,7 +14,7 @@ Gemini tier; production needs a paid key under a data-processing agreement.
 ### A registry, keyed by string
 
 `tenant_config.chat_model` holds a registry key such as
-`google:gemini-3.8-flash`. `packages/models` is the only place a provider SDK is
+`google:gemini-3.5-flash-lite`. `packages/models` is the only place a provider SDK is
 imported. The registry maps a key to an implementation plus the metadata the
 rest of the system needs: context window, maximum output, per-token pricing for
 cost logging, and for embeddings the dimensions, storage column and operator
@@ -40,6 +40,36 @@ A model swap triggers a full re-run.
 The same applies to `embedding_model`: changing it changes retrieval, so
 retrieval hit rate and deflection from before the swap describe a different
 system.
+
+## The current model, and the swap that is coming
+
+**`google:gemini-3.5-flash-lite` is the development model _and_ the current
+ship-bar model.** Everything Phase 5 measures will be measured on it.
+
+`gemini-3.8-flash` is deliberately **not in the registry**. Its free tier is
+twenty requests a day; an eval run is 200–300 calls. A registry entry for a
+model nobody can afford to call is an invitation to burn a day's quota by
+accident, so the entry only comes back with a paid key.
+
+**A production model swap is a known open item.** It invalidates every eval
+number on record when it happens — `eval_runs` stamps `chat_model`,
+`embedding_model` and `reranker` on every row precisely so that no number can
+outlive the model that produced it, and `meets_ship_bar` fails closed when a
+run's model differs from `tenant_config.production_chat_model`.
+
+The swap is designed to cost an hour, not a day:
+
+- **Nothing in the agent loop or the eval runner branches on free-tier
+  behaviour.** Pacing and quota handling read `ChatModelSpec.quota`, which is
+  per-model configuration consumed by the harness. The loop never sees it.
+  Swapping keys is not an exercise in unpicking accommodations.
+- **Every eval result is stored against a baseline per model**, and the runner
+  can diff a second model against it — which cases flipped, and every
+  citation-gate suppression that appeared or disappeared. A count is not the
+  signal: a suppressed-correct answer and a passed-fabricated one move it the
+  same way.
+- **The procedure is written down** in `docs/runbook.md` while the constraints
+  are fresh, not reconstructed at swap time.
 
 ## Consequences
 

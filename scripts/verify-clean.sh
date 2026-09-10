@@ -41,6 +41,9 @@ mkdir -p "$HOME"
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pnpm install --frozen-lockfile
 
+echo "→ release-age margin on pinned dependencies"
+node "$ROOT/scripts/release-age.mjs"
+
 echo "→ fresh Postgres on port $PORT (throwaway volume)"
 docker rm -f -v "$CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$CONTAINER" \

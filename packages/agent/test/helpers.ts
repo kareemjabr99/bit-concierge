@@ -37,7 +37,7 @@ export const seedTestTenant = async (
          (tenant_id, brand_name, brand_description, brand_voice, chat_model, embedding_model,
           escalation_emails, policy_overrides, max_turns_per_conversation, max_tokens_per_conversation,
           max_tokens_per_day, max_escalations_per_hour)
-       VALUES ($1, '1886', 'a test label', 'calm', 'google:gemini-3.8-flash', 'google:gemini-embedding-001@1536',
+       VALUES ($1, '1886', 'a test label', 'calm', 'google:gemini-3.5-flash-lite', 'google:gemini-embedding-001@1536',
                '{ops@bitc.example}', $2::jsonb, $3, $4, $5, $6)`,
       [
         t!.id,
@@ -119,7 +119,7 @@ export const scripted = (steps: ScriptStep[]): MockLanguageModelV4 => {
 };
 
 export const depsWith = (model: MockLanguageModelV4): TurnDeps => ({
-  chat: { spec: CHAT_MODELS['google:gemini-3.8-flash']!, model } as ChatModelHandle,
+  chat: { spec: CHAT_MODELS['google:gemini-3.5-flash-lite']!, model } as ChatModelHandle,
   shopify: new MockShopifyClient(),
   knowledge: new FixtureKnowledge(),
   logger: createLogger({ level: 'error', write: () => {} }),

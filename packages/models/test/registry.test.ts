@@ -10,9 +10,9 @@ import {
 
 describe('model registry', () => {
   it('resolves a Google model from a key without exposing the provider', () => {
-    const h = resolveChatModel('google:gemini-3.8-flash', { googleApiKey: 'test-key' });
+    const h = resolveChatModel('google:gemini-3.5-flash-lite', { googleApiKey: 'test-key' });
     expect(h.spec.provider).toBe('google');
-    expect((h.model as { modelId: string }).modelId).toBe('gemini-3.8-flash');
+    expect((h.model as { modelId: string }).modelId).toBe('gemini-3.5-flash-lite');
   });
 
   it('resolves an Anthropic model the same way — the abstraction is real', () => {
@@ -22,7 +22,7 @@ describe('model registry', () => {
 
   it('refuses an unknown key and a missing credential', () => {
     expect(() => resolveChatModel('openai:gpt', {})).toThrow(/Unknown chat model/);
-    expect(() => resolveChatModel('google:gemini-3.8-flash', {})).toThrow(/not configured/);
+    expect(() => resolveChatModel('google:gemini-3.5-flash-lite', {})).toThrow(/not configured/);
   });
 
   it('has a pricing row for every registered model, even if unpriced', () => {
@@ -33,10 +33,13 @@ describe('model registry', () => {
 
   it('prices a known model and returns null for an unpriced one', () => {
     expect(
-      estimateCostUsd('google:gemini-3.8-flash', { inputTokens: 1_000_000, outputTokens: 0 }),
-    ).toBe(0.75);
+      estimateCostUsd('google:gemini-embedding-001@1536', {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+      }),
+    ).toBe(0.15);
     expect(
-      estimateCostUsd('google:gemini-3.1-pro-preview', { inputTokens: 10, outputTokens: 10 }),
+      estimateCostUsd('google:gemini-3.5-flash-lite', { inputTokens: 10, outputTokens: 10 }),
     ).toBeNull();
   });
 
@@ -44,6 +47,21 @@ describe('model registry', () => {
     const spec = EMBEDDING_MODELS['google:gemini-embedding-001@1536']!;
     expect(spec.dims).toBe(1536);
     expect(spec.key.endsWith(`@${spec.dims}`)).toBe(true);
+  });
+
+  it('does not register a model whose free quota cannot run the eval suite', () => {
+    // gemini-3.8-flash is twenty free-tier requests a day. A registry entry is
+    // an invitation to burn them; adding it back is the swap procedure.
+    expect('google:gemini-3.8-flash' in CHAT_MODELS).toBe(false);
+    expect(() => resolveChatModel('google:gemini-3.8-flash', { googleApiKey: 'k' })).toThrow(
+      /Unknown chat model/,
+    );
+  });
+
+  it('carries provider quota for the harness, not the loop', () => {
+    expect(CHAT_MODELS['google:gemini-3.5-flash-lite']?.quota?.requestsPerMinute).toBeGreaterThan(
+      0,
+    );
   });
 
   it('only knows the fusion reranker until Phase 2', () => {

@@ -22,6 +22,13 @@ export default tseslint.config(
     },
   },
   {
+    // Plain Node scripts: no TypeScript, no bundler, Node globals available.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly', Buffer: 'readonly', URL: 'readonly' },
+    },
+  },
+  {
     // The raw Drizzle handle bypasses row-level security. Only packages/db may hold it.
     files: ['apps/**/*.ts', 'packages/!(db)/**/*.ts'],
     rules: {

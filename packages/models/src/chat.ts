@@ -8,7 +8,7 @@ import { BitcError } from '@bitc/core';
 export type ChatProvider = 'google' | 'anthropic';
 
 export interface ChatModelSpec {
-  /** Registry key, e.g. "google:gemini-3.8-flash". Stored in tenant_config.chat_model. */
+  /** Registry key, e.g. "google:gemini-3.5-flash-lite". Stored in tenant_config.chat_model. */
   key: string;
   provider: ChatProvider;
   modelId: string;
@@ -16,6 +16,13 @@ export interface ChatModelSpec {
   maxOutputTokens: number;
   /** Provider-side reasoning effort, where the model supports it. */
   thinking?: 'minimal' | 'low' | 'medium' | 'high';
+  /**
+   * Provider quota, for harness-side pacing. The agent loop never reads this:
+   * an eval runner or a CLI transcript paces itself from here, so swapping to
+   * a paid key is a registry edit and nothing else.
+   * See docs/adr/0006-model-abstraction.md.
+   */
+  quota?: { requestsPerMinute?: number; requestsPerDay?: number };
 }
 
 export interface ChatModelHandle {
@@ -33,22 +40,6 @@ export interface ProviderCredentials {
  * registry key and an AI SDK LanguageModel. See docs/adr/0006-model-abstraction.md.
  */
 export const CHAT_MODELS: Record<string, ChatModelSpec> = {
-  'google:gemini-3.8-flash': {
-    key: 'google:gemini-3.8-flash',
-    provider: 'google',
-    modelId: 'gemini-3.8-flash',
-    contextTokens: 1_000_000,
-    maxOutputTokens: 8_192,
-    thinking: 'low',
-  },
-  'google:gemini-3.5-flash-lite': {
-    key: 'google:gemini-3.5-flash-lite',
-    provider: 'google',
-    modelId: 'gemini-3.5-flash-lite',
-    contextTokens: 1_000_000,
-    maxOutputTokens: 8_192,
-    thinking: 'minimal',
-  },
   'google:gemini-3.1-pro-preview': {
     key: 'google:gemini-3.1-pro-preview',
     provider: 'google',
@@ -57,9 +48,19 @@ export const CHAT_MODELS: Record<string, ChatModelSpec> = {
     maxOutputTokens: 16_384,
     thinking: 'medium',
   },
-  // Development models. gemini-3.8-flash's free tier is twenty requests a
-  // day; these have quota to iterate against. Never the ship-bar model —
-  // ADR 0006 voids every eval number on a model swap.
+  // The development AND current ship-bar model. gemini-3.8-flash is absent on
+  // purpose: twenty free-tier requests a day cannot run a 200-call eval suite,
+  // and a registry entry is an invitation to burn a day's quota by accident.
+  // Adding a paid model back is the swap procedure in docs/runbook.md.
+  'google:gemini-3.5-flash-lite': {
+    key: 'google:gemini-3.5-flash-lite',
+    provider: 'google',
+    modelId: 'gemini-3.5-flash-lite',
+    contextTokens: 1_000_000,
+    maxOutputTokens: 8_192,
+    thinking: 'minimal',
+    quota: { requestsPerMinute: 15 },
+  },
   'google:gemini-3.6-flash': {
     key: 'google:gemini-3.6-flash',
     provider: 'google',

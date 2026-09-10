@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@bitc/core": "workspace:*",
-    "zod": "4.6.0"
+    "zod": "4.5.4"
   }
 }

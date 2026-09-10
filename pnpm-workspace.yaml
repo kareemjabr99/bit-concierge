@@ -9,12 +9,13 @@ allowBuilds:
 
 # Supply-chain policy. See docs/adr/0009-supply-chain.md.
 #
-# minimumReleaseAge is pnpm's default since v11, written down so the policy
-# does not depend on which pnpm a machine happens to run.
+# Three days, not pnpm's 1440-minute default: it lets a hotfix chain settle
+# and covers compromises that take longer than a day to detect. The tradeoff
+# inverts in production — see docs/adr/0009-supply-chain.md.
 #
 # Strict mode is the part that matters: without it, an exact pin to a version
 # younger than the floor is installed anyway and pnpm quietly appends it to
 # minimumReleaseAgeExclude — which is how a lockfile CI rejects got committed
 # on 2026-09-10. With it, resolution fails and no lockfile is written.
-minimumReleaseAge: 1440
+minimumReleaseAge: 4320
 minimumReleaseAgeStrict: true

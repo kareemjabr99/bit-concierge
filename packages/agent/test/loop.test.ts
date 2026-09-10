@@ -73,7 +73,7 @@ describe('agent turn', () => {
       [conv],
     );
     expect(rows.map((x) => x.role)).toEqual(['user', 'assistant']);
-    expect(rows[1]?.model).toBe('google:gemini-3.8-flash');
+    expect(rows[1]?.model).toBe('google:gemini-3.5-flash-lite');
     expect(rows[1]?.prompt_tokens).toBe(200);
 
     const [usage] = await sql.unsafe<{ prompt_tokens: string; llm_calls: number }[]>(

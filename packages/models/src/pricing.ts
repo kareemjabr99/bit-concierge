@@ -15,12 +15,8 @@ export interface Pricing {
 
 export const PRICING: Record<string, Pricing | null> = {
   // Introductory rate through 31 Dec 2026, per Google's pricing page.
-  'google:gemini-3.8-flash': {
-    inputPer1M: 0.75,
-    outputPer1M: 3.75,
-    checkedAt: '2026-09-10',
-    note: 'introductory to 2026-12-31',
-  },
+  // Free tier. Priced null rather than zero: cost reporting shows
+  // "unpriced", which is honest, and a paid swap fills this in.
   'google:gemini-3.5-flash-lite': null,
   'google:gemini-3.6-flash': null,
   'google:gemini-3.1-pro-preview': null,

@@ -79,7 +79,7 @@ export const seedTenant = async (sql: postgres.Sql, label: string): Promise<Seed
 
   await sql.unsafe(
     `INSERT INTO tenant_config (tenant_id, brand_name, brand_voice, chat_model, embedding_model)
-     VALUES ($1, $2, 'calm', 'google:gemini-3.8-flash', 'google:gemini-embedding-001@1536')`,
+     VALUES ($1, $2, 'calm', 'google:gemini-3.5-flash-lite', 'google:gemini-embedding-001@1536')`,
     [id, label],
   );
   const [doc] = await sql.unsafe<{ id: string }[]>(

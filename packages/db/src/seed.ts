@@ -20,7 +20,10 @@ export const DEV_TENANT = {
   brandDescription: 'an elevated streetwear label from Riyadh',
   brandVoice:
     'Calm, direct, quietly confident. Speaks like a well-informed friend at the store, not a call centre',
-  chatModel: 'google:gemini-3.8-flash',
+  chatModel: 'google:gemini-3.5-flash-lite',
+  // The model the ship bar is measured on. Currently the same as chatModel;
+  // a paid swap changes both and voids every eval number on record.
+  productionChatModel: 'google:gemini-3.5-flash-lite',
   embeddingModel: 'google:gemini-embedding-001@1536',
   escalationEmails: ['escalations@bitc.example'],
   policyOverrides: {
@@ -85,14 +88,15 @@ try {
   await sql.unsafe(
     `INSERT INTO tenant_config
        (tenant_id, brand_name, brand_description, brand_voice, chat_model, embedding_model,
-        escalation_emails, policy_overrides)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        production_chat_model, escalation_emails, policy_overrides)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
      ON CONFLICT (tenant_id) DO UPDATE SET
        brand_name = EXCLUDED.brand_name,
        brand_description = EXCLUDED.brand_description,
        brand_voice = EXCLUDED.brand_voice,
        chat_model = EXCLUDED.chat_model,
        embedding_model = EXCLUDED.embedding_model,
+       production_chat_model = EXCLUDED.production_chat_model,
        escalation_emails = EXCLUDED.escalation_emails,
        policy_overrides = EXCLUDED.policy_overrides,
        updated_at = now()`,
@@ -103,6 +107,7 @@ try {
       DEV_TENANT.brandVoice,
       DEV_TENANT.chatModel,
       DEV_TENANT.embeddingModel,
+      DEV_TENANT.productionChatModel,
       DEV_TENANT.escalationEmails as unknown as string[],
       JSON.stringify(DEV_TENANT.policyOverrides),
     ],

@@ -53,7 +53,7 @@ export const tenantConfig = pgTable(
       .notNull()
       .default(sql`'{web}'`),
 
-    /** Registry keys, e.g. "google:gemini-3.8-flash". See @bitc/models. */
+    /** Registry keys, e.g. "google:gemini-3.5-flash-lite". See @bitc/models. */
     chatModel: text('chat_model').notNull(),
     embeddingModel: text('embedding_model').notNull(),
     reranker: text('reranker').notNull().default('fusion'),

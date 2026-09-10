@@ -66,11 +66,14 @@ pnpm --filter @bitc/cli chat -- --debug
 it differs from what was delivered, tokens and latency. `/new` starts a fresh
 conversation, `/quit` leaves.
 
-Piping a transcript in works too — add `--pace 8` to stay under the free
-tier's ceiling, and `--model google:gemini-3.5-flash-lite` to iterate on a
-model with quota. **The free tier on `gemini-3.8-flash` is twenty requests a
-day.** The tenant's configured model is unchanged by `--model`; the header
-says which one you are talking to.
+Piping a transcript in works too — add `--pace 8` to stay inside the free
+tier's per-minute ceiling. `--model` overrides the tenant's model for the
+harness only; the header says which one you are talking to.
+
+The model is **`gemini-3.5-flash-lite`**, on the free tier, for development and
+for the ship bar alike. `gemini-3.8-flash` is not in the registry: twenty free
+requests a day cannot run an eval suite. See
+[ADR 0006](docs/adr/0006-model-abstraction.md).
 
 | Command                | Does                                     |
 | ---------------------- | ---------------------------------------- |
