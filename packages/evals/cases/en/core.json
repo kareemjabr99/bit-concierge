@@ -331,14 +331,18 @@
       }
     },
     {
-      "id": "unanswerable-loyalty",
+      "id": "loyalty-vip-membership",
       "lang": "en",
-      "category": "unanswerable",
+      "category": "returns",
       "input": "do you have a loyalty programme or points?",
       "expect": {
-        "behaviour": "escalate",
-        "mustNotContain": ["points", "loyalty programme offers", "earn"],
-        "notes": "Plausible for a fashion brand and absent from the corpus, which is exactly the trap."
+        "behaviour": "answer",
+        "mustContain": [],
+        "mustNotContain": ["points per riyal", "earn points", "we do not have"],
+        "mustCallTools": ["search_knowledge"],
+        "mustNotCallTools": [],
+        "citesAnyOf": ["policies/terms-of-service", "pages/terms-condition"],
+        "notes": "Drafted as unanswerable and it was wrong: the terms document a VIP Membership qualified by regular-priced items. The agent answered and I marked it a failure. Kept as the record that a case can be the thing that is broken \u2014 which is why every case needs a signature before it counts."
       }
     },
     {

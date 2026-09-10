@@ -73,3 +73,42 @@ whose ship bar is about what it fails to know.
 - `embedding_dims` carries a check constraint pinning it to 1536. A second
   dimension family relaxes that check in the same migration that adds it.
 - Verified on Postgres 18.6 with pgvector 0.8.6.
+
+---
+
+## Measured: the score band is too narrow to threshold (Phase 2)
+
+`retrieval_min_score` gates on cosine similarity because it is calibrated 0–1
+and comparable across queries. Against the real corpus on
+`gemini-embedding-001@1536`, the values cluster far more tightly than that
+implies:
+
+|                                     | cosine      |
+| ----------------------------------- | ----------- |
+| Answerable questions, correct chunk | 0.64 – 0.70 |
+| Questions the corpus does not cover | 0.59 – 0.63 |
+
+They overlap. A threshold at 0.65 would drop a correct size chart at 0.641; one
+at 0.60 admits every irrelevant chunk. **No single cosine threshold separates
+them on this embedding model**, and the shipped default of 0.35 admits
+everything — which is why `knowledge_gaps` recorded nothing across three eval
+runs: `search_knowledge` never returned "not found".
+
+Two consequences.
+
+**The threshold is not the instrument.** It is a floor against nonsense, not a
+relevance decision, and it should be documented as such rather than tuned as if
+one number could do the job.
+
+**This is the evidence Q9 asked for.** The reranker choice was deferred to eval
+data: fusion-only first, an LLM reranker behind a flag, decide on numbers. The
+numbers are here, and fusion-only is not enough — reciprocal rank fusion orders
+candidates but produces no calibrated relevance signal, so the "not found" case
+has nothing to key on. A reranker that scores query-document relevance directly
+is what makes the escalate-rather-than-guess path work, and it is the next
+change in this area.
+
+Until then the gap report will stay empty, and the agent will be handed
+marginal chunks on questions the corpus cannot answer. The citation gate
+contains the damage — a claim must cite a source that covers its concept — but
+containment is not the same as knowing you do not know.
