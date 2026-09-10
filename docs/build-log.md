@@ -45,6 +45,15 @@ out rather than absorbed, because "how long does a phase like this take" and
   OAuth — that work moved to Phase 4 where it belongs, and Phase 0 reduced to
   foundation only.
 
+### Follow-up — CI failure investigation (same day)
+
+**Wall clock: 0.25 h** (20:13 – 20:28 UTC)
+
+First CI run red on `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`. Root-caused to
+non-strict resolution plus a verification cache outside the repo (ADR 0009);
+fixed with strict mode, an explicit floor, and `pnpm verify:clean`. Logged
+separately from Phase 1 so Phase 1's hours stay honest.
+
 **Estimate accuracy so far: Phase 0 estimated 2 d, actual ~1 h.** The estimate
 was wrong about scope, not about pace. Treat later phase estimates with the same
 suspicion until Phase 2 gives a second data point.
