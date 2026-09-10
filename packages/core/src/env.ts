@@ -30,6 +30,11 @@ const encryption = z.object({
   ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
 });
 
+const security = z.object({
+  // Development falls back to a fixed salt with a warning; production must set it.
+  BLIND_INDEX_SALT: z.string().min(16).optional(),
+});
+
 const models = z.object({
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1, 'GOOGLE_GENERATIVE_AI_API_KEY is required'),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -48,12 +53,13 @@ const web = z.object({
     ),
 });
 
-const schemas = { base, migrator, encryption, models, web } as const;
+const schemas = { base, migrator, encryption, security, models, web } as const;
 
 export type EnvLayer = keyof typeof schemas;
 export type BaseEnv = z.infer<typeof base>;
 export type MigratorEnv = z.infer<typeof migrator>;
 export type EncryptionEnv = z.infer<typeof encryption>;
+export type SecurityEnv = z.infer<typeof security>;
 export type ModelsEnv = z.infer<typeof models>;
 export type WebEnv = z.infer<typeof web>;
 
@@ -61,6 +67,7 @@ interface EnvTypes {
   base: BaseEnv;
   migrator: MigratorEnv;
   encryption: EncryptionEnv;
+  security: SecurityEnv;
   models: ModelsEnv;
   web: WebEnv;
 }

@@ -24,12 +24,14 @@ echo "→ clean clone into $WORK"
 git clone --quiet "$ROOT" "$WORK/repo"
 cd "$WORK/repo"
 
-echo "→ fresh pnpm store and a fresh verification cache (no cached verdicts)"
-export XDG_CACHE_HOME="$WORK/cache"
-export XDG_DATA_HOME="$WORK/data"
-export XDG_STATE_HOME="$WORK/state"
-pnpm install --frozen-lockfile \
-  --store-dir "$WORK/store" --cache-dir "$WORK/cache" --state-dir "$WORK/state"
+echo "→ fresh HOME: fresh pnpm store, fresh verification cache, no cached verdicts"
+# pnpm caches "this lockfile passed policy" under ~/Library/Caches (macOS) or
+# ~/.cache (Linux) and reuses it on every install. No install flag bypasses
+# it; a fresh HOME does. corepack re-downloads pnpm into it, which is the point.
+export HOME="$WORK/home"
+mkdir -p "$HOME"
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+pnpm install --frozen-lockfile
 
 echo "→ fresh Postgres on port $PORT (throwaway volume)"
 docker rm -f -v "$CONTAINER" >/dev/null 2>&1 || true
