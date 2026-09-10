@@ -57,3 +57,38 @@ separately from Phase 1 so Phase 1's hours stay honest.
 **Estimate accuracy so far: Phase 0 estimated 2 d, actual ~1 h.** The estimate
 was wrong about scope, not about pace. Treat later phase estimates with the same
 suspicion until Phase 2 gives a second data point.
+
+---
+
+## Phase 1 — Core agent, mocked
+
+**Wall clock: 1.0 h** (2026-09-10, 20:22 – 21:21 UTC, through clean verification)
+
+| Activity                                                               | Hours    |
+| ---------------------------------------------------------------------- | -------- |
+| Model registry, mock store and fixtures, prompt template, both gates   | 0.18     |
+| Loop, six tools, identity gate, escalation, persistence, CLI           | 0.22     |
+| Scripted-model test suite and identity-gate suite (146 → 148 tests)    | 0.13     |
+| Real-model runs and the gate precision fixes they drove                | 0.22     |
+| Clean-clone verification, docs, plan revision                          | 0.07     |
+| **Incident — Docker daemon down again**                                | **0.02** |
+| **Incident — pnpm lockfile written without peer resolution**           | **0.05** |
+| **Incident — Gemini free-tier daily quota exhausted mid-verification** | **0.08** |
+
+### Notes
+
+- Four real-model false suppressions taught the citation gate more than the
+  scripted tests had: quoted tool values, paraphrased product names, source
+  links and vague timing words are all rules that exist because a transcript
+  showed the need. Each has the transcript sentence as its test.
+- The free tier on `gemini-3.8-flash` is twenty requests a day. That is a
+  Phase 2 planning fact, not an inconvenience: an eval run is 200–300 calls.
+- Two commits were rebuilt before pushing — one landed partial under a full
+  message when an edit script failed mid-way, one landed lint-red because the
+  gate only checked tests. Both gates now check everything and stop.
+- Phase 1 was estimated at 4 days. Actual 1.0 h. The estimate assumed the
+  scaffolding and integration time of a human-paced week; the pace is not the
+  point, the scope was right this time. Phase 2 is the first estimate made
+  with two data points behind it.
+
+**Estimate accuracy: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h.**
