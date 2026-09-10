@@ -92,3 +92,38 @@ suspicion until Phase 2 gives a second data point.
   with two data points behind it.
 
 **Estimate accuracy: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h.**
+
+---
+
+## Phase 2 — RAG and evals (partial)
+
+**Wall clock: 1.1 h** (2026-09-10, 22:31 – 23:37 UTC)
+
+| Activity                                                  | Hours |
+| --------------------------------------------------------- | ----- |
+| Supply-chain floor to three days, repin, registry change  | 0.12  |
+| Citation-gate adversarial suite and the rebuild it forced | 0.25  |
+| Corpus: crawl, HTML and table extraction, de-duplication  | 0.18  |
+| Chunking, ingestion, hybrid retrieval, knowledge gaps     | 0.22  |
+| Eval harness: runner, metrics, baselines, diff, report    | 0.20  |
+| Golden set (33 cases), runbook, CI, docs                  | 0.13  |
+
+### Notes
+
+- The adversarial suite paid for itself immediately: fabricated policies got
+  past four of the gate's five exemptions. The rebuild replaced all five with
+  one rule and cost nothing measurable in false suppressions.
+- The first eval run reported eight fabricated literals. **All eight were the
+  gate withholding correct answers** — an anchored source URL, the word
+  "available", and the store's own name, which is a four-digit number. That is
+  the single most valuable thing the harness has done so far, and it argues for
+  running it before trusting any gate metric.
+- Real content changed a fact the fixtures had wrong: the return window is
+  **7 days**, not 14.
+- Free-tier quota is the binding constraint on this phase: 100 embedding
+  requests a day and 15 chat requests a minute. The embedding cache and the
+  runner's pacing exist because of it, both harness-side.
+
+**Estimate accuracy: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d →
+1.1 h so far, and not finished.** Phase 2 is the first phase where the estimate
+is not simply too high: the remaining work is real and is listed at the gate.
