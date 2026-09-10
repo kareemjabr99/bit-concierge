@@ -11,7 +11,7 @@ import { MockShopifyClient } from '@bitc/shopify';
  * knowledge. Shows what the customer would see, and with --debug, what the
  * system did to produce it.
  *
- *   pnpm --filter @bitc/cli chat -- [--tenant pk_dev_1886] [--new] [--debug] [--pace 8]
+ *   pnpm --filter @bitc/cli chat -- [--tenant pk_dev_1886] [--new] [--debug] [--pace 8] [--model google:gemini-3.5-flash-lite]
  */
 const args = new Set(process.argv.slice(2));
 const flag = (name: string, fallback: string): string => {
@@ -41,7 +41,7 @@ if (!tenantId) {
   process.exit(1);
 }
 const config = await loadTenantConfig(tenantId);
-const chat = resolveChatModel(config.chatModel, {
+const chat = resolveChatModel(flag('--model', config.chatModel), {
   googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY,
   ...(models.ANTHROPIC_API_KEY ? { anthropicApiKey: models.ANTHROPIC_API_KEY } : {}),
 });

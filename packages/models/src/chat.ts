@@ -57,6 +57,17 @@ export const CHAT_MODELS: Record<string, ChatModelSpec> = {
     maxOutputTokens: 16_384,
     thinking: 'medium',
   },
+  // Development models. gemini-3.8-flash's free tier is twenty requests a
+  // day; these have quota to iterate against. Never the ship-bar model —
+  // ADR 0006 voids every eval number on a model swap.
+  'google:gemini-3.6-flash': {
+    key: 'google:gemini-3.6-flash',
+    provider: 'google',
+    modelId: 'gemini-3.6-flash',
+    contextTokens: 1_000_000,
+    maxOutputTokens: 8_192,
+    thinking: 'low',
+  },
   // Present to prove the abstraction. Unused in v1.
   'anthropic:claude-sonnet-5': {
     key: 'anthropic:claude-sonnet-5',

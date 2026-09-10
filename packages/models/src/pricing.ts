@@ -22,6 +22,7 @@ export const PRICING: Record<string, Pricing | null> = {
     note: 'introductory to 2026-12-31',
   },
   'google:gemini-3.5-flash-lite': null,
+  'google:gemini-3.6-flash': null,
   'google:gemini-3.1-pro-preview': null,
   'google:gemini-embedding-001@1536': { inputPer1M: 0.15, outputPer1M: 0, checkedAt: '2026-09-10' },
   'anthropic:claude-sonnet-5': null,
