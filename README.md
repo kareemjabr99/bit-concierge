@@ -9,8 +9,9 @@ tool call, not a retrieval.** Order, price and stock facts come from live
 Shopify calls. Policies, sizing and care come from retrieval. The two never
 cross, and a deterministic gate checks that before any reply is sent.
 
-> Status: **Phase 0 complete.** Foundation only — schema, migrations, tenant
-> isolation, CI. No agent, no retrieval, no Shopify connection yet.
+> Status: **Phase 1 complete.** The agent loop, six tools, both grounding
+> gates and a CLI harness — running against a synthetic store and a fixture
+> knowledge base. No real retrieval, no Shopify connection, English-first.
 
 ---
 
@@ -47,6 +48,23 @@ pnpm verify
 ```
 
 `pnpm verify` runs lint, typecheck and the full test suite. It is what CI runs.
+The suite creates and owns `bitconcierge_test`; it never touches the database
+in `DATABASE_URL`, so your seeded tenant and conversations survive it.
+
+## Talking to it
+
+Seed the development tenant once, then open the harness. It needs
+`GOOGLE_GENERATIVE_AI_API_KEY` in `.env.local` — synthetic data only on a
+free-tier key, see ADR 0006.
+
+```bash
+pnpm db:seed
+pnpm --filter @bitc/cli chat -- --debug
+```
+
+`--debug` shows every tool call, both gate verdicts, the raw model text when
+it differs from what was delivered, tokens and latency. `/new` starts a fresh
+conversation, `/quit` leaves.
 
 | Command                | Does                                     |
 | ---------------------- | ---------------------------------------- |
@@ -66,14 +84,14 @@ Two deployable processes, ten libraries.
 apps/web       Shopify embedded admin + widget chat API + webhooks  (Phase 3–4)
 apps/worker    pg-boss consumer: ingest, embed, re-index, escalate  (Phase 2)
 apps/widget    Shadow DOM storefront embed                          (Phase 3)
-apps/cli       conversation harness                                 (Phase 1)
+apps/cli       conversation harness
 
 packages/core      env, redacting logger, errors, identifiers
 packages/db        Drizzle schema, migrations, RLS, withTenant()
-packages/models    chat / embedding / reranker provider abstraction (Phase 1)
-packages/agent     tool-calling loop, six tools, grounding gate     (Phase 1)
+packages/models    chat / embedding / reranker provider abstraction
+packages/agent     tool-calling loop, six tools, both grounding gates
 packages/rag       chunking, ingestion, hybrid retrieval            (Phase 2)
-packages/shopify   Admin GraphQL client and mocks                   (Phase 1/4)
+packages/shopify   read-only store interface; mock now, Admin GraphQL in Phase 4
 packages/channels  message envelope and channel adapters            (Phase 6)
 packages/evals     eval harness and golden sets                     (Phase 2)
 ```
@@ -109,6 +127,17 @@ no values.
 through `redact()` — sensitive field names are replaced wholesale, and remaining
 strings have emails, phone numbers and long digit runs stripped. There is one
 write path and it cannot be bypassed by accident.
+
+**A fact the tools did not return cannot reach a customer.** Every reply
+passes a deterministic gate before delivery: order numbers, tracking
+references, URLs, prices, dates and stock claims must appear in that turn's
+tool results, and every policy sentence must cite the retrieved chunk it came
+from. A miss withholds the reply, records the verdict with the raw model text
+on `messages.grounding`, and escalates. See [ADR 0005](docs/adr/0005-grounding.md).
+
+**An order is never revealed on an order number alone.** Order number plus a
+matching email, compared in constant time, with a wrong email and a
+nonexistent order producing byte-identical results — asserted by a test.
 
 **Migrations cannot be edited after the fact.** Each is checksummed when
 applied; changing an applied migration fails the next run with an instruction to

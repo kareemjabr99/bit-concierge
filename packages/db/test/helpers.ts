@@ -1,22 +1,48 @@
 import postgres from 'postgres';
 import { up } from '../src/migrate.ts';
 
+/**
+ * The suite truncates tenants and drops the schema. It therefore owns a
+ * database of its own — bitconcierge_test by default — and never reads
+ * DATABASE_URL, so a developer's data cannot be on the receiving end.
+ * Override with TEST_DATABASE_URL_MIGRATOR / TEST_DATABASE_URL (CI does).
+ */
 export const ADMIN_URL =
-  process.env.DATABASE_URL_MIGRATOR ?? 'postgres://postgres:postgres@localhost:55432/bitconcierge';
+  process.env.TEST_DATABASE_URL_MIGRATOR ??
+  'postgres://postgres:postgres@localhost:55432/bitconcierge_test';
 
 /** The application role. Row-level security applies to it. */
 export const APP_URL =
-  process.env.DATABASE_URL ?? 'postgres://bitc_app_local:localdev@localhost:55432/bitconcierge';
+  process.env.TEST_DATABASE_URL ??
+  'postgres://bitc_app_local:localdev@localhost:55432/bitconcierge_test';
 
 export const admin = () => postgres(ADMIN_URL, { max: 1, onnotice: () => {} });
 export const app = () => postgres(APP_URL, { max: 1, onnotice: () => {} });
 
+const databaseName = (url: string): string => new URL(url).pathname.replace(/^\//, '');
+
+/** CREATE DATABASE cannot run inside the target; use the maintenance database. */
+const ensureDatabase = async (): Promise<void> => {
+  const name = databaseName(ADMIN_URL);
+  const maintenance = new URL(ADMIN_URL);
+  maintenance.pathname = '/postgres';
+  const sql = postgres(maintenance.toString(), { max: 1, onnotice: () => {} });
+  try {
+    const [exists] = await sql.unsafe(`SELECT 1 FROM pg_database WHERE datname = $1`, [name]);
+    if (!exists) await sql.unsafe(`CREATE DATABASE "${name}"`);
+  } finally {
+    await sql.end();
+  }
+};
+
 /**
- * Brings a database up to date and ensures the local login role exists.
- * Migrations create bitc_app as a NOLOGIN group role, which is right for a
- * managed database but cannot connect; locally we add a member that can.
+ * Creates the test database if needed, brings it up to date, and ensures the
+ * local login role exists. Migrations create bitc_app as a NOLOGIN group
+ * role, which is right for a managed database but cannot connect; locally we
+ * add a member that can.
  */
 export const prepareDatabase = async (): Promise<void> => {
+  await ensureDatabase();
   const sql = admin();
   try {
     await up(sql);
@@ -27,7 +53,7 @@ export const prepareDatabase = async (): Promise<void> => {
         END IF;
       END $$;
       GRANT bitc_app TO bitc_app_local;
-      GRANT CONNECT ON DATABASE bitconcierge TO bitc_app_local;
+      GRANT CONNECT ON DATABASE "${databaseName(ADMIN_URL)}" TO bitc_app_local;
     `);
   } finally {
     await sql.end();

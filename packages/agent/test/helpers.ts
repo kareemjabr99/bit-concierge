@@ -1,35 +1,17 @@
 import postgres from 'postgres';
 import { MockLanguageModelV4 } from 'ai/test';
-import { up } from '@bitc/db/migrate';
 import { asTenantId, createLogger, type TenantId } from '@bitc/core';
 import { CHAT_MODELS, type ChatModelHandle } from '@bitc/models';
 import { MockShopifyClient } from '@bitc/shopify';
+import { ADMIN_URL, APP_URL, prepareDatabase } from '../../db/test/helpers.ts';
 import { FixtureKnowledge, type TurnDeps } from '../src/index.ts';
 
-// Must be set before @bitc/db opens its lazy connection.
-process.env.DATABASE_URL ??= 'postgres://bitc_app_local:localdev@localhost:55432/bitconcierge';
-export const ADMIN_URL =
-  process.env.DATABASE_URL_MIGRATOR ?? 'postgres://postgres:postgres@localhost:55432/bitconcierge';
+// @bitc/db opens its connection lazily from DATABASE_URL. Tests must hit the
+// test database whatever the shell or CI has exported, so this is unconditional.
+process.env.DATABASE_URL = APP_URL;
 
+export { ADMIN_URL, prepareDatabase };
 export const admin = () => postgres(ADMIN_URL, { max: 1, onnotice: () => {} });
-
-export const prepareDatabase = async (): Promise<void> => {
-  const sql = admin();
-  try {
-    await up(sql);
-    await sql.unsafe(`
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bitc_app_local') THEN
-          CREATE USER bitc_app_local WITH PASSWORD 'localdev';
-        END IF;
-      END $$;
-      GRANT bitc_app TO bitc_app_local;
-      GRANT CONNECT ON DATABASE bitconcierge TO bitc_app_local;
-    `);
-  } finally {
-    await sql.end();
-  }
-};
 
 export interface TestTenantOptions {
   maxTurnsPerConversation?: number;
