@@ -160,6 +160,12 @@ fees, duties, cancellation, discounts. Three exemptions:
    our returns page (https://…/policies/returns)"_ after three correctly
    cited sentences and was withheld for it; the link is the attribution.
 
+**Escalation copy is system copy.** Once `escalate_to_human` succeeds, the
+customer receives the fixed hand-over message in their own language. The
+model's prose after handing over is kept on `messages.grounding.rawModelText`
+for audit and never delivered — on the real model it arrived in the wrong
+language and promised "soon".
+
 **Durations are always attributed.** "2–4 business days", "within 14 days",
 "خلال 3 أيام" — a timing statement in any sentence is cited, quoted verbatim
 from a tool result, or withheld, regardless of the exemptions above. This is

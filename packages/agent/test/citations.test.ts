@@ -106,6 +106,39 @@ describe('grounding gate — policy citations', () => {
     }
   });
 
+  it('accepts paraphrased product names — the Arabic order reply that was withheld', () => {
+    const order = {
+      ok: true,
+      order: {
+        payment_status: 'paid',
+        ship_to: 'Jeddah, SA',
+        items: [
+          { title: 'Najd Cargo Pant', variant: '32' },
+          { title: 'Desert Cap', variant: 'One size' },
+        ],
+      },
+    };
+    const v = checkCitations({
+      reply:
+        'الطلب مدفوع ويتضمن بنطال Najd Cargo (مقاس 32) وقبعة Desert (مقاس موحد)، وهو قيد التجهيز للشحن إلى جدة.',
+      retrieved: [],
+      searchCalled: false,
+      otherToolResults: [order],
+    });
+    expect(v.ok).toBe(true);
+  });
+
+  it('withholds a vague timing promise', () => {
+    for (const reply of [
+      'The hoodie will be back in stock soon.',
+      'راح يرجع المخزون قريباً.',
+      'We will ship it tomorrow.',
+    ]) {
+      const v = checkCitations({ reply, retrieved: [], searchCalled: false, otherToolResults: [] });
+      expect(v.ok, reply).toBe(false);
+    }
+  });
+
   it('still withholds an invented duration after a successful lookup', () => {
     const order = {
       ok: true,

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type postgres from 'postgres';
 import { disconnect } from '@bitc/db';
 import type { TenantId } from '@bitc/core';
-import { runTurn } from '../src/index.ts';
+import { runTurn, systemMessage } from '../src/index.ts';
 import {
   admin,
   depsWith,
@@ -178,6 +178,9 @@ describe('agent turn', () => {
     const r = await turn('your delivery guy was rude to me', model);
     expect(r.status).toBe('escalated');
     expect(r.recorder.escalation?.reason).toBe('complaint');
+    // Escalation copy is system copy, in the customer's language — never the model's prose.
+    expect(r.reply).toBe(systemMessage('escalated', 'en'));
+    expect(r.rawModelText).toContain('passed this to the team');
   });
 
   it('a fabricated order number is suppressed and escalated, never sent', async () => {

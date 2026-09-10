@@ -287,6 +287,18 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   });
   const grounding = { literal, citations };
 
+  // Escalation copy is system copy. The model's prose after handing over adds
+  // nothing a customer needs and can add a promise; it is kept for audit only.
+  if (recorder.escalation) {
+    return finish('escalated', systemMessage('escalated', lang, config.messages), {
+      usage,
+      steps,
+      modelKey,
+      grounding,
+      rawModelText: text,
+    });
+  }
+
   if (!literal.ok || !citations.ok) {
     logger.warn('reply suppressed by grounding gate', {
       literal: literal.misses,
@@ -306,6 +318,5 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   }
 
   const reply = citations.cleanReply || systemMessage('escalated', lang, config.messages);
-  const status: TurnResult['status'] = recorder.escalation ? 'escalated' : 'answered';
-  return finish(status, reply, { usage, steps, modelKey, grounding, rawModelText: text });
+  return finish('answered', reply, { usage, steps, modelKey, grounding, rawModelText: text });
 };

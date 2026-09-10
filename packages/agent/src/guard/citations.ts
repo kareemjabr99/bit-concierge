@@ -87,6 +87,13 @@ const collectFactValues = (value: unknown, out: Set<string>): void => {
     if (/^https?:\/\//i.test(value)) return;
     const norm = normalizeForMatch(value);
     if (norm.length >= 6) out.add(norm);
+    // A model paraphrases multi-word values — "Najd Cargo Pant" becomes
+    // "بنطال Najd Cargo". Any adjacent pair of the value's words still counts.
+    const words = norm.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
+    for (let i = 0; i + 1 < words.length; i += 1) {
+      const pair = `${words[i]} ${words[i + 1]}`;
+      if (pair.length >= 6) out.add(pair);
+    }
     return;
   }
   if (Array.isArray(value)) {
@@ -98,6 +105,10 @@ const collectFactValues = (value: unknown, out: Set<string>): void => {
       if (!NON_FACT_KEYS.has(k)) collectFactValues(v, out);
   }
 };
+
+// "soon", "tomorrow", "قريباً" — a timing promise with no number in it.
+const VAGUE_TIMING =
+  /\b(?:soon|shortly|asap|as soon as possible|tomorrow|tonight|this week|next week|in a few (?:days|hours)|within a few (?:days|hours))\b|قريباً|قريبا|بأقرب وقت|بكرة|بكره|الأسبوع القادم|الاسبوع القادم/iu;
 
 // "2–4 business days", "within 14 days", "خلال 3 أيام". A timing statement is
 // cited, quoted from a tool, or withheld — whatever else the sentence says.
@@ -129,7 +140,7 @@ export const checkCitations = ({
     return false;
   };
   const durationGrounded = (sentence: string): boolean => {
-    const found = sentence.match(DURATION);
+    const found = sentence.match(DURATION) ?? sentence.match(VAGUE_TIMING);
     return !found || factCorpus.includes(normalizeForMatch(found[0]));
   };
   const byUrl = new Map<string, string[]>();
