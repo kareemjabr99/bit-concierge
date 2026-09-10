@@ -142,6 +142,12 @@ importers:
       '@bitc/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@bitc/models':
+        specifier: workspace:*
+        version: link:../../packages/models
+      '@bitc/shopify':
+        specifier: workspace:*
+        version: link:../../packages/shopify
 
   apps/web:
     dependencies:
@@ -185,12 +191,22 @@ importers:
       '@bitc/models':
         specifier: workspace:*
         version: link:../models
+      '@bitc/shopify':
+        specifier: workspace:*
+        version: link:../shopify
       ai:
         specifier: 7.0.97
         version: 7.0.97(zod@4.6.0)
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(pg@8.23.0)(postgres@3.4.9)
       zod:
         specifier: 4.6.0
         version: 4.6.0
+    devDependencies:
+      postgres:
+        specifier: 3.4.9
+        version: 3.4.9
 
   packages/channels:
     dependencies:

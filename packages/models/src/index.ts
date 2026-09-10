@@ -1,2 +1,4 @@
-// Phase boundary: implemented in a later phase. See docs/adr/ and the plan.
-export {};
+export * from './chat.ts';
+export * from './embed.ts';
+export * from './rerank.ts';
+export * from './pricing.ts';
