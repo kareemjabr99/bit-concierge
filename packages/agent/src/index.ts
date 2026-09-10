@@ -1,2 +1,15 @@
-// Phase boundary: implemented in a later phase. See docs/adr/ and the plan.
-export {};
+export * from './context.ts';
+export * from './escalation.ts';
+export * from './guard/citations.ts';
+export * from './guard/grounding.ts';
+export * from './guard/normalize.ts';
+export * from './knowledge/fixture.ts';
+export * from './knowledge/types.ts';
+export * from './lang/detect.ts';
+export * from './loop.ts';
+export * from './persistence.ts';
+export * from './prompt/messages.ts';
+export * from './prompt/template.ts';
+export * from './tenant.ts';
+export * from './tools/identity-gate.ts';
+export * from './tools/index.ts';
