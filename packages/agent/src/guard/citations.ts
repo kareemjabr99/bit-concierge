@@ -19,10 +19,15 @@ const POLICY_TERMS_EN =
 const POLICY_TERMS_AR =
   /(?:إرجاع|ارجاع|استرجاع|استرداد|استبدال|تبديل|شحن|توصيل|ضمان|مقاس|مقاسات|قياس|عناية|غسيل|كوي|سياسة|مجاني|مجاناً|أيام|ايام|يوم|ساعة|ساعات|رسوم|تكلفة|جمارك|إلغاء|الغاء|خصم|كوبون)/;
 
+export interface RetrievedChunkRef {
+  chunkId: string;
+  url: string | null;
+}
+
 export interface CitationInput {
   reply: string;
-  /** Chunk ids search_knowledge returned this turn. */
-  retrievedChunkIds: string[];
+  /** What search_knowledge returned this turn: ids and their source pages. */
+  retrieved: RetrievedChunkRef[];
   searchCalled: boolean;
   /** Results of the non-knowledge tools this turn, for the order-fact exemption. */
   otherToolResults: unknown[];
@@ -63,6 +68,9 @@ const CONVERSATIONAL =
 const GROUNDED_LITERAL =
   /https?:\/\/\S+|#\s?[A-Za-z0-9-]{3,}|\b\d{4,}\b|\b(?=[A-Z0-9-]{8,}\b)(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+\b/g;
 
+const URL_IN_TEXT = /https?:\/\/[^\s<>()"'\]]+/gi;
+const trimUrl = (url: string): string => url.replace(/[.,;:!?)\]]+$/, '').toLowerCase();
+
 const isQuestion = (s: string): boolean => /[?؟]\s*$/.test(s.trim());
 const isPolicyClaim = (s: string): boolean => POLICY_TERMS_EN.test(s) || POLICY_TERMS_AR.test(s);
 const isConversational = (s: string): boolean => CONVERSATIONAL.test(s.trim());
@@ -77,11 +85,29 @@ export const stripCitations = (text: string): string =>
 
 export const checkCitations = ({
   reply,
-  retrievedChunkIds,
+  retrieved,
   searchCalled,
   otherToolResults,
 }: CitationInput): CitationVerdict => {
-  const known = new Set(retrievedChunkIds);
+  const known = new Set(retrieved.map((r) => r.chunkId));
+  const byUrl = new Map<string, string[]>();
+  for (const r of retrieved) {
+    if (!r.url) continue;
+    const key = trimUrl(r.url);
+    byUrl.set(key, [...(byUrl.get(key) ?? []), r.chunkId]);
+  }
+  // A link to the page a chunk came from attributes the sentence as well as a
+  // marker does — the model is pointing at its source.
+  const linkedChunks = (sentence: string): string[] =>
+    (sentence.match(URL_IN_TEXT) ?? [])
+      .map(trimUrl)
+      .flatMap((found) =>
+        [...byUrl.entries()]
+          .filter(
+            ([url]) => found === url || found.startsWith(`${url}#`) || found.startsWith(`${url}?`),
+          )
+          .flatMap(([, ids]) => ids),
+      );
   const factCorpus = normalizeForMatch(JSON.stringify(otherToolResults));
   const misses: CitationMiss[] = [];
   const cited = new Set<string>();
@@ -98,6 +124,12 @@ export const checkCitations = ({
     }
     if (markers.length > 0) continue;
     if (!isPolicyClaim(sentence) || isConversational(sentence)) continue;
+
+    const linked = linkedChunks(sentence);
+    if (linked.length > 0) {
+      for (const id of linked) cited.add(id);
+      continue;
+    }
 
     // Exempt when the sentence carries a literal another tool actually returned.
     const literals = sentence.match(GROUNDED_LITERAL) ?? [];

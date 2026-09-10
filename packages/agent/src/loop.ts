@@ -274,7 +274,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   });
   const citations = checkCitations({
     reply: text,
-    retrievedChunkIds: recorder.retrievalHits.map((h) => h.chunkId),
+    retrieved: recorder.retrievalHits.map((h) => ({ chunkId: h.chunkId, url: h.url })),
     searchCalled: knowledgeResults.length > 0,
     otherToolResults: otherResults,
   });
