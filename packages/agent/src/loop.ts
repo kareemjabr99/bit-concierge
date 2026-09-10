@@ -4,7 +4,7 @@ import { estimateCostUsd, providerOptionsFor, type ChatModelHandle } from '@bitc
 import type { ShopifyReadClient } from '@bitc/shopify';
 import type { TurnContext, TurnRecorder } from './context.ts';
 import { escalate } from './escalation.ts';
-import { checkCitations, type CitationVerdict } from './guard/citations.ts';
+import { checkCitations, sourcesFromToolCalls, type CitationVerdict } from './guard/citations.ts';
 import { checkGrounding, type GroundingVerdict } from './guard/grounding.ts';
 import type { KnowledgeSearcher } from './knowledge/types.ts';
 import { detectLanguage } from './lang/detect.ts';
@@ -268,12 +268,6 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   }
 
   // Both halves of the deterministic gate. ADR 0005.
-  const knowledgeResults = recorder.toolCalls
-    .filter((t) => t.name === 'search_knowledge')
-    .map((t) => t.output);
-  const otherResults = recorder.toolCalls
-    .filter((t) => t.name !== 'search_knowledge')
-    .map((t) => t.output);
   const literal = checkGrounding({
     reply: text,
     toolResults: recorder.toolCalls.map((t) => t.output),
@@ -281,9 +275,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   });
   const citations = checkCitations({
     reply: text,
-    retrieved: recorder.retrievalHits.map((h) => ({ chunkId: h.chunkId, url: h.url })),
-    searchCalled: knowledgeResults.length > 0,
-    otherToolResults: otherResults,
+    sources: sourcesFromToolCalls(recorder.toolCalls),
   });
   const grounding = { literal, citations };
 

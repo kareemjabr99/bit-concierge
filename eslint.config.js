@@ -7,7 +7,11 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     rules: {
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        // ignoreRestSiblings allows the omit idiom: `const { id: _id, ...rest } = x`.
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
       '@typescript-eslint/consistent-type-imports': 'error',
       // Packages run under plain `node file.ts` (strip-only). Syntax that needs
       // a transform, not a strip, is rejected here rather than at runtime.

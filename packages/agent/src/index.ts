@@ -1,6 +1,7 @@
 export * from './context.ts';
 export * from './escalation.ts';
 export * from './guard/citations.ts';
+export * from './guard/concepts.ts';
 export * from './guard/grounding.ts';
 export * from './guard/normalize.ts';
 export * from './knowledge/fixture.ts';

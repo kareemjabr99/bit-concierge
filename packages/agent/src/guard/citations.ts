@@ -1,44 +1,51 @@
 import { normalizeForMatch } from './normalize.ts';
+import { conceptsIn, type Concept } from './concepts.ts';
 
 /**
- * Half one, part two — policy-claim attribution. A sentence that states a
- * policy must carry the id of the retrieved chunk it came from, and that id
- * must be one search_knowledge actually returned this turn. A claim with no
- * resolvable id is suppressed and escalated, exactly like a literal miss.
+ * Half one, part two of the hallucination bar — attribution.
  *
- * Order facts are exempt: a policy-flavoured sentence that contains a literal
- * grounded in another tool's result ("your order #1886-2041 shipped on 8 Sep")
- * is a fact, not a policy, and needs no citation.
- * See docs/adr/0005-grounding.md.
+ * One rule, no exemptions:
+ *
+ *   A sentence that asserts something in a costly category must carry a
+ *   citation, and the cited source must cover every category the sentence
+ *   asserts.
+ *
+ * Both halves matter. The citation proves the claim came from somewhere; the
+ * concept check proves it came from somewhere *about that*. Citing the
+ * shipping page for a returns claim resolves, and is still rejected.
+ *
+ * There are no sentence-level exemptions — not for questions, offers, quoted
+ * tool values or embedded literals. An earlier version had five, and an
+ * adversarial suite got fabricated policies past four of them by wrapping them
+ * in something the gate trusted. See docs/adr/0005-grounding.md and
+ * packages/agent/test/citations-adversarial.test.ts.
  */
 
-export const CITATION_MARKER = /\[\[c:([A-Za-z0-9_-]+)\]\]/g;
+export const CITATION_MARKER = /\[\[c:([A-Za-z0-9_:#.-]+)\]\]/g;
 
-const POLICY_TERMS_EN =
-  /\b(?:return|returns|returned|refund|refunds|exchange|exchanges|ship|ships|shipping|shipped|deliver|delivery|delivered|warranty|guarantee|size|sizes|sizing|care|wash|iron|policy|policies|free|days|hours|business days|working days|cost|fee|fees|charge|charges|duties|customs|cancel|cancellation|discount|voucher|eligible)\b/i;
-const POLICY_TERMS_AR =
-  /(?:إرجاع|ارجاع|استرجاع|استرداد|استبدال|تبديل|شحن|توصيل|ضمان|مقاس|مقاسات|قياس|عناية|غسيل|كوي|سياسة|مجاني|مجاناً|أيام|ايام|يوم|ساعة|ساعات|رسوم|تكلفة|جمارك|إلغاء|الغاء|خصم|كوبون)/;
-
-export interface RetrievedChunkRef {
-  chunkId: string;
-  url: string | null;
+/** Anything the model is allowed to cite: a retrieved chunk or a tool result. */
+export interface CitableSource {
+  id: string;
+  /** Everything the source returned, as text. Scanned for the concepts it covers. */
+  text: string;
+  /** Source page, where there is one. A link to it attributes like a marker. */
+  url?: string | null;
 }
 
 export interface CitationInput {
   reply: string;
-  /** What search_knowledge returned this turn: ids and their source pages. */
-  retrieved: RetrievedChunkRef[];
-  searchCalled: boolean;
-  /** Results of the non-knowledge tools this turn, for the order-fact exemption. */
-  otherToolResults: unknown[];
+  sources: CitableSource[];
 }
 
-export type CitationMissReason = 'no_marker' | 'unknown_chunk' | 'no_retrieval';
+export type CitationMissReason = 'no_citation' | 'unknown_source' | 'source_mismatch';
 
 export interface CitationMiss {
   sentence: string;
   reason: CitationMissReason;
-  chunkId?: string;
+  /** Categories the sentence asserts that no cited source covers. */
+  concepts: Concept[];
+  /** The id that failed to resolve, for `unknown_source`. */
+  sourceId?: string;
 }
 
 export interface CitationVerdict {
@@ -50,108 +57,41 @@ export interface CitationVerdict {
 }
 
 const SENTENCE_END = /(?<=[.!?؟۔])\s+|\n+/;
+const URL_IN_TEXT = /https?:\/\/[^\s<>()"'\]]+/gi;
 
 // The prompt asks for the marker after the full stop; models also put it
-// before. Fold a trailing marker back into the sentence it belongs to so the
-// splitter never hands it to the next one.
-const MARKER_AFTER_STOP = /([.!?؟۔])((?:\s*\[\[c:[A-Za-z0-9_-]+\]\])+)/g;
+// before. Fold a trailing marker back into its own sentence so the splitter
+// never hands it to the next one.
+const MARKER_AFTER_STOP = /([.!?؟۔])((?:\s*\[\[c:[A-Za-z0-9_:#.-]+\]\])+)/g;
 const foldMarkers = (text: string): string =>
   text.replace(
     MARKER_AFTER_STOP,
     (_m, stop: string, markers: string) => ` ${markers.trim()}${stop}`,
   );
 
-// An offer or a pleasantry is not a claim. "I can check that for you" states
-// no policy even when it mentions one.
-const CONVERSATIONAL =
-  /^(?:i can|i'll|i will|i'd|let me|would you|want me|happy to|shall i|do you want|sure|of course|thanks|thank you|أقدر|خلني|خليني|تبغى|تبي|هل تريد|هل تبغى|أكيد|بكل سرور|شكرا|شكراً)(?![\p{L}\p{N}])/iu;
-const GROUNDED_LITERAL =
-  /https?:\/\/\S+|#\s?[A-Za-z0-9-]{3,}|\b\d{4,}\b|\b(?=[A-Z0-9-]{8,}\b)(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+\b/g;
-
-const URL_IN_TEXT = /https?:\/\/[^\s<>()"'\]]+/gi;
 const trimUrl = (url: string): string => url.replace(/[.,;:!?)\]]+$/, '').toLowerCase();
-
-const isQuestion = (s: string): boolean => /[?؟]\s*$/.test(s.trim());
-
-// Instructions to the model that ride along in tool results. Not facts.
-const NON_FACT_KEYS = new Set(['note', 'message', 'next']);
-
-/**
- * String values the other tools returned — carrier names, product titles,
- * statuses, published ranges. A sentence that quotes one is reporting a tool
- * result, not stating a policy. Short values ("paid") are left out because
- * they occur in ordinary prose.
- */
-const collectFactValues = (value: unknown, out: Set<string>): void => {
-  if (typeof value === 'string') {
-    if (/^https?:\/\//i.test(value)) return;
-    const norm = normalizeForMatch(value);
-    if (norm.length >= 6) out.add(norm);
-    // A model paraphrases multi-word values — "Najd Cargo Pant" becomes
-    // "بنطال Najd Cargo". Any adjacent pair of the value's words still counts.
-    const words = norm.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
-    for (let i = 0; i + 1 < words.length; i += 1) {
-      const pair = `${words[i]} ${words[i + 1]}`;
-      if (pair.length >= 6) out.add(pair);
-    }
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const v of value) collectFactValues(v, out);
-    return;
-  }
-  if (value && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value))
-      if (!NON_FACT_KEYS.has(k)) collectFactValues(v, out);
-  }
-};
-
-// "soon", "tomorrow", "قريباً" — a timing promise with no number in it.
-const VAGUE_TIMING =
-  /\b(?:soon|shortly|asap|as soon as possible|tomorrow|tonight|this week|next week|in a few (?:days|hours)|within a few (?:days|hours))\b|قريباً|قريبا|بأقرب وقت|بكرة|بكره|الأسبوع القادم|الاسبوع القادم/iu;
-
-// "2–4 business days", "within 14 days", "خلال 3 أيام". A timing statement is
-// cited, quoted from a tool, or withheld — whatever else the sentence says.
-const DURATION =
-  /(?:\d+\s*[–—-]\s*\d+|\b\d+)\s*(?:business\s|working\s)?(?:days?|hours?|weeks?)\b|\bwithin\s+\d+\b|(?:\d+\s*(?:إلى|-|–)\s*)?\d+\s*(?:أيام|يوم|ساعات|ساعة|أسابيع|أسبوع)|خلال\s+\d+/iu;
-const isPolicyClaim = (s: string): boolean => POLICY_TERMS_EN.test(s) || POLICY_TERMS_AR.test(s);
-const isConversational = (s: string): boolean => CONVERSATIONAL.test(s.trim());
 
 export const stripCitations = (text: string): string =>
   text
     .replace(CITATION_MARKER, '')
+    .replace(/\(\s*\)/g, '')
     .replace(/[ \t]+([.!?؟،,])/g, '$1')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +\n/g, '\n')
     .trim();
 
-export const checkCitations = ({
-  reply,
-  retrieved,
-  searchCalled,
-  otherToolResults,
-}: CitationInput): CitationVerdict => {
-  const known = new Set(retrieved.map((r) => r.chunkId));
-  const factValues = new Set<string>();
-  for (const result of otherToolResults) collectFactValues(result, factValues);
-  const quotesToolValue = (sentence: string): boolean => {
-    const norm = normalizeForMatch(sentence);
-    for (const v of factValues) if (norm.includes(v)) return true;
-    return false;
-  };
-  const durationGrounded = (sentence: string): boolean => {
-    const found = sentence.match(DURATION) ?? sentence.match(VAGUE_TIMING);
-    return !found || factCorpus.includes(normalizeForMatch(found[0]));
-  };
+export const checkCitations = ({ reply, sources }: CitationInput): CitationVerdict => {
+  const covers = new Map<string, Set<Concept>>();
   const byUrl = new Map<string, string[]>();
-  for (const r of retrieved) {
-    if (!r.url) continue;
-    const key = trimUrl(r.url);
-    byUrl.set(key, [...(byUrl.get(key) ?? []), r.chunkId]);
+  for (const source of sources) {
+    covers.set(source.id, conceptsIn(source.text));
+    if (!source.url) continue;
+    const key = trimUrl(source.url);
+    byUrl.set(key, [...(byUrl.get(key) ?? []), source.id]);
   }
-  // A link to the page a chunk came from attributes the sentence as well as a
-  // marker does — the model is pointing at its source.
-  const linkedChunks = (sentence: string): string[] =>
+
+  /** A link to a source's own page attributes the sentence, exactly as a marker does. */
+  const linkedIds = (sentence: string): string[] =>
     (sentence.match(URL_IN_TEXT) ?? [])
       .map(trimUrl)
       .flatMap((found) =>
@@ -161,46 +101,83 @@ export const checkCitations = ({
           )
           .flatMap(([, ids]) => ids),
       );
-  const factCorpus = normalizeForMatch(JSON.stringify(otherToolResults));
+
   const misses: CitationMiss[] = [];
   const cited = new Set<string>();
 
   for (const raw of foldMarkers(reply).split(SENTENCE_END)) {
     const sentence = raw.trim();
-    if (!sentence || isQuestion(sentence)) continue;
+    if (!sentence) continue;
 
+    const asserted = conceptsIn(sentence);
     const markers = [...sentence.matchAll(CITATION_MARKER)].map((m) => m[1]!);
-    for (const id of markers) {
-      if (known.has(id)) cited.add(id);
-      else
-        misses.push({ sentence: stripCitations(sentence), reason: 'unknown_chunk', chunkId: id });
+    const ids = [...new Set([...markers, ...linkedIds(sentence)])];
+
+    let unresolved = false;
+    for (const id of ids) {
+      if (covers.has(id)) cited.add(id);
+      else {
+        misses.push({
+          sentence: stripCitations(sentence),
+          reason: 'unknown_source',
+          concepts: [...asserted],
+          sourceId: id,
+        });
+        unresolved = true;
+      }
     }
-    if (markers.length > 0) continue;
-    if (!durationGrounded(sentence)) {
-      misses.push({ sentence, reason: searchCalled ? 'no_marker' : 'no_retrieval' });
+    if (asserted.size === 0 || unresolved) continue;
+
+    if (ids.length === 0) {
+      misses.push({
+        sentence: stripCitations(sentence),
+        reason: 'no_citation',
+        concepts: [...asserted],
+      });
       continue;
     }
-    if (!isPolicyClaim(sentence) || isConversational(sentence)) continue;
-    if (quotesToolValue(sentence)) continue;
 
-    const linked = linkedChunks(sentence);
-    if (linked.length > 0) {
-      for (const id of linked) cited.add(id);
-      continue;
+    const covered = new Set<Concept>();
+    for (const id of ids) for (const concept of covers.get(id) ?? []) covered.add(concept);
+    const uncovered = [...asserted].filter((concept) => !covered.has(concept));
+    if (uncovered.length > 0) {
+      misses.push({
+        sentence: stripCitations(sentence),
+        reason: 'source_mismatch',
+        concepts: uncovered,
+      });
     }
-
-    // Exempt when the sentence carries a literal another tool actually returned.
-    const literals = sentence.match(GROUNDED_LITERAL) ?? [];
-    const groundedElsewhere = literals.some((lit) => factCorpus.includes(normalizeForMatch(lit)));
-    if (groundedElsewhere) continue;
-
-    misses.push({ sentence, reason: searchCalled ? 'no_marker' : 'no_retrieval' });
   }
 
-  return {
-    ok: misses.length === 0,
-    cleanReply: stripCitations(reply),
-    cited: [...cited],
-    misses,
-  };
+  return { ok: misses.length === 0, cleanReply: stripCitations(reply), cited: [...cited], misses };
+};
+
+/** Builds the citable-source list from a turn's tool calls. */
+export const sourcesFromToolCalls = (
+  calls: { name: string; output: unknown }[],
+): CitableSource[] => {
+  const sources: CitableSource[] = [];
+  for (const call of calls) {
+    const output = call.output as {
+      ok?: boolean;
+      results?: { id: string; content: string; url: string | null }[];
+      id?: string;
+    };
+    if (output?.ok !== true) continue;
+    if (call.name === 'search_knowledge' && Array.isArray(output.results)) {
+      for (const hit of output.results) {
+        sources.push({ id: hit.id, text: normalizeForMatch(hit.content), url: hit.url });
+      }
+      continue;
+    }
+    if (typeof output.id === 'string') {
+      // `note` and `next` are instructions to the model, not facts about the
+      // store. Scanning them for concepts would let a tool vouch for itself.
+      // `note` and `next` are instructions to the model, not facts. `id` is the
+      // handle itself — "t:shipping" must not make a result vouch for shipping.
+      const { note: _note, next: _next, id: _id, ...facts } = output as Record<string, unknown>;
+      sources.push({ id: output.id, text: normalizeForMatch(JSON.stringify(facts)) });
+    }
+  }
+  return sources;
 };

@@ -206,7 +206,7 @@ describe('agent turn', () => {
     expect(r.status).toBe('suppressed');
     expect(r.grounding?.literal.ok).toBe(true);
     expect(r.grounding?.citations.ok).toBe(false);
-    expect(r.grounding?.citations.misses[0]?.reason).toBe('no_retrieval');
+    expect(r.grounding?.citations.misses[0]?.reason).toBe('no_citation');
   });
 
   it('out of stock: a stock claim backed by a live check passes', async () => {
