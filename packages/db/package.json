@@ -6,13 +6,15 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./unsafe": "./src/unsafe.ts"
+    "./unsafe": "./src/unsafe.ts",
+    "./migrate": "./src/migrate.ts"
   },
   "scripts": {
     "migrate": "node src/cli.ts up",
     "rollback": "node src/cli.ts down",
     "status": "node src/cli.ts status",
-    "reset": "node src/cli.ts reset"
+    "reset": "node src/cli.ts reset",
+    "seed": "node src/seed.ts"
   },
   "dependencies": {
     "@bitc/core": "workspace:*",

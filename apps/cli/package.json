@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "chat": "node src/chat.ts"
+    "chat": "node --env-file-if-exists=../../.env.local src/chat.ts"
   },
   "dependencies": {
-    "@bitc/core": "workspace:*",
     "@bitc/agent": "workspace:*",
-    "@bitc/db": "workspace:*"
+    "@bitc/core": "workspace:*",
+    "@bitc/db": "workspace:*",
+    "@bitc/models": "workspace:*",
+    "@bitc/shopify": "workspace:*"
   }
 }

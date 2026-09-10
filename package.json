@@ -18,7 +18,8 @@
     "db:rollback": "pnpm --filter @bitc/db run rollback",
     "db:reset": "pnpm --filter @bitc/db run reset",
     "verify": "pnpm lint && pnpm typecheck && pnpm test",
-    "verify:clean": "bash scripts/verify-clean.sh"
+    "verify:clean": "bash scripts/verify-clean.sh",
+    "db:seed": "pnpm --filter @bitc/db run seed"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
