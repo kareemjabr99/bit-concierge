@@ -27,7 +27,11 @@ let externalId = args.has('--new')
   ? `cli-${Date.now()}`
   : (process.env.BITC_CLI_SESSION ?? `cli-${Date.now()}`);
 
-const logger = createLogger({ level: debug ? 'info' : 'error' });
+// Structured logs go to stderr so the transcript on stdout stays readable.
+const logger = createLogger({
+  level: debug ? 'info' : 'error',
+  write: (line) => process.stderr.write(`${line}\n`),
+});
 const tenantId = await resolveTenantByWidgetKey(widgetKey);
 if (!tenantId) {
   console.error(`No active tenant for widget key "${widgetKey}". Run: pnpm db:seed`);
@@ -71,7 +75,8 @@ const show = (r: TurnResult): void => {
         ),
       );
     }
-    if (r.rawModelText && r.rawModelText !== r.reply) console.log(dim(`  raw   ${r.rawModelText}`));
+    if (r.rawModelText && (r.status !== 'answered' || r.grounding?.citations.cited.length))
+      console.log(dim(`  raw   ${r.rawModelText}`));
     console.log(
       dim(
         `  ${r.status}  ·  ${r.steps} steps  ·  ${r.usage.inputTokens}+${r.usage.outputTokens} tokens  ·  ${r.latencyMs}ms  ·  lang ${r.lang}`,
@@ -81,20 +86,35 @@ const show = (r: TurnResult): void => {
   console.log();
 };
 
-const rl = createInterface({ input: stdin, output: stdout });
+const interactive = Boolean(stdin.isTTY);
+const rl = createInterface({ input: stdin, output: stdout, terminal: interactive });
+rl.setPrompt(`${bold('you')}   `);
+const prompt = (): void => {
+  if (interactive) rl.prompt();
+};
+
+prompt();
 try {
-  for (;;) {
-    const line = (await rl.question(bold('you  ') + ' ')).trim();
-    if (!line) continue;
+  // The async iterator delivers every line in order and ends at EOF, so the
+  // same loop serves a person at a terminal and a transcript piped in.
+  for await (const raw of rl) {
+    const line = raw.trim();
+    if (!line) {
+      prompt();
+      continue;
+    }
+    if (!interactive) console.log(`${bold('you')}   ${line}`);
     if (line === '/quit') break;
     if (line === '/debug') {
       debug = !debug;
       console.log(dim(`debug ${debug ? 'on' : 'off'}`));
+      prompt();
       continue;
     }
     if (line === '/new') {
       externalId = `cli-${Date.now()}`;
       console.log(dim(`new session ${externalId}`));
+      prompt();
       continue;
     }
     try {
@@ -107,6 +127,7 @@ try {
     } catch (error) {
       console.error('turn failed:', error instanceof Error ? error.message : error);
     }
+    prompt();
   }
 } finally {
   rl.close();
