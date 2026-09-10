@@ -81,7 +81,12 @@ export const readEnv = <L extends EnvLayer>(
   layer: L,
   source: NodeJS.ProcessEnv = process.env,
 ): EnvTypes[L] => {
-  const result = schemas[layer].safeParse(source);
+  // A copied .env.example leaves optional keys as `KEY=` — an empty string,
+  // which means "unset" to a person and must mean it to the schema too.
+  const present = Object.fromEntries(
+    Object.entries(source).filter(([, value]) => value !== undefined && value !== ''),
+  );
+  const result = schemas[layer].safeParse(present);
   if (!result.success) {
     const detail = result.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)

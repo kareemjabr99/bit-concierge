@@ -8,6 +8,18 @@ describe('environment', () => {
     expect(env.LOG_LEVEL).toBe('info');
   });
 
+  it('treats blank values from a copied .env.example as unset', () => {
+    const env = readEnv('base', {
+      DATABASE_URL: 'postgres://localhost/x',
+      NODE_ENV: '',
+      LOG_LEVEL: '',
+    });
+    expect(env.NODE_ENV).toBe('development');
+    expect(env.LOG_LEVEL).toBe('info');
+    expect(readEnv('web', { PORT: '' }).PORT).toBe(8080);
+    expect(() => readEnv('base', { DATABASE_URL: '' })).toThrow(/DATABASE_URL/);
+  });
+
   it('reports every missing key at once, not just the first', () => {
     try {
       readEnv('encryption', {});
