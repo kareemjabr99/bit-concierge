@@ -216,6 +216,63 @@ That is one run of six on one model, not a rate. The false-suppression rate is
 a Phase 2 eval metric, measured against the golden set, and it is the number
 that decides whether any concept pattern needs narrowing.
 
+### One exemption, and what it took to earn it
+
+The section above says there are none. There is now exactly one, and the
+distance between those two statements is the point: it was added only after a
+102-case run showed the gate withholding the agent's **refusals and hand-offs**.
+
+Four of that run's six false suppressions, verbatim:
+
+| withheld sentence                                                                    | concept   |
+| ------------------------------------------------------------------------------------ | --------- |
+| "I cannot provide discount codes."                                                   | discounts |
+| "We do not currently have an active discount code available to share."               | discounts |
+| "Since it has been 8 days, I want to check with the team on this for you."           | timing    |
+| "I want to make sure we handle this correctly, so I will connect you with the team." | returns   |
+
+Every one is the agent doing the right thing. A sentence that declines, or says
+a human will follow up, **cannot mislead a customer into acting** — there is
+nothing in it to act on. That is the whole justification, and it is a different
+shape from the five exemptions that were removed: those asked the gate to trust
+a claim because of its _neighbours_; this one observes that there is no claim.
+
+Three conditions, all required:
+
+1. A decline or hand-off marker is present — "I cannot", "I will check", "we do
+   not have", "the team will", and Arabic equivalents.
+2. **The sentence grants nothing.** "you can", "you may", "is eligible", "we
+   offer", "are accepted", "is free". A grant is what makes a claim actionable,
+   and a sentence containing one is never exempt however it is wrapped.
+3. **Every duration in it is one the customer stated first.** The customer's
+   own message is passed in for this single purpose. It can never license a
+   _concept_ — only a number the customer already knew — because an attacker
+   echoing their own figure learns nothing.
+
+Adversarially tested, and these stay suppressed:
+
+- "I cannot process it myself, but you are eligible for a 90 day return." — grant
+- "We do not currently have that, but returns are free for 60 days." — grant
+- "Since it has been 90 days, I want to check with the team." — figure the
+  customer never mentioned
+
+### Read a gate metric with the raw text beside it
+
+Across two runs of the suite, **every single reported "fabricated literal" was
+the gate withholding a correct answer.** Eight in the first run — an anchored
+source URL, the word "available", and the store's own name, which is a
+four-digit number — and four more in the second, all real delivery dates
+written in prose rather than ISO.
+
+Zero were model fabrications.
+
+That is not an argument for a looser gate; suppression is the safe direction and
+every one of those replies escalated to a human. It is an argument about how the
+number is read. `hallucinationCount` is a count of _gate verdicts_, and a gate is
+at least as likely to be wrong as the model is. `messages.grounding.rawModelText`
+exists so that every verdict can be checked against what the model actually said,
+and `pnpm --filter @bitc/evals run adjudicate` prints exactly that.
+
 ### Known limit: attribution is not faithfulness
 
 A citation that resolves and covers the right concept can still misrepresent
