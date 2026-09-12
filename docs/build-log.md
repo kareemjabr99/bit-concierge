@@ -127,3 +127,36 @@ suspicion until Phase 2 gives a second data point.
 **Estimate accuracy: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d →
 1.1 h so far, and not finished.** Phase 2 is the first phase where the estimate
 is not simply too high: the remaining work is real and is listed at the gate.
+
+---
+
+## Phase 2 — completion pass
+
+**Wall clock: 3.2 h** (2026-09-12, 12:31 – 15:45 UTC)
+
+| Activity                                                          | Hours |
+| ----------------------------------------------------------------- | ----- |
+| LLM reranker, separation measurement, threshold migration         | 0.35  |
+| Golden set to 103 cases from the verified corpus                  | 0.45  |
+| Two full 103-case runs (≈50 min each, mostly waiting)             | 1.10  |
+| Adjudicating failures; two more gate false-positive classes fixed | 0.55  |
+| Fixture audit, corpus findings, reindex command, quota work       | 0.45  |
+| ADRs, runbook, docs                                               | 0.30  |
+
+### Notes
+
+- **Every reported "fabricated literal" across three runs — twelve of twelve —
+  was the gate withholding a correct answer.** None was a model fabrication.
+  That is the most useful thing the harness has produced, and it is an argument
+  about how the metric is read rather than about the gate being too strict:
+  suppression is the safe direction, and each one escalated to a human.
+- **Two of 103 drafted cases had wrong expectations**, both in the same
+  direction — assuming the corpus could not answer when it could. A systematic
+  bias, not bad luck, and the evidence for why Phase 5 client validation is not
+  optional.
+- The second full run hit a **500/day chat cap at case 62** and wrote a
+  baseline from it before I caught it. The runner now reports an incomplete run
+  and refuses to record a baseline from one. That failure mode was predictable
+  from the first wrong-baseline incident and I did not guard it in time.
+- Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 4.3 h
+  across two sittings, and still not closed.

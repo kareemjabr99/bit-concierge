@@ -125,4 +125,6 @@ export interface RunResult {
   /** False unless every gate passed, including the model-binding check. */
   meetsShipBar: boolean;
   shipBarNotes: string[];
+  /** Turns that never reached the model — a quota wall, not a quality signal. */
+  incompleteCases?: number;
 }

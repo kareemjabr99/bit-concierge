@@ -101,6 +101,26 @@ not per HTTP call, even though it batches up to 100 texts per request. The
 current corpus is 121 chunks, so a full backfill is 121 metered requests and
 needs pacing. See ADR 0006.
 
+## Quota, and what a run costs
+
+Free tier, measured 2026-09-12: **15 chat requests a minute, 500 a day** on
+`gemini-3.5-flash-lite`; embeddings metered per text at 100 a minute.
+
+A case costs about **8.2 model calls**, so the daily budget is roughly **60
+cold cases**. A full 103-case suite does not fit in one free-tier day.
+
+```bash
+# What a run will cost before you start it
+pnpm --filter @bitc/rag quota-probe -- --n 140     # embeddings only
+```
+
+If a run stops with `got error` on a block of consecutive cases, that is the
+daily cap, not a regression. The runner reports it as an incomplete run and
+`--baseline` refuses to record one.
+
+Caches make a re-run affordable: `.embed-cache/` and `.rerank-cache/` at the
+repo root. Delete them only when you intend to pay the full cost again.
+
 ## Swapping the chat model
 
 Assume this happens before the client demo. It is designed to cost an hour.

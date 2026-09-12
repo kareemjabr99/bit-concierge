@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig } from '@bitc/agent';
-import { cachedEmbedder, resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
+import {
+  cachedEmbedder,
+  cachedReranker,
+  resolveChatModel,
+  resolveEmbedder,
+  resolveReranker,
+} from '@bitc/models';
 import { PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
 import { MockShopifyClient } from '@bitc/shopify';
 import {
@@ -81,7 +87,13 @@ const build = async () => {
     resolveEmbedder(config.embeddingModel, { googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY }),
     { dir: process.env.BITC_EMBED_CACHE ?? join(HERE, '..', '..', '..', '.embed-cache') },
   );
-  const reranker = resolveReranker(arg('reranker', config.reranker), { model: chat.model });
+  // Cached like the embedder, and for a sharper reason: a model-backed reranker
+  // costs one chat request per search, and chat requests are the binding
+  // free-tier limit — 500 a day. See @bitc/models rerank-cache.ts.
+  const reranker = cachedReranker(
+    resolveReranker(arg('reranker', config.reranker), { model: chat.model }),
+    { dir: process.env.BITC_RERANK_CACHE ?? join(HERE, '..', '..', '..', '.rerank-cache') },
+  );
 
   return {
     tenantId: asTenantId(tenantId),
@@ -131,7 +143,12 @@ try {
     const out = arg('out');
     if (out) writeFileSync(out, `${markdown}\n`);
     await persistRun(tenantId, result);
-    if (has('baseline')) {
+    if (has('baseline') && (result.incompleteCases ?? 0) > 0) {
+      console.error(
+        `Refusing to record a baseline: ${result.incompleteCases} case(s) never reached the model.\n` +
+          'A baseline from an incomplete run makes the next diff meaningless. Re-run when quota allows.',
+      );
+    } else if (has('baseline')) {
       const path = writeBaseline(BASELINE_DIR, result);
       process.stderr.write(`baseline written: ${path}\n`);
     }

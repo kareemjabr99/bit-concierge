@@ -40,12 +40,13 @@ const gitSha = (): string => {
  * not the loop: a customer's turn must never be delayed because an eval suite
  * is what the quota was sized for.
  */
-const paced = (requestsPerMinute: number | undefined) => {
+const paced = (requestsPerMinute: number | undefined, callsPerTurn: number) => {
   if (!requestsPerMinute) return async (): Promise<void> => {};
-  // A turn is two model calls, three when a tool result sends it round again,
-  // and four once a model-backed reranker scores a retrieval. The first run
-  // paced for two and hit the per-minute ceiling twice.
-  const gapMs = Math.ceil((60_000 / requestsPerMinute) * 4);
+  // Pace from the measured cost of a turn, not a guess. Hitting the per-minute
+  // ceiling is not merely slow: the SDK retries three times, so every 429
+  // triples what that call takes out of the DAILY budget. Under-pacing is how
+  // the 12 Sep run spent 500 requests in 61 cases.
+  const gapMs = Math.ceil((60_000 / requestsPerMinute) * callsPerTurn);
   let previous = 0;
   return async (): Promise<void> => {
     const wait = previous + gapMs - Date.now();
@@ -225,7 +226,10 @@ export const shipBar = (
 
 export const runSuite = async (options: RunOptions): Promise<RunResult> => {
   const { tenantId, deps, cases } = options;
-  const wait = paced(deps.chat.spec.quota?.requestsPerMinute);
+  const wait = paced(
+    deps.chat.spec.quota?.requestsPerMinute,
+    deps.chat.spec.quota?.callsPerTurn ?? 4,
+  );
   const startedAt = new Date().toISOString();
   const outcomes: CaseOutcome[] = [];
 
@@ -264,6 +268,10 @@ export const runSuite = async (options: RunOptions): Promise<RunResult> => {
   }
 
   const metrics = metricsFor(outcomes);
+  // A turn that never reached the model is not a result. Counting those as
+  // failures makes a quota wall look like a quality collapse, and a baseline
+  // recorded from one is a trap for the next diff.
+  const quotaExhausted = outcomes.filter((o) => o.behaviour === 'error').length;
   const base = {
     suite: options.suite,
     tier: tierOf(cases),
@@ -276,7 +284,16 @@ export const runSuite = async (options: RunOptions): Promise<RunResult> => {
     outcomes,
   };
   const bar = shipBar(base, options.productionChatModel);
-  return { ...base, meetsShipBar: bar.meets, shipBarNotes: bar.notes };
+  const notes =
+    quotaExhausted > 0
+      ? [`${quotaExhausted} case(s) never reached the model — this run is incomplete`, ...bar.notes]
+      : bar.notes;
+  return {
+    ...base,
+    meetsShipBar: bar.meets && quotaExhausted === 0,
+    shipBarNotes: notes,
+    incompleteCases: quotaExhausted,
+  };
 };
 
 export const persistRun = async (tenantId: TenantId, result: RunResult): Promise<string> =>

@@ -22,7 +22,16 @@ export interface ChatModelSpec {
    * a paid key is a registry edit and nothing else.
    * See docs/adr/0006-model-abstraction.md.
    */
-  quota?: { requestsPerMinute?: number; requestsPerDay?: number };
+  quota?: {
+    requestsPerMinute?: number;
+    requestsPerDay?: number;
+    /**
+     * Model calls a single agent turn costs, measured rather than assumed:
+     * two or three for the loop, one per retrieval for a model-backed
+     * reranker, and three per call once a 429 sends the SDK into retries.
+     */
+    callsPerTurn?: number;
+  };
 }
 
 export interface ChatModelHandle {
@@ -59,7 +68,9 @@ export const CHAT_MODELS: Record<string, ChatModelSpec> = {
     contextTokens: 1_000_000,
     maxOutputTokens: 8_192,
     thinking: 'minimal',
-    quota: { requestsPerMinute: 15 },
+    // Measured 2026-09-12 against the free tier: 15/min, 500/day, and a
+    // 103-case suite consumed the daily budget in 61 cases — 8.2 calls each.
+    quota: { requestsPerMinute: 15, requestsPerDay: 500, callsPerTurn: 9 },
   },
   'google:gemini-3.6-flash': {
     key: 'google:gemini-3.6-flash',

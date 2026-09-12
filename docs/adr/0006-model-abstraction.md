@@ -71,6 +71,37 @@ The swap is designed to cost an hour, not a day:
 - **The procedure is written down** in `docs/runbook.md` while the constraints
   are fresh, not reconstructed at swap time.
 
+## Measured free-tier ceilings
+
+Taken from the provider's own quota errors on 2026-09-12, not from
+documentation and not inferred:
+
+|                              | limit                                              |
+| ---------------------------- | -------------------------------------------------- |
+| `gemini-3.5-flash-lite` chat | **15 requests/minute, 500/day**                    |
+| `gemini-embedding-001`       | **100 requests/minute**, metered per text embedded |
+
+Two things follow, and both shaped the harness.
+
+**A cold 103-case suite does not fit in a free-tier day.** Measured: the run of
+12 Sep consumed the full 500 in **61 cases — 8.2 model calls each**. A turn is
+two or three loop calls plus one per retrieval for a model-backed reranker, and
+then the multiplier that matters: **a 429 costs three requests, because the SDK
+retries**. Under-pacing does not merely slow a run down, it triples what each
+call takes out of the daily budget. Pacing is now derived from
+`quota.callsPerTurn`, which is measured rather than guessed.
+
+**So the caches are not a convenience.** Query embeddings and reranker verdicts
+are both cached to disk by the harness, which removes them from every repeat
+run and brings a re-run back inside the daily budget. The agent resolves both
+from the registry and sees neither, so none of this survives a swap to a paid
+key.
+
+What this means for planning: **one cold full run per day, or a paid key.**
+Phase 5 adds an Arabic corpus and an Arabic suite, both cold, and that is the
+point at which the free tier stops being workable — which is worth knowing now
+rather than during the demo build.
+
 ## Consequences
 
 - Adding a provider means a registry entry and a pricing row. No call site
