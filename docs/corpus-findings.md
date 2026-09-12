@@ -51,7 +51,7 @@ around**, because these are exactly where customer questions live.
 | ----------------------------------- | ---------------------------------------------------------------------- |
 | `/pages/faq-1`                      | the FAQ itself — questions are visible only inside a section JSON blob |
 | `/pages/return-exchange`            | the online returns portal                                              |
-| `/pages/stores`                     | store addresses; the page extracts to "Loading store locator…"         |
+| `/pages/stores`                     | the branch locator; the page extracts to "Loading store locator…"      |
 | `/pages/order-tracking-form`        | the tracking form                                                      |
 | several `/pages/<garment>-<season>` | size charts for specific garments                                      |
 
@@ -59,9 +59,21 @@ The ingestion script refuses to index a page whose content is a heading and
 nothing else. Indexing one would be worse than skipping it: it would match the
 query and answer nothing.
 
-Consequences already visible in the golden set — `unanswerable-store-locations`,
-`unanswerable-opening-hours` and `shipping-track-how` all expect an escalation
-purely because the content is unreachable, not because the store has no answer.
+**CORRECTED 2026-09-12.** An earlier version of this document claimed store
+addresses were unreachable. They are not — `/policies/contact-information`
+carries the registered address, phone number and care email:
+
+> Trade name: 1886 fashion · Phone: 920021886 · Email: Care@1886fashion.com ·
+> Physical address: 1886 fashion, Al-Marwa, Al-Fursan st, Riyadh 14722, Saudi Arabia
+
+Only the _branch locator_ is unreachable. The golden-set case that asserted
+otherwise was wrong, the agent answered it correctly and cited the right
+document, and I scored it a failure — the second of 102 drafted cases to be
+wrong in exactly that direction.
+
+Consequences still visible in the golden set: `unanswerable-opening-hours` and
+`shipping-track-how` expect an escalation because the content is unreachable,
+not because the store has no answer.
 
 **What would close them:** plain-text exports, dropped in `corpus/1886/clean/`.
 The four policy documents are already offered; the FAQ is the one that matters

@@ -35,6 +35,13 @@ export interface CitableSource {
 export interface CitationInput {
   reply: string;
   sources: CitableSource[];
+  /**
+   * What the customer wrote this turn. Used for one narrow purpose: a duration
+   * the customer stated themselves ("it has been 8 days") is not a figure the
+   * assistant produced, so echoing it inside a hand-off is not a claim. It can
+   * never license a concept — only a number the customer already knew.
+   */
+  customerText?: string | undefined;
 }
 
 export type CitationMissReason = 'no_citation' | 'unknown_source' | 'source_mismatch';
@@ -57,6 +64,39 @@ export interface CitationVerdict {
 }
 
 const SENTENCE_END = /(?<=[.!?؟۔])\s+|\n+/;
+
+/**
+ * The one exemption, and the four transcripts that forced it.
+ *
+ * The gate was withholding the agent's REFUSALS and HAND-OFFS — sentences that
+ * make no claim a customer could act on. From the 102-case run:
+ *
+ *   "I cannot provide discount codes."                           [discounts]
+ *   "We do not currently have an active discount code to share." [discounts]
+ *   "Since it has been 8 days, I want to check with the team."   [timing]
+ *   "I will connect you with the team to check how to proceed."  [returns]
+ *
+ * Four of that run's six false suppressions. A sentence that declines, or says
+ * a human will follow up, cannot mislead anyone into acting: there is nothing
+ * in it to act on.
+ *
+ * Narrow on purpose, and adversarially tested. It applies only when a decline
+ * or hand-off marker is present AND the sentence grants nothing. A grant is
+ * what makes a claim actionable — "you can", "you may", "is eligible", "we
+ * offer" — and a sentence containing one is never exempt, however it is
+ * wrapped.
+ */
+const DECLINE =
+  /\b(?:i (?:cannot|can't|can not|am unable|am not able)|i (?:will|'ll|want to|would like to) (?:check|confirm|connect|pass|make sure)|let me (?:check|connect|pass)|we (?:do not|don't) (?:have|offer|provide|currently)|someone from the team|the team will|passed (?:this|it) to the team)\b|ما (?:أقدر|اقدر)|بتواصل مع الفريق|راح (?:أتحقق|اتحقق)|الفريق (?:راح|سوف)/iu;
+
+const GRANT =
+  /\b(?:you (?:can|may|are able to|are eligible|will be able|are entitled)|we (?:offer|provide|accept|allow|cover|will refund|will replace)|is eligible|are eligible|is accepted|are accepted|is free|are free|is included|are included)\b|تقدر|يمكنك|نوفر|نقبل|مجاني/iu;
+
+const DURATION_IN =
+  /(?:\d+\s*[–—-]\s*\d+|\b\d+)\s*(?:business\s|working\s)?(?:days?|hours?|weeks?)|\b\d+[–—-]day\b/giu;
+
+const durationsIn = (text: string): Set<string> =>
+  new Set((text.match(DURATION_IN) ?? []).map((d) => d.replace(/\s+/g, ' ').toLowerCase()));
 const URL_IN_TEXT = /https?:\/\/[^\s<>()"'\]]+/gi;
 
 // The prompt asks for the marker after the full stop; models also put it
@@ -80,7 +120,20 @@ export const stripCitations = (text: string): string =>
     .replace(/ +\n/g, '\n')
     .trim();
 
-export const checkCitations = ({ reply, sources }: CitationInput): CitationVerdict => {
+export const checkCitations = ({
+  reply,
+  sources,
+  customerText,
+}: CitationInput): CitationVerdict => {
+  const customerDurations = durationsIn(customerText ?? '');
+  /** A decline or hand-off that grants nothing and invents no figure. */
+  const isDecline = (sentence: string): boolean => {
+    if (!DECLINE.test(sentence) || GRANT.test(sentence)) return false;
+    for (const duration of durationsIn(sentence)) {
+      if (!customerDurations.has(duration)) return false;
+    }
+    return true;
+  };
   const covers = new Map<string, Set<Concept>>();
   const byUrl = new Map<string, string[]>();
   for (const source of sources) {
@@ -127,6 +180,7 @@ export const checkCitations = ({ reply, sources }: CitationInput): CitationVerdi
       }
     }
     if (asserted.size === 0 || unresolved) continue;
+    if (ids.length === 0 && isDecline(sentence)) continue;
 
     if (ids.length === 0) {
       misses.push({

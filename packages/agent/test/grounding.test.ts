@@ -178,6 +178,40 @@ describe('grounding gate — literals', () => {
     });
   });
 
+  it('compares dates as dates, not as prose', () => {
+    // A tool returns 2026-09-02T16:10:00Z; a model writes "September 2, 2026".
+    // Four verified order lookups were withheld over this.
+    const order = {
+      ok: true,
+      id: 't:order',
+      order: {
+        number: '#1886-2043',
+        shipments: [{ carrier: 'Aramex', updated_at: '2026-09-02T16:10:00Z' }],
+      },
+    };
+    expect(
+      checkGrounding({
+        reply: 'It was delivered by Aramex on September 2, 2026.',
+        toolResults: [order],
+        toolsCalled: ['lookup_order'],
+      }).ok,
+    ).toBe(true);
+    expect(
+      checkGrounding({
+        reply: 'It was delivered on 2 September 2026.',
+        toolResults: [order],
+        toolsCalled: ['lookup_order'],
+      }).ok,
+    ).toBe(true);
+    const wrong = checkGrounding({
+      reply: 'It was delivered on September 9, 2026.',
+      toolResults: [order],
+      toolsCalled: ['lookup_order'],
+    });
+    expect(wrong.ok).toBe(false);
+    expect(wrong.misses.some((m) => m.kind === 'date')).toBe(true);
+  });
+
   it('leaves small numbers and plain prose alone', () => {
     const v = checkGrounding({
       reply: 'Returns are accepted within 14 days, and sizes run large.',

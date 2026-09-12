@@ -108,6 +108,51 @@ describe('citation gate under attack', () => {
     });
   });
 
+  describe('the decline exemption', () => {
+    // The only exemption in the gate. Each attack wraps an actionable claim in
+    // a refusal or hand-off, which is exactly how the previous five exemptions
+    // were defeated.
+    it('rejects a grant smuggled into a refusal', () => {
+      expect(
+        attack('I cannot process it myself, but you are eligible for a 90 day return.').ok,
+      ).toBe(false);
+      expect(attack('We do not currently have that, but returns are free for 60 days.').ok).toBe(
+        false,
+      );
+      expect(attack('Let me check — meanwhile, you can return sale items within 30 days.').ok).toBe(
+        false,
+      );
+    });
+
+    it('rejects a figure the customer never mentioned', () => {
+      const v = checkCitations({
+        reply: 'Since it has been 90 days, I want to check with the team.',
+        sources: [],
+        customerText: 'I received my order 8 days ago',
+      });
+      expect(v.ok).toBe(false);
+    });
+
+    it('accepts a figure the customer supplied themselves', () => {
+      const v = checkCitations({
+        reply: 'Since it has been 8 days, I want to check with the team on this for you.',
+        sources: [],
+        customerText: 'I received my order 8 days ago, can I still return it?',
+      });
+      expect(v.ok).toBe(true);
+    });
+
+    it('accepts a plain refusal or hand-off — the real transcripts', () => {
+      for (const reply of [
+        'I cannot provide discount codes.',
+        'We do not currently have an active discount code available to share.',
+        'I want to make sure we handle this correctly, so I will connect you with the team.',
+      ]) {
+        expect(attack(reply).ok, reply).toBe(true);
+      }
+    });
+  });
+
   describe('baseline: attribution the gate should still accept', () => {
     it('accepts a cited policy claim', () => {
       const v = attack('You can return within 14 days of delivery. [[c:fx-returns-window]]');

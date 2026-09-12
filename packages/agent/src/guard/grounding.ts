@@ -55,6 +55,64 @@ const STOCK_CLAIM =
   /\b(?:in stock|out of stock|sold out|back in stock|restocked|last (?:one|piece)|only \d+ left)\b|متوفر|غير متوفر|نفذ|نفدت|نفد المخزون/giu;
 const STOCK_TOOLS = new Set(['check_availability', 'search_products']);
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
+};
+
+/**
+ * Every date in a piece of text, as YYYY-MM-DD.
+ *
+ * A tool returns `2026-09-02T16:10:00Z`; a model writes "September 2, 2026".
+ * Comparing those as strings made a correctly reported delivery date look
+ * invented, and four verified order lookups were withheld because of it.
+ */
+/** The three shapes canonicalDates understands, for blanking them out. */
+const FULL_DATE_PATTERNS = [
+  /\b(\d{4})-(\d{1,2})-(\d{1,2})(?![\d-])/g,
+  /\b(\d{1,2})\s+([a-z]{3,9})\.?,?\s+(\d{4})\b/gi,
+  /\b([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi,
+];
+
+/**
+ * Removes dates canonicalDates has already handled, so the fallback below does
+ * not re-flag "September 2" as an ungrounded fragment of "September 2, 2026".
+ */
+const withoutFullDates = (text: string): string =>
+  FULL_DATE_PATTERNS.reduce((acc, pattern) => acc.replace(pattern, ' '), text);
+
+export const canonicalDates = (text: string): Set<string> => {
+  const found = new Set<string>();
+  const add = (y: number, m: number, d: number): void => {
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31 && y > 1970) {
+      found.add(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    }
+  };
+  for (const m of text.matchAll(/\b(\d{4})-(\d{1,2})-(\d{1,2})(?![\d-])/g)) {
+    add(Number(m[1]), Number(m[2]), Number(m[3]));
+  }
+  // "2 September 2026" and "September 2, 2026"
+  for (const m of text.matchAll(/\b(\d{1,2})\s+([a-z]{3,9})\.?,?\s+(\d{4})\b/gi)) {
+    const month = MONTH_INDEX[m[2]!.slice(0, 3).toLowerCase()];
+    if (month) add(Number(m[3]), month, Number(m[1]));
+  }
+  for (const m of text.matchAll(/\b([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi)) {
+    const month = MONTH_INDEX[m[1]!.slice(0, 3).toLowerCase()];
+    if (month) add(Number(m[3]), month, Number(m[2]));
+  }
+  return found;
+};
+
 const uniq = (values: string[]): string[] => [...new Set(values)];
 
 const trimUrl = (url: string): string => url.replace(/[.,;:!?)\]]+$/, '');
@@ -96,7 +154,20 @@ export const checkGrounding = ({
     const digits = price.replace(/[^\d.]/g, '').replace(/\.00$/, '');
     require('price', price, digits);
   }
-  for (const date of uniq(reply.match(DATE) ?? [])) require('date', date);
+  // Dates are compared as dates. A date the reply states in prose and the tool
+  // returned in ISO are the same fact.
+  const corpusDates = canonicalDates(raw);
+  const replyDates = canonicalDates(reply);
+  for (const date of replyDates) {
+    if (corpusDates.has(date)) matched += 1;
+    else misses.push({ kind: 'date', value: date });
+  }
+  // A date shape the canonicaliser could not parse — "12 March", "3/4" — still
+  // has to be grounded. Full dates are blanked first so their own fragments do
+  // not come back through here.
+  for (const date of uniq(withoutFullDates(reply).match(DATE) ?? [])) {
+    require('date', date);
+  }
   for (const n of uniq(normalizedReply.match(LONG_NUMBER) ?? [])) require('long_number', n);
 
   const stockClaims = uniq(reply.match(STOCK_CLAIM) ?? []);

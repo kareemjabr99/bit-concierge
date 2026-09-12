@@ -46,6 +46,7 @@ export const evalCase = z.object({
     'stock',
     'escalation',
     'abuse',
+    'store-info',
     'unanswerable',
     'injection',
   ]),

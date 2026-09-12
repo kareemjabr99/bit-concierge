@@ -280,6 +280,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   const citations = checkCitations({
     reply: text,
     sources: sourcesFromToolCalls(recorder.toolCalls),
+    customerText: input.text,
   });
   const grounding = { literal, citations };
 

@@ -38,6 +38,7 @@ describe('golden set', () => {
       'stock',
       'escalation',
       'abuse',
+      'store-info',
       'unanswerable',
       'injection',
     ] as const) {
