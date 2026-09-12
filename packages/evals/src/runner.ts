@@ -42,9 +42,10 @@ const gitSha = (): string => {
  */
 const paced = (requestsPerMinute: number | undefined) => {
   if (!requestsPerMinute) return async (): Promise<void> => {};
-  // A turn is two model calls, three when a tool result sends it round again.
-  // The first run paced for two and still hit the per-minute ceiling.
-  const gapMs = Math.ceil((60_000 / requestsPerMinute) * 3);
+  // A turn is two model calls, three when a tool result sends it round again,
+  // and four once a model-backed reranker scores a retrieval. The first run
+  // paced for two and hit the per-minute ceiling twice.
+  const gapMs = Math.ceil((60_000 / requestsPerMinute) * 4);
   let previous = 0;
   return async (): Promise<void> => {
     const wait = previous + gapMs - Date.now();

@@ -11,6 +11,7 @@
     "@bitc/core": "workspace:*",
     "@bitc/db": "workspace:*",
     "@bitc/models": "workspace:*",
-    "@bitc/shopify": "workspace:*"
+    "@bitc/shopify": "workspace:*",
+    "@bitc/rag": "workspace:*"
   }
 }

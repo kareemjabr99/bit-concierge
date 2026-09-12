@@ -81,7 +81,7 @@ const build = async () => {
     resolveEmbedder(config.embeddingModel, { googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY }),
     { dir: process.env.BITC_EMBED_CACHE ?? join(HERE, '..', '..', '..', '.embed-cache') },
   );
-  const reranker = resolveReranker(config.reranker);
+  const reranker = resolveReranker(arg('reranker', config.reranker), { model: chat.model });
 
   return {
     tenantId: asTenantId(tenantId),

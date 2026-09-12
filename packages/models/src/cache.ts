@@ -8,9 +8,9 @@ import type { Embedder, EmbeddingModelSpec } from './embed.ts';
  *
  * Two reasons, and the second is the important one:
  *
- *  - The free tier allows 100 embedding requests a day. A hundred-case suite
- *    spends the whole day's quota on one run, which makes producing a baseline
- *    and a diff on the same day impossible.
+ *  - The free tier meters embedding requests per text, and a hundred-case suite
+ *    spends that budget on every run. Cached query vectors make repeat runs and
+ *    same-day diffs free.
  *  - An eval that re-embeds the same hundred queries every run measures the
  *    embedding endpoint's variance along with everything else. Cached query
  *    vectors make a run repeatable, so a diff between two runs is a difference
@@ -77,7 +77,9 @@ export const cachedEmbedder = (
     async embedDocuments(texts) {
       const keys = texts.map((text) => keyFor(inner.spec, 'document', text));
       const out: (number[] | undefined)[] = keys.map(load);
-      const missing = out.map((vector, index) => (vector ? -1 : index)).filter((index) => index >= 0);
+      const missing = out
+        .map((vector, index) => (vector ? -1 : index))
+        .filter((index) => index >= 0);
       stats.hits += out.length - missing.length;
       stats.misses += missing.length;
       if (missing.length > 0) {

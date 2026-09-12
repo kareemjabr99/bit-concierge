@@ -1,9 +1,10 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { FixtureKnowledge, loadTenantConfig, runTurn, type TurnResult } from '@bitc/agent';
+import { PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
 import { createLogger, readEnv } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
-import { resolveChatModel } from '@bitc/models';
+import { cachedEmbedder, resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
 import { MockShopifyClient } from '@bitc/shopify';
 
 /**
@@ -45,7 +46,28 @@ const chat = resolveChatModel(flag('--model', config.chatModel), {
   googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY,
   ...(models.ANTHROPIC_API_KEY ? { anthropicApiKey: models.ANTHROPIC_API_KEY } : {}),
 });
-const deps = { chat, shopify: new MockShopifyClient(), knowledge: new FixtureKnowledge(), logger };
+// The real index by default. --fixture falls back to the synthetic corpus,
+// which states policies that are not 1886's — useful for offline work, wrong
+// for anything anyone might believe.
+const useFixture = args.has('--fixture');
+const embedder = cachedEmbedder(
+  resolveEmbedder(config.embeddingModel, { googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY }),
+  { dir: process.env.BITC_EMBED_CACHE ?? '.embed-cache' },
+);
+const knowledge = useFixture
+  ? new FixtureKnowledge()
+  : new PgKnowledgeSearcher(
+      tenantId,
+      embedder,
+      resolveReranker(config.reranker, { model: chat.model }),
+    );
+const deps = {
+  chat,
+  shopify: new MockShopifyClient(),
+  knowledge,
+  gaps: new PgGapRecorder(tenantId),
+  logger,
+};
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;

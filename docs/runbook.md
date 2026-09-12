@@ -64,6 +64,43 @@ worth alerting on, not noise to filter. See ADR 0005.
 
 ---
 
+## Re-indexing to a new embedding model
+
+Changing the embedding model changes the vector dimension family, so it is a
+backfill and a cutover rather than an edit. New vectors are written beside the
+old ones and nothing is removed until you say so.
+
+**This is a command, not a queue job** — deliberately, for now. A swap has a
+verification step in the middle, so a person runs each half and reads the
+output between them. Wiring it to pg-boss is Phase 4 work, when webhook-driven
+ingestion needs the worker anyway.
+
+```bash
+# 1. What exists today
+pnpm --filter @bitc/rag reindex -- --status
+
+# 2. Backfill the new model. Nothing customer-facing changes.
+pnpm --filter @bitc/rag reindex -- --to google:the-new-model@1536
+
+# 3. Check retrieval still returns what it should, on the new model
+pnpm --filter @bitc/rag probe -- --separation
+
+# 4. Cut the tenant over
+psql "$DATABASE_URL_MIGRATOR" -c \
+  "UPDATE tenant_config SET embedding_model = 'google:the-new-model@1536';"
+
+# 5. Verify again, then remove the superseded vectors
+pnpm --filter @bitc/rag reindex -- --drop google:gemini-embedding-001@1536 --yes
+```
+
+`--drop` refuses to remove the model a tenant is actively using, so step 5
+cannot run before step 4.
+
+Budget the backfill against quota: the provider meters **per text embedded**,
+not per HTTP call, even though it batches up to 100 texts per request. The
+current corpus is 121 chunks, so a full backfill is 121 metered requests and
+needs pacing. See ADR 0006.
+
 ## Swapping the chat model
 
 Assume this happens before the client demo. It is designed to cost an hour.

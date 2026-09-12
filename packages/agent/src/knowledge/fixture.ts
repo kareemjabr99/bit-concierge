@@ -14,9 +14,19 @@ interface FixtureChunk {
 const SITE = 'https://dev-store.example';
 
 /**
- * A synthetic policy corpus in the shape Phase 2's chunker will produce.
- * Content is invented for a fictional store. Ids are stable so tests and
- * transcripts can name them.
+ * A synthetic policy corpus in the shape the chunker produces, for tests that
+ * need retrieval to be deterministic.
+ *
+ * **This is fiction and it is NOT 1886's policy.** Every figure here was
+ * drafted from assumption before the real corpus existed, and the real corpus
+ * contradicts most of it — the return window is 7 days, not 14; exchanges are
+ * not free; shipping is not 25 SAR over a 300 SAR threshold. Keeping the wrong
+ * numbers is deliberate: a test fixture that matched production would make a
+ * test pass for the wrong reason, and these values appear nowhere a customer
+ * can reach.
+ *
+ * Anything customer-facing reads from PgKnowledgeSearcher against the real
+ * index. See docs/adr/0004-embeddings.md.
  */
 export const FIXTURE_CHUNKS: FixtureChunk[] = [
   {

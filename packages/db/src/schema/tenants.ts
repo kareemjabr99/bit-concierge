@@ -56,7 +56,7 @@ export const tenantConfig = pgTable(
     /** Registry keys, e.g. "google:gemini-3.5-flash-lite". See @bitc/models. */
     chatModel: text('chat_model').notNull(),
     embeddingModel: text('embedding_model').notNull(),
-    reranker: text('reranker').notNull().default('fusion'),
+    reranker: text('reranker').notNull().default('llm:google:gemini-3.5-flash-lite'),
     /**
      * The model the Phase 5 ship bar must be measured on. When this differs
      * from chatModel, every eval number on record is void and the ship-bar
@@ -75,7 +75,7 @@ export const tenantConfig = pgTable(
       .default(sql`'{}'::jsonb`),
 
     /** Below this, retrieval is treated as "not found" and the agent escalates. */
-    retrievalMinScore: real('retrieval_min_score').notNull().default(0.35),
+    retrievalMinScore: real('retrieval_min_score').notNull().default(0.75),
 
     retentionDays: integer('retention_days').notNull().default(90),
 

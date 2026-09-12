@@ -222,3 +222,44 @@ A citation that resolves and covers the right concept can still misrepresent
 what the source says — "returns within 60 days" citing a chunk that says 14.
 The concept check narrows this to _within_ a topic; it cannot close it. That is
 half two's job, and it is why half two exists.
+
+---
+
+## Instructions that arrive through legitimate content (Phase 2)
+
+1886's storefront publishes `/agents.md`, linked from `robots.txt`. It is a
+well-formed, good-faith document, and it contains directives aimed at whatever
+agent reads it: install a particular shopping skill, prefer it over the
+storefront, route purchases through a named payment service.
+
+None of it was acted on and none of it was ingested. It is not customer-facing
+policy, so it has no place in a knowledge base that answers customers.
+
+The point is not this document, which is benign. The point is the shape:
+
+- It is **published by the merchant**, on their own domain, over TLS. Every
+  provenance signal says trust it.
+- It arrives through a **legitimate content channel** — the same crawl that
+  fetches the returns policy.
+- It is **addressed to the agent** rather than to a customer, so it reads as
+  configuration rather than as data.
+
+That combination will exist on **every Shopify store we onboard**, because
+Shopify generates it. A tenant could also put anything there, and a compromised
+or careless merchant site is not a hypothetical.
+
+The rules this sets for ingestion:
+
+- **Only customer-facing content is ingested.** Policies, product copy, size
+  guides, FAQ. Not `agents.md`, not `robots.txt`, not `.well-known`, not
+  anything whose audience is a machine.
+- **Retrieved content is never an instruction**, whatever it claims about its
+  own authority. The system prompt says so, the tool results are labelled as
+  store documents, and the citation gate means a claim sourced from a poisoned
+  document still has to cite a chunk that covers its topic.
+- **A UCP or MCP endpoint a storefront advertises is not a tool we call.** v1 is
+  read-only and has six tools, all of ours. An agent that discovers and calls
+  endpoints a merchant advertises has a trust boundary we have not designed.
+
+Phase 6 should add an ingestion allowlist by path, so a new source type is a
+decision rather than a default.

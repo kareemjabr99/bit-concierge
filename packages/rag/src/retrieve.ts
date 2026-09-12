@@ -129,13 +129,21 @@ export class PgKnowledgeSearcher implements KnowledgeSearcher {
       return [...result];
     });
 
+    // Candidates arrive ordered by RRF and carrying cosine as their score. The
+    // reranker may replace that score, and whatever it returns is what the
+    // threshold compares against — see @bitc/models rerank.ts.
     const ranked = await this.reranker.rerank(
       query.query,
-      rows.map((row) => ({ id: row.id, text: row.content, score: row.rrf })),
+      rows.map((row) => ({
+        id: row.id,
+        text: row.content,
+        score: row.sim === null ? 0 : Number(row.sim),
+      })),
       query.topK,
     );
 
     const byId = new Map(rows.map((row) => [row.id, row]));
+    const rerankedScore = new Map(ranked.map((candidate) => [candidate.id, candidate.score]));
     // A store publishes the same policy at /policies/x and /pages/x, so the
     // same paragraph arrives twice under two titles and fills the top-k
     // between them. Whichever scored higher survives. Document-level
@@ -162,10 +170,10 @@ export class PgKnowledgeSearcher implements KnowledgeSearcher {
           title: row.title,
           url: row.url,
           headingPath: row.heading_path ?? [],
-          // Calibrated 0–1, and what the threshold applies to. A chunk found
-          // only by the lexical arm has no vector for this model; it is not
-          // admissible on a score we cannot compute.
-          score: row.sim === null ? 0 : Number(row.sim.toFixed(4)),
+          // Whatever the reranker judged. With `fusion` that is cosine, the
+          // behaviour before a reranker existed; with an LLM reranker it is a
+          // relevance score, which is the number worth thresholding.
+          score: Number((rerankedScore.get(row.id) ?? 0).toFixed(4)),
         };
       })
       .filter((hit) => hit.score >= query.minScore && !isDuplicate(hit.content))

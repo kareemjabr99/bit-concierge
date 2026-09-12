@@ -113,3 +113,11 @@ export const providerOptionsFor = (spec: ChatModelSpec): ProviderOptions => {
   }
   return {};
 };
+
+/**
+ * Reranker keys that name a chat model. `llm:` prefixed so `resolveReranker`
+ * can tell a model-backed reranker from a local one without a lookup.
+ */
+export const RERANKER_MODELS: Record<string, string> = {
+  'llm:google:gemini-3.5-flash-lite': 'google:gemini-3.5-flash-lite',
+};

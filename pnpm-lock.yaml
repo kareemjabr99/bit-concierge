@@ -145,6 +145,9 @@ importers:
       '@bitc/models':
         specifier: workspace:*
         version: link:../../packages/models
+      '@bitc/rag':
+        specifier: workspace:*
+        version: link:../../packages/rag
       '@bitc/shopify':
         specifier: workspace:*
         version: link:../../packages/shopify
