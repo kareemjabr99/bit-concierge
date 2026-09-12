@@ -17,6 +17,7 @@
     "zod": "4.5.4"
   },
   "scripts": {
-    "evals": "node --env-file-if-exists=../../.env.local src/cli.ts"
+    "evals": "node --env-file-if-exists=../../.env.local src/cli.ts",
+    "adjudicate": "node --env-file-if-exists=../../.env.local scripts/adjudicate.ts"
   }
 }
