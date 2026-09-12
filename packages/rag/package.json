@@ -17,6 +17,7 @@
   "scripts": {
     "ingest": "node --env-file-if-exists=../../.env.local scripts/ingest-storefront.ts",
     "probe": "node --env-file-if-exists=../../.env.local scripts/probe.ts",
-    "reindex": "node --env-file-if-exists=../../.env.local scripts/reindex.ts"
+    "reindex": "node --env-file-if-exists=../../.env.local scripts/reindex.ts",
+    "quota-probe": "node --env-file-if-exists=../../.env.local scripts/quota-probe.ts"
   }
 }

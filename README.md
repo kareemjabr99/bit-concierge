@@ -179,6 +179,10 @@ anything in `packages/db`, `packages/rag` or `packages/agent`.
 
 ---
 
+[Corpus findings](docs/corpus-findings.md) records what the pilot storefront
+actually publishes — including two live pages stating different processing
+times, and the pages whose content a crawl cannot reach.
+
 ## Toolchain
 
 |            |         |                                             |
