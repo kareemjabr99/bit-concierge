@@ -273,6 +273,84 @@ at least as likely to be wrong as the model is. `messages.grounding.rawModelText
 exists so that every verdict can be checked against what the model actually said,
 and `pnpm --filter @bitc/evals run adjudicate` prints exactly that.
 
+### What the gate does not do
+
+The gate validates that a claim **traces to a source**. A tool result is a
+valid source. So any fact that enters through tenant configuration or a tool
+implementation is laundered into a confident, grounded answer.
+
+**Unsourced fabrication is impossible. Error is not.**
+
+That sentence is quotable as written, with one word doing real work:
+_unsourced_. The gate guarantees a claim came from somewhere the system can
+name. It guarantees nothing about whether that somewhere is right. Three
+distinct ways a fully grounded answer can still be wrong, none of which the
+gate can see:
+
+1. **A wrong fact in a source.** `get_shipping_estimate` read invented rates
+   from tenant config for the whole of Phase 1, presented them as the store's
+   published terms, and the gate accepted every one — correctly, by its own
+   rules. Replacing the rates fixed the instance; the mechanism is unchanged.
+2. **An unfaithful reading of a correct source.** Covered below, and it is why
+   half two exists.
+3. **Two sources that contradict each other.** The merchant publishes the same
+   shipping policy at two URLs, one saying 1–10 business days and the other
+   2–3. Both chunks cover shipping and timing, so whichever the model cites,
+   the citation resolves and is on topic. Attribution is intact and the answer
+   is a coin flip. **The gate is structurally incapable of catching this**: it
+   reasons about one claim against one source, and has no concept of agreement
+   between sources.
+
+### Every source a customer-facing fact can enter through
+
+Audited 2026-09-13. Ordered by how much provenance each actually has.
+
+| source                                    | reaches the customer via                                | provenance                                                                                                                                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ingested pages                            | `search_knowledge`                                      | A URL on the merchant's domain. **Attests publication, not truth** — this is where the 1–10 / 2–3 conflict lives                                                                                                                   |
+| Shopify Admin API                         | `lookup_order`, `search_products`, `check_availability` | Authoritative from Phase 4: Shopify is the system of record. **Today these read invented fixtures**, exactly as unverified as the shipping rates were, and scoped to end at Phase 4                                                |
+| `tenant_config.policy_overrides.shipping` | `get_shipping_estimate`                                 | **None.** Hand-entered. The instance that failed                                                                                                                                                                                   |
+| `tenant_config.policy_overrides.messages` | `systemMessage()`                                       | **None, and it bypasses both gates entirely** — this copy never passes through the model, so nothing inspects it. A tenant who writes "we will refund you within 24 hours" as their escalation message has that delivered verbatim |
+| `tenant_config.brand_name`                | `alwaysGrounded` in the literal gate                    | **None, by construction.** Narrow — a brand name — but it is the mechanism in miniature: configuration telling the gate what to treat as true                                                                                      |
+
+The pattern across the last three rows: **configuration is trusted absolutely
+and is never attested by anyone.** A merchant types a number into a form and it
+reaches a customer with the full confidence of a system that was built to make
+that impossible.
+
+### Provenance for configured facts — designed now, built in Phase 6
+
+Every tenant-config field that can reach a customer carries, alongside its
+value:
+
+```
+value          the fact itself
+attested_by    who asserted it — a named person at the merchant
+attested_at    when
+source_note    where they got it: a URL, a contract clause, "told by ops"
+verified_at    when someone last checked it against the published policy
+```
+
+Three consequences, all deliberate:
+
+- **The admin dashboard shows these as merchant-attested, never as retrieved.**
+  A conversation transcript that used `get_shipping_estimate` shows the answer
+  came from a figure a named person entered on a date, not from the store's
+  published policy. The two must never look alike in the UI, because they are
+  not alike.
+- **An unattested field is treated as absent.** `get_shipping_estimate` returns
+  `unknown_destination` and the agent escalates, rather than quoting a number
+  nobody signed. That is the behaviour the tool already has for a destination
+  it does not know, so this is a default change rather than new machinery.
+- **Staleness is visible.** `verified_at` older than the tenant's review
+  interval surfaces in the dashboard the way the knowledge-gap report does.
+  A rate nobody has checked in a year is a liability, and the system should
+  say so rather than keep quoting it.
+
+Phase 6 owns the schema migration, the dashboard surface and the
+unattested-is-absent default. The design is recorded here so that it is not
+reconstructed from memory when the dashboard is built.
+
 ### Known limit: attribution is not faithfulness
 
 A citation that resolves and covers the right concept can still misrepresent

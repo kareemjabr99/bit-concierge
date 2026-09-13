@@ -21,7 +21,13 @@ Both pages are live. A customer reading one gets a different answer from a
 customer reading the other, and so does the assistant: retrieval returns
 whichever chunk scores higher for the phrasing used.
 
-**The citation gate cannot catch this.** Both chunks cover the same concepts —
+**The citation gate is structurally incapable of catching this.** It reasons
+about one claim against one source and has no concept of agreement _between_
+sources. This belongs to the same class as the tool-provenance limit — both are
+cases where a claim is perfectly grounded and still wrong — and both are
+recorded together in [ADR 0005](adr/0005-grounding.md#what-the-gate-does-not-do).
+
+Originally: Both chunks cover the same concepts —
 shipping and timing — so whichever is cited, the citation resolves and is on
 topic. Attribution is intact and the answer is still a coin flip. This is a
 class of failure neither half of ADR 0005 addresses: _consistency across

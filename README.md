@@ -179,7 +179,8 @@ anything in `packages/db`, `packages/rag` or `packages/agent`.
 
 ---
 
-[Corpus findings](docs/corpus-findings.md) records what the pilot storefront
+[Writing fixtures](docs/fixtures.md) is the process that came out of finding
+fifteen of fifteen drafted fixture facts wrong. [Corpus findings](docs/corpus-findings.md) records what the pilot storefront
 actually publishes — including two live pages stating different processing
 times, and the pages whose content a crawl cannot reach.
 
