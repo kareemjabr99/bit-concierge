@@ -128,7 +128,13 @@ describe('adjudication discipline', () => {
         adjudications: [
           {
             ...evidenced,
-            evidence: { kind: 'absence', queries: [], bestScore: 0, alsoChecked: 'the live page' },
+            evidence: {
+              kind: 'absence',
+              queries: [],
+              bestScore: 0,
+              corpusSearch: { terms: ['gift wrap'], matchedChunks: 0 },
+              alsoChecked: 'the live page',
+            },
           },
         ],
       }),
@@ -145,6 +151,7 @@ describe('adjudication discipline', () => {
           kind: 'absence',
           queries: ['tracking portal'],
           bestScore: 1,
+          corpusSearch: { terms: ['tracking number'], matchedChunks: 0 },
           alsoChecked: 'the crawl notes in docs/corpus-findings.md',
         },
       },
@@ -159,13 +166,35 @@ describe('adjudication discipline', () => {
           ...evidenced,
           evidence: {
             kind: 'absence',
-            queries: ['tracking portal', 'how to track an order'],
+            queries: ['gift wrapping', 'gift wrap at checkout'],
             bestScore: 0.5,
-            alsoChecked: 'the crawl notes in docs/corpus-findings.md',
+            corpusSearch: { terms: ['gift wrap'], matchedChunks: 0 },
+            alsoChecked: 'the live page, and the crawl notes in docs/corpus-findings.md',
           },
         },
       ]),
     ).toEqual([]);
+  });
+
+  it('refuses an absence the corpus text contradicts', () => {
+    // The mistake this field was added for. An absence was recorded for
+    // order-tracking instructions because retrieval scored them 0.5 and the
+    // threshold excluded them. The corpus has them, on two pages, disagreeing
+    // with each other. A substring search does not care what the reranker
+    // thought, which is why it is the check.
+    const problems = validateAdjudications([
+      {
+        ...evidenced,
+        evidence: {
+          kind: 'absence',
+          queries: ['track order shipping tracking'],
+          bestScore: 0.5,
+          corpusSearch: { terms: ['tracking number'], matchedChunks: 4 },
+          alsoChecked: 'the crawl notes in docs/corpus-findings.md',
+        },
+      },
+    ]);
+    expect(problems.join(' ')).toContain('Retrieval missing it is not the corpus lacking it');
   });
 
   it('refuses one that records no change', () => {

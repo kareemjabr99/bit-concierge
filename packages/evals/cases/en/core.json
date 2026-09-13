@@ -715,13 +715,13 @@
       "input": "how do I track my order?",
       "history": [],
       "expect": {
-        "behaviour": "escalate",
+        "behaviour": "answer",
         "mustContain": [],
-        "mustNotContain": ["72 hour"],
+        "mustNotContain": [],
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
-        "citesAnyOf": [],
-        "notes": "The corpus has no tracking-portal instructions and no 72-hour activation window; /pages/order-tracking-form extracts to form furniture with no body text, and the ingester refuses to index it. Escalate rather than describe a process that is not published. Reclassified from 'answer' 2026-09-14 — see adjudications.json; the behaviour field had been left at the drafting default while these notes already said escalate."
+        "citesAnyOf": ["policies/shipping-policy", "pages/shipping-policy"],
+        "notes": "The shipping policy DOES publish tracking instructions: a Shipment Confirmation email containing the tracking number. Both the earlier 'corpus has no tracking instructions' note and the mustNotContain on '72 hour' were wrong — /pages/shipping-policy states the tracking number is active within 72 hours, while /policies/shipping-policy says 24 hours. That contradiction is the merchant's to resolve; the agent citing either is correctly grounded. Verified by direct text search of the indexed chunks 2026-09-14."
       },
       "validatedBy": null,
       "validatedAt": null

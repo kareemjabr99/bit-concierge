@@ -1,22 +1,4 @@
 {
   "suite": "en-core",
-  "adjudications": [
-    {
-      "caseId": "shipping-track-how",
-      "field": "behaviour",
-      "originalBehaviour": "answer",
-      "newBehaviour": "escalate",
-      "originalValue": [],
-      "newValue": [],
-      "evidence": {
-        "kind": "absence",
-        "queries": ["track order shipping tracking", "order tracking"],
-        "bestScore": 0.5,
-        "alsoChecked": "docs/corpus-findings.md records /pages/order-tracking-form as a page whose content extracts to the form furniture and nothing else, and the ingestion script refuses to index a page that is a heading with no body. There is no tracking-portal instruction anywhere in the crawled corpus."
-      },
-      "rationale": "The case contradicts itself. Its behaviour field says answer; its own notes say 'If retrieval finds nothing, escalate rather than describe a process that is not published.' The corpus has no tracking instructions to find — the only tracking page is a form whose text does not survive extraction — so the notes describe the correct behaviour and the behaviour field was left at the drafting default. The agent escalated, which is what the notes prescribe. Reclassified to match the notes, not to match the agent.",
-      "adjudicatedBy": "Claude (Bit68 build), pending merchant validation at Phase 5",
-      "adjudicatedAt": "2026-09-14"
-    }
-  ]
+  "adjudications": []
 }

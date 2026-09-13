@@ -35,10 +35,32 @@ const sourcesFound = z.object({
 
 const nothingFound = z.object({
   kind: z.literal('absence'),
-  /** The exact queries run. Without these the claim is unfalsifiable. */
+  /** The exact retrieval queries run. Without these the claim is unfalsifiable. */
   queries: z.array(z.string().min(3)).min(1),
   /** The best score any candidate reached, so "nothing" is a number. */
   bestScore: z.number(),
+  /**
+   * A direct substring search over the indexed chunk text, and what it
+   * returned.
+   *
+   * This field exists because the first absence record written under this
+   * schema was wrong, and wrong in the way the whole constraint was built to
+   * prevent. It claimed the corpus had no order-tracking instructions. The
+   * corpus has them, on two pages, saying different things. What had actually
+   * happened was that retrieval scored them 0.5 and the threshold excluded
+   * them — and both the case notes and the crawl notes had recorded that
+   * retrieval failure as a fact about the corpus, where it then sat waiting to
+   * be cited as evidence.
+   *
+   * **Retrieval finding nothing is not the corpus containing nothing.** A
+   * substring search does not care what the reranker thought, which is exactly
+   * why it is the check. `matchedChunks` must be zero: a non-zero count is a
+   * refutation of the claim being made, not a detail.
+   */
+  corpusSearch: z.object({
+    terms: z.array(z.string().min(3)).min(1),
+    matchedChunks: z.number().int().min(0),
+  }),
   /** Where else this was checked — the crawl notes, the live page. */
   alsoChecked: z.string().min(10),
 });
@@ -104,11 +126,21 @@ export const validate = (adjudications: Adjudication[]): string[] => {
     // Evidence is required in both shapes; the schema guarantees each is
     // non-empty. This catches the one thing the schema cannot: an absence
     // claim asserting nothing was found when something scored well.
-    if (a.evidence.kind === 'absence' && a.evidence.bestScore >= 0.75) {
-      problems.push(
-        `${a.caseId}: claims the corpus does not cover this, but a candidate scored ` +
-          `${a.evidence.bestScore}. That is not an absence.`,
-      );
+    if (a.evidence.kind === 'absence') {
+      if (a.evidence.bestScore >= 0.75) {
+        problems.push(
+          `${a.caseId}: claims the corpus does not cover this, but a candidate scored ` +
+            `${a.evidence.bestScore}. That is not an absence.`,
+        );
+      }
+      if (a.evidence.corpusSearch.matchedChunks > 0) {
+        problems.push(
+          `${a.caseId}: claims the corpus does not cover this, but a direct text search for ` +
+            `${JSON.stringify(a.evidence.corpusSearch.terms)} matched ` +
+            `${a.evidence.corpusSearch.matchedChunks} chunk(s). Retrieval missing it is not ` +
+            `the corpus lacking it.`,
+        );
+      }
     }
   }
   return problems;
