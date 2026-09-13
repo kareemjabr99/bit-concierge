@@ -22,6 +22,8 @@ export interface RunOptions {
   suite: string;
   deps: TurnDeps;
   cases: EvalCase[];
+  /** Run only these case ids. For isolating an experiment to the cases it affects. */
+  only?: string[] | undefined;
   /** Recorded reclassifications, so both scores can be reported. */
   adjudications?: Adjudication[];
   /** Called after each case, for progress output. */

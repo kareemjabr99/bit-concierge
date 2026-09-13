@@ -2,7 +2,7 @@ import { ToolLoopAgent, isStepCount, type ModelMessage } from 'ai';
 import type { Channel, Language, Logger, TenantId } from '@bitc/core';
 import { estimateCostUsd, providerOptionsFor, type ChatModelHandle } from '@bitc/models';
 import type { ShopifyReadClient } from '@bitc/shopify';
-import type { TurnContext, TurnRecorder } from './context.ts';
+import type { TenantRuntimeConfig, TurnContext, TurnRecorder } from './context.ts';
 import { escalate } from './escalation.ts';
 import { checkCitations, sourcesFromToolCalls, type CitationVerdict } from './guard/citations.ts';
 import { checkGrounding, type GroundingVerdict } from './guard/grounding.ts';
@@ -35,6 +35,12 @@ export interface TurnDeps {
   chat: ChatModelHandle;
   shopify: ShopifyReadClient;
   knowledge: KnowledgeSearcher;
+  /**
+   * Harness-only. Lets an experiment vary one config value across runs without
+   * editing the tenant, so an A/B is a flag rather than a migration. Nothing
+   * in production sets this.
+   */
+  configOverrides?: Partial<TenantRuntimeConfig> | undefined;
   /** Optional. Without it, unanswerable questions go unreported. */
   gaps?: GapRecorder | undefined;
   logger: Logger;
@@ -77,7 +83,7 @@ const HARD_TOOL_FAILURES = new Set(['tool_error', 'rate_limited']);
 export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnResult> => {
   const now = deps.now ?? (() => new Date());
   const started = performance.now();
-  const config = await loadTenantConfig(input.tenantId);
+  const config = { ...(await loadTenantConfig(input.tenantId)), ...(deps.configOverrides ?? {}) };
   const lang = input.localeHint ?? detectLanguage(input.text);
   const conversation = await getOrCreateConversation(
     input.tenantId,

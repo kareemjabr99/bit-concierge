@@ -111,6 +111,10 @@ const build = async () => {
       shopify: new MockShopifyClient(),
       knowledge: new PgKnowledgeSearcher(asTenantId(tenantId), embedder, reranker),
       gaps: new PgGapRecorder(asTenantId(tenantId)),
+      // The 0.5 experiment: admit the reranker's middle class, or not.
+      ...(arg('min-score')
+        ? { configOverrides: { retrievalMinScore: Number(arg('min-score')) } }
+        : {}),
       logger: createLogger({ level: 'error', write: (line) => process.stderr.write(`${line}\n`) }),
     },
   };
@@ -118,7 +122,16 @@ const build = async () => {
 
 const execute = async () => {
   const { tenantId, config, embedder, deps } = await build();
-  const cases = loadCases(suiteName);
+  const only = arg('only')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const all = loadCases(suiteName);
+  const cases = only.length > 0 ? all.filter((c) => only.includes(c.id)) : all;
+  if (only.length > 0 && cases.length !== only.length) {
+    const missing = only.filter((id) => !cases.some((c) => c.id === id));
+    throw new Error(`--only names cases that do not exist: ${missing.join(', ')}`);
+  }
   process.stderr.write(
     `${cases.length} cases · ${deps.chat.spec.key} · pacing ${deps.chat.spec.quota?.requestsPerMinute ?? '∞'}/min\n`,
   );
