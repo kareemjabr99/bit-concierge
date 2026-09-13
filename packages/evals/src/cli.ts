@@ -7,6 +7,7 @@ import { loadTenantConfig } from '@bitc/agent';
 import {
   cachedEmbedder,
   cachedReranker,
+  recordingReranker,
   resolveChatModel,
   resolveEmbedder,
   resolveReranker,
@@ -90,10 +91,15 @@ const build = async () => {
   // Cached like the embedder, and for a sharper reason: a model-backed reranker
   // costs one chat request per search, and chat requests are the binding
   // free-tier limit — 500 a day. See @bitc/models rerank-cache.ts.
-  const reranker = cachedReranker(
+  const cached = cachedReranker(
     resolveReranker(arg('reranker', config.reranker), { model: chat.model }),
     { dir: process.env.BITC_RERANK_CACHE ?? join(HERE, '..', '..', '..', '.rerank-cache') },
   );
+  // Recording wraps the cache, so a cached verdict is captured too. The shape
+  // of this distribution is what decides whether retrieval_min_score is a
+  // calibrated threshold or a coin toss wearing a number.
+  const rerankLog = process.env.BITC_RERANK_LOG;
+  const reranker = rerankLog ? recordingReranker(cached, rerankLog) : cached;
 
   return {
     tenantId: asTenantId(tenantId),
