@@ -9,11 +9,12 @@ tool call, not a retrieval.** Order, price and stock facts come from live
 Shopify calls. Policies, sizing and care come from retrieval. The two never
 cross, and a deterministic gate checks that before any reply is sent.
 
-> Status: **Phase 2 in progress.** Retrieval is real — 37 documents and 121
+> Status: **Phase 2 at the gate.** Retrieval is real — 37 documents and 121
 > chunks indexed from 1886riyadh.com's public pages, hybrid search over
-> pgvector — and an eval harness runs a 33-case provisional golden set. No
-> Shopify connection yet, English only, and the golden set is drafted rather
-> than client-validated, so it does not measure the ship bar.
+> pgvector with an LLM reranker — and an eval harness runs a 103-case
+> provisional golden set: 75.7% accuracy, zero fabricated literals. No Shopify
+> connection yet, English only, and the golden set is drafted rather than
+> client-validated, so it does not measure the ship bar.
 
 ---
 
