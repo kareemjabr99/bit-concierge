@@ -19,6 +19,7 @@
   "scripts": {
     "evals": "node --env-file-if-exists=../../.env.local src/cli.ts",
     "adjudicate": "node --env-file-if-exists=../../.env.local scripts/adjudicate.ts",
-    "distribution": "node --env-file-if-exists=../../.env.local scripts/rerank-distribution.ts"
+    "distribution": "node --env-file-if-exists=../../.env.local scripts/rerank-distribution.ts",
+    "middle": "node scripts/middle-class.ts"
   }
 }

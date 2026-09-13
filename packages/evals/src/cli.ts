@@ -173,6 +173,11 @@ try {
     console.log(markdown);
     const out = arg('out');
     if (out) writeFileSync(out, `${markdown}\n`);
+    // The full outcomes, for analysis the report does not carry — which cases
+    // retrieved nothing, what each cited, the raw model text behind a
+    // suppression. The report is for reading; this is for asking questions of.
+    const outJson = arg('out-json');
+    if (outJson) writeFileSync(outJson, `${JSON.stringify(result, null, 2)}\n`);
     await persistRun(tenantId, result);
     if (has('baseline') && (result.incompleteCases ?? 0) > 0) {
       console.error(
