@@ -160,3 +160,36 @@ is not simply too high: the remaining work is real and is listed at the gate.
   from the first wrong-baseline incident and I did not guard it in time.
 - Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 4.3 h
   across two sittings, and still not closed.
+
+## Phase 2 — closing pass
+
+**Wall clock: 2.4 h** (2026-09-13 22:45 – 2026-09-14 01:15 UTC)
+
+| Activity                                                        | Hours |
+| --------------------------------------------------------------- | ----- |
+| Third full 103-case run (mostly waiting) + the 30-case A/B arm  | 1.05  |
+| Reranker distribution, the 0.5 question, the A/B analysis       | 0.35  |
+| retrieval_admits migration and threading the policy through     | 0.30  |
+| Adjudication rework, the wrong adjudication and its correction  | 0.30  |
+| Enforceable fixture rules, merchant-copy notice, mutation tests | 0.25  |
+| ADRs 0004 and 0005, corpus findings                             | 0.15  |
+
+### Notes
+
+- **Zero fabricated literals across 103 cases.** The gate's false-positive
+  classes are fixed and the count now means what it says. Accuracy 75.7%, and
+  the ship bar correctly refused: 5 cases never reached the model.
+- **Third quota wall, first one caught by a guard rather than by me.** The
+  incomplete-run check refused to write a baseline. That is the failure mode
+  that produced two bad baselines becoming a non-event.
+- **I recorded a false adjudication and the A/B caught it.** I claimed the
+  corpus had no order-tracking instructions. It has them, on two pages,
+  disagreeing with each other. What I had actually measured was retrieval
+  scoring them 0.5 and the threshold excluding them — and both the case notes
+  and the crawl notes had already written that retrieval failure down as a
+  fact about the corpus, where it sat until I cited it as evidence. Third
+  instance of the same bias, and the first committed while operating the
+  machinery built to prevent it. Absence claims now require a substring search
+  over the indexed text.
+- Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 6.7 h
+  across three sittings.
