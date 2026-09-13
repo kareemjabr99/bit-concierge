@@ -95,26 +95,100 @@ const outcome = (over: Partial<CaseOutcome> = {}): CaseOutcome => ({
 describe('adjudication discipline', () => {
   const evidenced: Adjudication = {
     caseId: 'x',
+    field: 'behaviour',
     originalBehaviour: 'answer',
     newBehaviour: 'escalate',
-    retrievedSources: [
-      { sourceId: 'policies/refund-policy', score: 0.5, excerpt: 'returns within 7 days' },
-    ],
+    originalValue: [],
+    newValue: [],
+    evidence: {
+      kind: 'sources',
+      sources: [
+        { sourceId: 'policies/refund-policy', score: 0.5, excerpt: 'returns within 7 days' },
+      ],
+    },
     rationale:
       'The corpus states the window but says nothing about gift returns, so the original expectation that this was answerable is not supported by any retrieved chunk.',
     adjudicatedBy: 'reviewer',
     adjudicatedAt: '2026-09-13',
   };
 
-  it('refuses a reclassification with no sources in front of you', () => {
-    const problems = validateAdjudications([{ ...evidenced, retrievedSources: [] }]);
-    expect(problems.join(' ')).toContain('no retrieved sources');
+  it('refuses a reclassification with no evidence in front of you', () => {
+    expect(() =>
+      adjudicationFile.parse({
+        suite: 's',
+        adjudications: [{ ...evidenced, evidence: { kind: 'sources', sources: [] } }],
+      }),
+    ).toThrow();
+  });
+
+  it('refuses an absence claim with no queries behind it', () => {
+    expect(() =>
+      adjudicationFile.parse({
+        suite: 's',
+        adjudications: [
+          {
+            ...evidenced,
+            evidence: { kind: 'absence', queries: [], bestScore: 0, alsoChecked: 'the live page' },
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it('refuses an absence claim contradicted by its own best score', () => {
+    // "The corpus does not cover this" is not compatible with a candidate the
+    // reranker called a direct answer.
+    const problems = validateAdjudications([
+      {
+        ...evidenced,
+        evidence: {
+          kind: 'absence',
+          queries: ['tracking portal'],
+          bestScore: 1,
+          alsoChecked: 'the crawl notes in docs/corpus-findings.md',
+        },
+      },
+    ]);
+    expect(problems.join(' ')).toContain('not an absence');
+  });
+
+  it('accepts an absence recorded with the queries that found nothing', () => {
+    expect(
+      validateAdjudications([
+        {
+          ...evidenced,
+          evidence: {
+            kind: 'absence',
+            queries: ['tracking portal', 'how to track an order'],
+            bestScore: 0.5,
+            alsoChecked: 'the crawl notes in docs/corpus-findings.md',
+          },
+        },
+      ]),
+    ).toEqual([]);
   });
 
   it('refuses one that records no change', () => {
     expect(validateAdjudications([{ ...evidenced, newBehaviour: 'answer' }]).join(' ')).toContain(
       'records no change',
     );
+  });
+
+  it('refuses a content-expectation change that changes nothing', () => {
+    expect(
+      validateAdjudications([
+        {
+          ...evidenced,
+          field: 'mustNotContain',
+          originalValue: ['free return'],
+          newValue: ['free return'],
+        },
+      ]).join(' '),
+    ).toContain('records no change to mustNotContain');
+  });
+
+  it('refuses the same case and field adjudicated twice', () => {
+    expect(validateAdjudications([evidenced, evidenced]).join(' ')).toContain('adjudicated twice');
   });
 
   it('demands a real rationale, not a word', () => {
@@ -179,7 +253,11 @@ describe('the recorded adjudications.json on disk', () => {
     const parsed = adjudicationFile.parse(JSON.parse(readFileSync(path, 'utf8')));
     expect(validateAdjudications(parsed.adjudications)).toEqual([]);
     for (const a of parsed.adjudications) {
-      expect(a.retrievedSources.length, `${a.caseId} has no sources`).toBeGreaterThan(0);
+      const carries =
+        a.evidence.kind === 'sources'
+          ? a.evidence.sources.length > 0
+          : a.evidence.queries.length > 0;
+      expect(carries, `${a.caseId} carries no evidence`).toBe(true);
       expect(a.rationale.length, `${a.caseId} rationale is too thin`).toBeGreaterThan(60);
     }
   });

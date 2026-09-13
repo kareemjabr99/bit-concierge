@@ -715,13 +715,13 @@
       "input": "how do I track my order?",
       "history": [],
       "expect": {
-        "behaviour": "answer",
+        "behaviour": "escalate",
         "mustContain": [],
         "mustNotContain": ["72 hour"],
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
         "citesAnyOf": [],
-        "notes": "The corpus has no tracking-portal instructions and no 72-hour activation window. If retrieval finds nothing, escalate rather than describe a process that is not published."
+        "notes": "The corpus has no tracking-portal instructions and no 72-hour activation window; /pages/order-tracking-form extracts to form furniture with no body text, and the ingester refuses to index it. Escalate rather than describe a process that is not published. Reclassified from 'answer' 2026-09-14 — see adjudications.json; the behaviour field had been left at the drafting default while these notes already said escalate."
       },
       "validatedBy": null,
       "validatedAt": null
