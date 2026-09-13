@@ -14,8 +14,8 @@ interface FixtureChunk {
 const SITE = 'https://dev-store.example';
 
 /**
- * A synthetic policy corpus in the shape the chunker produces, for tests that
- * need retrieval to be deterministic.
+ * INVENTED. A synthetic policy corpus in the shape the chunker produces, for
+ * tests that need retrieval to be deterministic.
  *
  * **This is fiction and it is NOT 1886's policy.** Every figure here was
  * drafted from assumption before the real corpus existed, and the real corpus

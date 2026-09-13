@@ -1,10 +1,18 @@
 import type { Order, Product } from '../types.ts';
 
 /**
- * Synthetic store data for Phase 1–3. Nothing here is real: addresses are
- * RFC 2606 reserved domains, names are invented, the catalogue is a plausible
- * elevated-streetwear range and no more. This is what the free-tier model key
- * is allowed to see. Phase 4 seeds the development store from the same shapes.
+ * INVENTED. Synthetic store data for Phase 1–3.
+ *
+ * Nothing here is 1886's: addresses are RFC 2606 reserved domains, names are
+ * made up, the catalogue is a plausible elevated-streetwear range and no more.
+ * This is what the free-tier model key is allowed to see, because a free-tier
+ * key trains on its prompts. Phase 4 seeds the development store from the same
+ * shapes with real data behind a paid key.
+ *
+ * The marker on the first line is load-bearing: test/provenance.test.ts
+ * requires every file stating a window, a price or a rate to declare either
+ * that its content is fiction or where it was sourced from. See
+ * docs/fixtures.md rule 3.
  */
 
 const STORE = 'https://dev-store.example';

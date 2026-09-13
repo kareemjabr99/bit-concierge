@@ -5,7 +5,17 @@ import postgres from 'postgres';
  * public key. Runs as the migrator, which is the only role that can create a
  * tenant (the tenants policy only admits the tenant already in scope).
  *
- * Everything here is synthetic. The escalation address is a reserved domain.
+ * **This file is configuration, not a fixture.** Values under `policyOverrides`
+ * are returned by tools, and the citation gate accepts a tool result as a
+ * legitimate source — so anything wrong here reaches a customer with the
+ * system's full confidence behind it, having passed every check we have. It
+ * gets the same scrutiny as code: sourced from the merchant, with the URL and
+ * the date it was read, or absent. The marker that fixtures use to declare
+ * themselves fiction is not available to this file, and
+ * test/provenance.test.ts enforces that. See docs/fixtures.md rule 2.
+ *
+ * Operational values — the escalation address, the widget key — are synthetic
+ * and reach nobody; the address is a reserved domain.
  */
 const url = process.env.DATABASE_URL_MIGRATOR;
 if (!url) {
@@ -29,8 +39,9 @@ export const DEV_TENANT = {
   retrievalMinScore: 0.75,
   escalationEmails: ['escalations@bitc.example'],
   policyOverrides: {
-    // Published shipping terms, taken verbatim from the storefront on
-    // 2026-09-12 and checked against the ingested corpus.
+    // Published shipping terms.
+    // SOURCE: https://1886riyadh.com/policies/shipping-policy (checked 2026-09-12)
+    // Taken verbatim and checked against the ingested corpus.
     //
     // The earlier version of this block was invented — SMSA at 2-4 days, free
     // over 300 SAR, Aramex to five GCC countries at 45 SAR. None of it is the
