@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -166,6 +166,19 @@ describe('adjudication discipline', () => {
     );
     expect(bar.meets).toBe(false);
     expect(bar.notes.join(' ')).toContain('as originally scored');
+  });
+});
+
+describe('the recorded adjudications.json on disk', () => {
+  it('parses, and every entry carries the evidence that forced it', () => {
+    const path = join(HERE, '..', 'adjudications.json');
+    if (!existsSync(path)) return;
+    const parsed = adjudicationFile.parse(JSON.parse(readFileSync(path, 'utf8')));
+    expect(validateAdjudications(parsed.adjudications)).toEqual([]);
+    for (const a of parsed.adjudications) {
+      expect(a.retrievedSources.length, `${a.caseId} has no sources`).toBeGreaterThan(0);
+      expect(a.rationale.length, `${a.caseId} rationale is too thin`).toBeGreaterThan(60);
+    }
   });
 });
 
