@@ -117,24 +117,38 @@ containment is not the same as knowing you do not know.
 
 The section above deferred the relevance decision to a reranker, on the
 evidence that cosine cannot make it. The reranker shipped, a full suite ran
-with every verdict recorded, and the number it produces turns out not to be a
-score.
+with every verdict recorded, and the number it produces turns out to carry far
+less information than a 0–1 score implies.
 
-Across 60 searches and 164 scored candidates on the third full run, **every
-candidate scored exactly 0.00, 0.50 or 1.00. Nothing landed anywhere else.**
+Across 93 searches and 234 scored candidates, the scores are near-degenerate:
+
+| all candidate scores | count | share |
+| -------------------- | ----- | ----- |
+| 0.00                 | 42    | 17.9% |
+| 0.40                 | 3     | 1.3%  |
+| 0.50                 | 67    | 28.6% |
+| 1.00                 | 122   | 52.1% |
+
+**98.7% of candidates land on one of the three rubric anchors.** Three did not,
+all at 0.40, and only one of those was ever a top candidate.
 
 | top-1 score per search | searches | share |
 | ---------------------- | -------- | ----- |
-| 0.00                   | 18       | 30%   |
-| 0.50                   | 6        | 10%   |
-| 1.00                   | 36       | 60%   |
+| 0.00                   | 38       | 40.9% |
+| 0.40                   | 1        | 1.1%  |
+| 0.50                   | 13       | 14.0% |
+| 1.00                   | 41       | 44.1% |
 
-This is not a distribution that happens to be lumpy. It is the rubric, read
-back. The reranker's prompt gives the model three anchors — 1.0 when the
-document states the answer, around 0.5 when it is on the right topic but does
-not answer, 0.0 when it is unrelated — and at temperature 0 the model returns
-the anchors. There is no evidence it can produce a meaningful 0.7, and no
-reason to expect one: nothing in the prompt describes what 0.7 would mean.
+This is the rubric read back. The reranker's prompt gives the model three
+anchors — 1.0 when the document states the answer, around 0.5 when it is on
+the right topic but does not answer, 0.0 when it is unrelated — and at
+temperature 0 it overwhelmingly returns the anchors. Nothing in the prompt
+describes what 0.7 would mean, and the model does not invent a meaning for it.
+
+> An earlier draft of this section said no candidate scored off-anchor at all.
+> That was written from the first 60 searches of the run and was wrong; the
+> full 93 contain three. The conclusion survives the correction and the
+> sentence did not, so it is recorded here rather than quietly edited.
 
 ### What 0.5 means operationally
 
@@ -153,20 +167,31 @@ catch the ones where it obliged.
 Excluding the class, which is what a 0.75 threshold does, converts those
 searches into "nothing retrieved" and the turn escalates to a human.
 
-### The threshold number is decorative
+### The threshold number is decoration
 
-Because the scores take three values, every threshold in (0.5, 1.0] selects an
-identical set of candidates, and so does every threshold in (0.0, 0.5]. Moving
-`retrieval_min_score` from 0.75 to 0.9, or to 0.6, changes nothing at all.
-There are exactly two reachable behaviours and the configured decimal selects
-one of them.
+The scores cluster so hard on the anchors that the threshold has three
+reachable settings, and two of them are the same decision:
 
-So **`retrieval_min_score` is not calibrated and was never calibrated.** It is
-a two-valued switch wearing four characters of apparent precision, and the
-0.75 was chosen by intuition about what a confidence threshold should look
-like. Stating that here rather than leaving the number to imply otherwise: a
-reader who sees 0.75 in a config will reasonably assume someone measured
-something, and nobody did.
+| threshold lands in | searches whose top candidate is admitted |
+| ------------------ | ---------------------------------------- |
+| (0.5, 1.0]         | 41 of 93                                 |
+| (0.4, 0.5]         | 54 of 93                                 |
+| (0.0, 0.4]         | 55 of 93                                 |
+
+Moving `retrieval_min_score` from 0.75 to 0.9, or to 0.6, changes nothing —
+every value in (0.5, 1.0] selects an identical set. Dropping it below 0.5
+admits thirteen more searches. Dropping it below 0.4 admits one more than
+that, and that one is a rounding artefact rather than a class.
+
+So the real choice is binary — **admit the partial class or do not** — and it
+turns on 13 of 93 searches, 14%. Everything else the decimal appears to offer
+is unreachable.
+
+**`retrieval_min_score` is not calibrated and was never calibrated.** The 0.75
+was chosen by intuition about what a confidence threshold should look like,
+before any score had been observed. Stating that here rather than leaving the
+number to imply otherwise: a reader who sees 0.75 in a config will reasonably
+assume someone measured something, and nobody did.
 
 ### The rubric is the knob
 
