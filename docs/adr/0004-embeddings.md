@@ -112,3 +112,86 @@ Until then the gap report will stay empty, and the agent will be handed
 marginal chunks on questions the corpus cannot answer. The citation gate
 contains the damage — a claim must cite a source that covers its concept — but
 containment is not the same as knowing you do not know.
+
+## Measured: the reranker is a three-way classifier, and the threshold is a label (Phase 2)
+
+The section above deferred the relevance decision to a reranker, on the
+evidence that cosine cannot make it. The reranker shipped, a full suite ran
+with every verdict recorded, and the number it produces turns out not to be a
+score.
+
+Across 60 searches and 164 scored candidates on the third full run, **every
+candidate scored exactly 0.00, 0.50 or 1.00. Nothing landed anywhere else.**
+
+| top-1 score per search | searches | share |
+| ---------------------- | -------- | ----- |
+| 0.00                   | 18       | 30%   |
+| 0.50                   | 6        | 10%   |
+| 1.00                   | 36       | 60%   |
+
+This is not a distribution that happens to be lumpy. It is the rubric, read
+back. The reranker's prompt gives the model three anchors — 1.0 when the
+document states the answer, around 0.5 when it is on the right topic but does
+not answer, 0.0 when it is unrelated — and at temperature 0 the model returns
+the anchors. There is no evidence it can produce a meaningful 0.7, and no
+reason to expect one: nothing in the prompt describes what 0.7 would mean.
+
+### What 0.5 means operationally
+
+**The retrieved document is about the subject the customer asked about and
+does not contain the answer.** Not "probably relevant", not "relevant with
+lower confidence" — a different thing entirely from a low-confidence 1.0.
+
+That distinction is what makes admitting the class a real decision rather than
+a slider. A 0.5 chunk handed to the agent is on-topic material that cannot
+support the answer, which is the precise raw material for a confident wrong
+answer. The citation gate is the backstop — a claim must cite a source covering
+every concept it asserts — but relying on it means routinely asking the model
+to write from sources that do not answer the question and trusting a regex to
+catch the ones where it obliged.
+
+Excluding the class, which is what a 0.75 threshold does, converts those
+searches into "nothing retrieved" and the turn escalates to a human.
+
+### The threshold number is decorative
+
+Because the scores take three values, every threshold in (0.5, 1.0] selects an
+identical set of candidates, and so does every threshold in (0.0, 0.5]. Moving
+`retrieval_min_score` from 0.75 to 0.9, or to 0.6, changes nothing at all.
+There are exactly two reachable behaviours and the configured decimal selects
+one of them.
+
+So **`retrieval_min_score` is not calibrated and was never calibrated.** It is
+a two-valued switch wearing four characters of apparent precision, and the
+0.75 was chosen by intuition about what a confidence threshold should look
+like. Stating that here rather than leaving the number to imply otherwise: a
+reader who sees 0.75 in a config will reasonably assume someone measured
+something, and nobody did.
+
+### The rubric is the knob
+
+The thing that would actually change a score is the prompt in
+`llmReranker` — its anchors, and what it says counts as answering. Retuning
+retrieval means editing that text and re-measuring, not nudging a number in
+tenant config. Two of the six partial-scoring searches on this run
+(`return receipt lost proof of purchase`, `exchange sale items 30% off`) are
+questions the corpus does answer, so the rubric is currently too strict at the
+0.5/1.0 boundary. That is a prompt change, and it is where the next
+improvement in this area comes from.
+
+A reranker that emits genuinely calibrated scores — a trained cross-encoder
+rather than a rubric prompt — would make the threshold meaningful again. Until
+one is in place, treating the number as a tuning surface is measuring the
+wrong thing.
+
+### Measured with
+
+`packages/models/src/rerank-record.ts` records every verdict, wrapped outside
+the cache so cached scores are captured too; `packages/evals/scripts/middle-class.ts`
+reports the distribution and cross-checks itself against the run's outcomes.
+Both are harness-only. Re-run after any rubric change:
+
+```
+BITC_RERANK_LOG=… pnpm evals run -- --suite en-core --out-json run.json
+pnpm --filter @bitc/evals run middle -- --log … --outcomes run.json
+```
