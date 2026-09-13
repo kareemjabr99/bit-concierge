@@ -45,7 +45,13 @@ export const reportRun = (result: RunResult): string => {
   lines.push('| | |');
   lines.push('| --- | --- |');
   lines.push(`| Cases | ${m.cases} (${m.passed} passed, ${m.failed} failed) |`);
-  lines.push(`| Accuracy | ${pct(m.accuracy)} |`);
+  // Both figures, always, in the same table. A reader who sees one without the
+  // other cannot tell whether the number moved because the system improved or
+  // because an expectation was rewritten.
+  lines.push(`| Accuracy, as originally scored | **${pct(m.accuracyAsOriginallyScored)}** |`);
+  lines.push(
+    `| Accuracy, after adjudication | ${pct(m.accuracy)}${m.adjudicatedCases > 0 ? ` · ${m.adjudicatedCases} case(s) reclassified` : ' · no reclassifications'} |`,
+  );
   lines.push(`| Deflection | ${pct(m.deflectionRate)} |`);
   lines.push(`| Escalation precision | ${pct(m.escalationPrecision)} |`);
   lines.push(`| Retrieval hit rate | ${pct(m.retrievalHitRate)} |`);

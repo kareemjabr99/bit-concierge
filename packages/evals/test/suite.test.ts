@@ -2,7 +2,17 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { listBaselines, diffRuns, metricsFor, shipBar, suiteFile, tierOf } from '../src/index.ts';
+import {
+  listBaselines,
+  diffRuns,
+  metricsFor,
+  shipBar,
+  suiteFile,
+  tierOf,
+  validate as validateAdjudications,
+  adjudicationFile,
+} from '../src/index.ts';
+import type { Adjudication } from '../src/index.ts';
 import type { CaseOutcome, EvalCase, RunResult } from '../src/index.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -80,6 +90,83 @@ const outcome = (over: Partial<CaseOutcome> = {}): CaseOutcome => ({
   outputTokens: 5,
   costUsd: null,
   ...over,
+});
+
+describe('adjudication discipline', () => {
+  const evidenced: Adjudication = {
+    caseId: 'x',
+    originalBehaviour: 'answer',
+    newBehaviour: 'escalate',
+    retrievedSources: [
+      { sourceId: 'policies/refund-policy', score: 0.5, excerpt: 'returns within 7 days' },
+    ],
+    rationale:
+      'The corpus states the window but says nothing about gift returns, so the original expectation that this was answerable is not supported by any retrieved chunk.',
+    adjudicatedBy: 'reviewer',
+    adjudicatedAt: '2026-09-13',
+  };
+
+  it('refuses a reclassification with no sources in front of you', () => {
+    const problems = validateAdjudications([{ ...evidenced, retrievedSources: [] }]);
+    expect(problems.join(' ')).toContain('no retrieved sources');
+  });
+
+  it('refuses one that records no change', () => {
+    expect(validateAdjudications([{ ...evidenced, newBehaviour: 'answer' }]).join(' ')).toContain(
+      'records no change',
+    );
+  });
+
+  it('demands a real rationale, not a word', () => {
+    expect(() =>
+      adjudicationFile.parse({ suite: 's', adjudications: [{ ...evidenced, rationale: 'wrong' }] }),
+    ).toThrow();
+  });
+
+  it('accepts one that carries its evidence', () => {
+    expect(validateAdjudications([evidenced])).toEqual([]);
+  });
+
+  it('reports both scores, and the original counts an adjudicated pass as a failure', () => {
+    const outcomes = [
+      outcome({ id: 'a' }),
+      outcome({ id: 'b' }),
+      outcome({ id: 'c', passed: false }),
+    ];
+    const plain = metricsFor(outcomes);
+    const adjudicated = metricsFor(outcomes, [{ ...evidenced, caseId: 'b' }]);
+
+    expect(plain.accuracy).toBeCloseTo(2 / 3);
+    expect(plain.accuracyAsOriginallyScored).toBeCloseTo(2 / 3);
+    // 'b' now passes only because its expectation was rewritten.
+    expect(adjudicated.accuracy).toBeCloseTo(2 / 3);
+    expect(adjudicated.accuracyAsOriginallyScored).toBeCloseTo(1 / 3);
+    expect(adjudicated.adjudicatedCases).toBe(1);
+  });
+
+  it('judges the ship bar on the original score, never the adjudicated one', () => {
+    // Ten cases, nine passing only because they were reclassified.
+    const outcomes = Array.from({ length: 10 }, (_, i) => outcome({ id: `c${i}` }));
+    const adjudications = outcomes.slice(0, 9).map((o) => ({ ...evidenced, caseId: o.id }));
+    const metrics = metricsFor(outcomes, adjudications);
+    expect(metrics.accuracy).toBe(1);
+    const bar = shipBar(
+      {
+        suite: 's',
+        tier: 'validated',
+        gitSha: 'a',
+        chatModel: 'google:m',
+        embeddingModel: 'e',
+        reranker: 'fusion',
+        startedAt: '',
+        metrics,
+        outcomes,
+      },
+      'google:m',
+    );
+    expect(bar.meets).toBe(false);
+    expect(bar.notes.join(' ')).toContain('as originally scored');
+  });
 });
 
 describe('ship bar', () => {

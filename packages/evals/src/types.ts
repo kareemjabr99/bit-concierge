@@ -98,7 +98,19 @@ export interface RunMetrics {
   cases: number;
   passed: number;
   failed: number;
+  /**
+   * Against the CURRENT expectations. Never reported without the figure below
+   * beside it — a number that moves when an expectation is rewritten needs the
+   * unrewritten one next to it or it is not a measurement.
+   */
   accuracy: number;
+  /**
+   * Against the expectations as first drafted, counting every adjudicated case
+   * as the failure it originally was.
+   */
+  accuracyAsOriginallyScored: number;
+  /** How many cases have had their expectation changed, with evidence. */
+  adjudicatedCases: number;
   /** Answered rather than escalated, over cases that should be answerable. */
   deflectionRate: number;
   /** Of the turns that escalated, how many should have. */

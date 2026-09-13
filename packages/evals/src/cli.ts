@@ -24,6 +24,7 @@ import {
 import { reportDiff, reportRun } from './report.ts';
 import { persistRun, runSuite } from './runner.ts';
 import { suiteFile, type EvalCase } from './types.ts';
+import { loadAdjudications } from './adjudication.ts';
 
 /**
  *   pnpm evals run   [--suite en-core] [--model KEY] [--baseline] [--out report.md]
@@ -122,11 +123,14 @@ const execute = async () => {
     `${cases.length} cases · ${deps.chat.spec.key} · pacing ${deps.chat.spec.quota?.requestsPerMinute ?? '∞'}/min\n`,
   );
 
+  const adjudications = loadAdjudications(join(CASES_DIR, '..', 'adjudications.json'), suiteName);
+
   const result = await runSuite({
     tenantId,
     suite: suiteName,
     deps,
     cases,
+    adjudications,
     productionChatModel: config.productionChatModel,
     onCase: (outcome, index, total) =>
       process.stderr.write(

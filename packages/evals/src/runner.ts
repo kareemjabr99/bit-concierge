@@ -6,6 +6,7 @@ import { runTurn, type TurnDeps, type TurnResult } from '@bitc/agent';
 import { estimateCostUsd } from '@bitc/models';
 import type { CaseOutcome, EvalCase, RunMetrics, RunResult } from './types.ts';
 import { tierOf } from './types.ts';
+import type { Adjudication } from './adjudication.ts';
 
 /**
  * Runs the golden set through the real agent loop against the real retriever.
@@ -21,6 +22,8 @@ export interface RunOptions {
   suite: string;
   deps: TurnDeps;
   cases: EvalCase[];
+  /** Recorded reclassifications, so both scores can be reported. */
+  adjudications?: Adjudication[];
   /** Called after each case, for progress output. */
   onCase?: (outcome: CaseOutcome, index: number, total: number) => void;
   /** The model the ship bar must be measured on. Mismatch fails the gate. */
@@ -157,7 +160,14 @@ const percentile = (values: number[], p: number): number => {
   return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))]!;
 };
 
-export const metricsFor = (outcomes: CaseOutcome[]): RunMetrics => {
+export const metricsFor = (
+  outcomes: CaseOutcome[],
+  adjudications: Adjudication[] = [],
+): RunMetrics => {
+  // A case whose expectation was rewritten and now passes would have failed as
+  // first drafted. That is what the original figure counts.
+  const adjudicated = new Set(adjudications.map((a) => a.caseId));
+  const rescuedByAdjudication = outcomes.filter((o) => adjudicated.has(o.id) && o.passed).length;
   const answerable = outcomes.filter((o) => o.expectedBehaviour !== 'escalate');
   const escalated = outcomes.filter((o) => o.behaviour === 'escalate');
   const withSources = outcomes.filter(
@@ -170,6 +180,10 @@ export const metricsFor = (outcomes: CaseOutcome[]): RunMetrics => {
     passed: outcomes.filter((o) => o.passed).length,
     failed: outcomes.filter((o) => !o.passed).length,
     accuracy: outcomes.length ? outcomes.filter((o) => o.passed).length / outcomes.length : 0,
+    accuracyAsOriginallyScored: outcomes.length
+      ? (outcomes.filter((o) => o.passed).length - rescuedByAdjudication) / outcomes.length
+      : 0,
+    adjudicatedCases: adjudicated.size,
     deflectionRate: answerable.length
       ? answerable.filter((o) => o.behaviour === 'answer').length / answerable.length
       : 0,
@@ -216,8 +230,16 @@ export const shipBar = (
     notes.push(`${metrics.hallucinationCount} fabricated literal(s) — pass/fail`);
   if (metrics.citationMissCount > 0)
     notes.push(`${metrics.citationMissCount} uncited policy claim(s) — pass/fail`);
-  if (metrics.accuracy < 0.95)
-    notes.push(`accuracy ${(metrics.accuracy * 100).toFixed(1)}% is below 95%`);
+  // The ship bar reads the ORIGINAL score. A bar that can be cleared by
+  // rewriting expectations is not a bar.
+  if (metrics.accuracyAsOriginallyScored < 0.95) {
+    notes.push(
+      `accuracy as originally scored ${(metrics.accuracyAsOriginallyScored * 100).toFixed(1)}% is below 95%` +
+        (metrics.adjudicatedCases > 0
+          ? ` (${(metrics.accuracy * 100).toFixed(1)}% after ${metrics.adjudicatedCases} adjudication(s))`
+          : ''),
+    );
+  }
   if (metrics.deflectionRate < 0.6)
     notes.push(`deflection ${(metrics.deflectionRate * 100).toFixed(1)}% is below 60%`);
 
@@ -267,7 +289,7 @@ export const runSuite = async (options: RunOptions): Promise<RunResult> => {
     options.onCase?.(outcome, index, cases.length);
   }
 
-  const metrics = metricsFor(outcomes);
+  const metrics = metricsFor(outcomes, options.adjudications ?? []);
   // A turn that never reached the model is not a result. Counting those as
   // failures makes a quota wall look like a quality collapse, and a baseline
   // recorded from one is a trap for the next diff.
