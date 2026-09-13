@@ -305,18 +305,75 @@ gate can see:
 
 Audited 2026-09-13. Ordered by how much provenance each actually has.
 
-| source                                    | reaches the customer via                                | provenance                                                                                                                                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ingested pages                            | `search_knowledge`                                      | A URL on the merchant's domain. **Attests publication, not truth** — this is where the 1–10 / 2–3 conflict lives                                                                                                                   |
-| Shopify Admin API                         | `lookup_order`, `search_products`, `check_availability` | Authoritative from Phase 4: Shopify is the system of record. **Today these read invented fixtures**, exactly as unverified as the shipping rates were, and scoped to end at Phase 4                                                |
-| `tenant_config.policy_overrides.shipping` | `get_shipping_estimate`                                 | **None.** Hand-entered. The instance that failed                                                                                                                                                                                   |
-| `tenant_config.policy_overrides.messages` | `systemMessage()`                                       | **None, and it bypasses both gates entirely** — this copy never passes through the model, so nothing inspects it. A tenant who writes "we will refund you within 24 hours" as their escalation message has that delivered verbatim |
-| `tenant_config.brand_name`                | `alwaysGrounded` in the literal gate                    | **None, by construction.** Narrow — a brand name — but it is the mechanism in miniature: configuration telling the gate what to treat as true                                                                                      |
+| source                                    | reaches the customer via                                | provenance                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ingested pages                            | `search_knowledge`                                      | A URL on the merchant's domain. **Attests publication, not truth** — this is where the 1–10 / 2–3 conflict lives                                                                                                                                                                                                 |
+| Shopify Admin API                         | `lookup_order`, `search_products`, `check_availability` | Authoritative from Phase 4: Shopify is the system of record. **Today these read invented fixtures**, exactly as unverified as the shipping rates were, and scoped to end at Phase 4                                                                                                                              |
+| `tenant_config.policy_overrides.shipping` | `get_shipping_estimate`                                 | **None.** Hand-entered. The instance that failed                                                                                                                                                                                                                                                                 |
+| `tenant_config.policy_overrides.messages` | `systemMessage()`                                       | **None, and it bypasses both gates entirely** — this copy never passes through the model, so nothing inspects it. A tenant who writes "we will refund you within 24 hours" as their escalation message has that delivered verbatim. **By decision, and it stays** — a contractual boundary, not a gap. See below |
+| `tenant_config.brand_name`                | `alwaysGrounded` in the literal gate                    | **None, by construction.** Narrow — a brand name — but it is the mechanism in miniature: configuration telling the gate what to treat as true                                                                                                                                                                    |
 
 The pattern across the last three rows: **configuration is trusted absolutely
 and is never attested by anyone.** A merchant types a number into a form and it
 reaches a customer with the full confidence of a system that was built to make
 that impossible.
+
+Two of those three rows are defects. The third is not, and separating them is
+the point of the next two sections.
+
+### `policy_overrides.messages` is a contractual boundary, not a system limit
+
+One row of that table is not a gap to be closed, and recording it as one would
+be the wrong decision written down.
+
+`policy_overrides.messages` is the merchant's own voice. It is what their
+escalation message says, what their out-of-hours message says, in their words.
+It reaches the customer verbatim: it never passes through the model, so neither
+gate ever sees it. A tenant who writes _"we will refund you within 24 hours"_
+has that delivered exactly as typed, and nothing in this system will stop it.
+
+**That stays.** Not as an accepted risk, and not as work deferred — as the
+correct behaviour. A merchant's own words about their own business are not ours
+to police, and a system that quietly rewrote them, or refused to send them,
+would be worse than one that sends them unchecked. The alternative to "we do
+not gate this" is not "we gate it safely"; it is "we edit our clients' speech
+to their own customers," which is not a product anyone asked for.
+
+So this does not go in the backlog, because there is nothing to build. It goes
+in the **licence agreement**, where a boundary of responsibility belongs:
+
+> Copy the merchant enters in the message fields is transmitted to customers as
+> written. Bit68's accuracy controls apply to responses the assistant composes;
+> they do not apply to merchant-authored copy, and Bit68 does not review,
+> correct or warrant it. Accuracy of that copy, including keeping it current,
+> rests with the merchant.
+
+Two obligations follow on our side, and both are live now rather than at
+Phase 6:
+
+- **The screen says so.** Wherever this copy is edited, the editor shows
+  `MERCHANT_COPY_NOTICE` — "You are writing this. It is sent to customers
+  exactly as typed, in your own words, and nothing checks it." The wording
+  lives in `packages/agent/src/prompt/messages.ts`, next to the mechanism it
+  describes, so it cannot drift from what the code actually does.
+  `test/merchant-copy.test.ts` fails if an editor for these fields is ever
+  built without it. That test activates on its own: today it matches no files
+  and passes, and it binds the day someone writes the screen.
+- **The clause reaches the agreement.** This section is the source for it.
+  It is not done when the ADR is merged; it is done when the text above is in
+  the signed licence. **Open at the time of writing — owner: Bit68, before the
+  first paid tenant.**
+
+The same test also pins the ungated behaviour in place, with a case that feeds
+an invented 90-day return policy through `systemMessage()` and asserts it comes
+back untouched. That is there so a future engineer who decides to "fix" this
+has to delete an assertion that says, in words, that it is not broken.
+
+This row is therefore **excluded from the provenance design below.** Attesting
+it would be a category error: `attested_by` answers "who says this fact is
+true," and the answer for a merchant's own message is always, trivially, the
+merchant. The design below covers the rows where the system quotes a fact as
+though it were retrieved — `policy_overrides.shipping` and `brand_name`.
 
 ### Provenance for configured facts — designed now, built in Phase 6
 
