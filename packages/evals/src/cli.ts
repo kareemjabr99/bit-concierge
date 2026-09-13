@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig } from '@bitc/agent';
+import type { AdmissionPolicy } from '@bitc/models';
 import {
   cachedEmbedder,
   cachedReranker,
@@ -97,8 +98,18 @@ const build = async () => {
     { dir: process.env.BITC_RERANK_CACHE ?? join(HERE, '..', '..', '..', '.rerank-cache') },
   );
   // Recording wraps the cache, so a cached verdict is captured too. The shape
-  // of this distribution is what decides whether retrieval_min_score is a
+  // of this distribution is what decided whether the threshold was a
   // calibrated threshold or a coin toss wearing a number.
+  // --admits relevant | relevant_or_partial. Rejected rather than coerced: a
+  // typo silently running the default arm would make the comparison a lie.
+  const admitsArg = (): AdmissionPolicy => {
+    const value = arg('admits');
+    if (value !== 'relevant' && value !== 'relevant_or_partial') {
+      throw new Error(`--admits must be "relevant" or "relevant_or_partial", got "${value}"`);
+    }
+    return value;
+  };
+
   const rerankLog = process.env.BITC_RERANK_LOG;
   // Advanced by the runner's onCaseStart, so every recorded score names the
   // case that produced it. Correlating by file order instead would work right
@@ -116,10 +127,10 @@ const build = async () => {
       shopify: new MockShopifyClient(),
       knowledge: new PgKnowledgeSearcher(asTenantId(tenantId), embedder, reranker),
       gaps: new PgGapRecorder(asTenantId(tenantId)),
-      // The 0.5 experiment: admit the reranker's middle class, or not.
-      ...(arg('min-score')
-        ? { configOverrides: { retrievalMinScore: Number(arg('min-score')) } }
-        : {}),
+      // The partial-class experiment: admit the reranker's middle verdict, or
+      // not. Kept as an override rather than a config edit so one run can name
+      // one variable.
+      ...(arg('admits') ? { configOverrides: { retrievalAdmits: admitsArg() } } : {}),
       logger: createLogger({ level: 'error', write: (line) => process.stderr.write(`${line}\n`) }),
     },
   };

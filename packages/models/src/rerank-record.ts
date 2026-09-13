@@ -5,7 +5,7 @@ import type { RerankCandidate, Reranker } from './rerank.ts';
 /**
  * Records every verdict a reranker produces, for calibration analysis.
  *
- * The reranker's score is what `retrieval_min_score` gates on, so the shape of
+ * The reranker's score is what admission gates on, so the shape of
  * its distribution decides whether that threshold is a calibrated decision or a
  * coin toss wearing a number. Twelve hand-picked questions cannot answer that;
  * the queries the agent actually generates across a full suite can.
@@ -42,6 +42,7 @@ export const recordingReranker = (
   mkdirSync(dirname(path), { recursive: true });
   return {
     key: inner.key,
+    floors: inner.floors,
     ...(inner.stats ? { stats: inner.stats } : {}),
     async rerank(query, candidates, topN) {
       const ranked = await inner.rerank(query, candidates, topN);

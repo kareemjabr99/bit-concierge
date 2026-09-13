@@ -36,7 +36,7 @@ export const DEV_TENANT = {
   productionChatModel: 'google:gemini-3.5-flash-lite',
   embeddingModel: 'google:gemini-embedding-001@1536',
   reranker: 'llm:google:gemini-3.5-flash-lite',
-  retrievalMinScore: 0.75,
+  retrievalAdmits: 'relevant_or_partial',
   escalationEmails: ['escalations@bitc.example'],
   policyOverrides: {
     // Published shipping terms.
@@ -85,7 +85,7 @@ try {
   await sql.unsafe(
     `INSERT INTO tenant_config
        (tenant_id, brand_name, brand_description, brand_voice, chat_model, embedding_model,
-        production_chat_model, reranker, retrieval_min_score, escalation_emails, policy_overrides)
+        production_chat_model, reranker, retrieval_admits, escalation_emails, policy_overrides)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
      ON CONFLICT (tenant_id) DO UPDATE SET
        brand_name = EXCLUDED.brand_name,
@@ -95,7 +95,7 @@ try {
        embedding_model = EXCLUDED.embedding_model,
        production_chat_model = EXCLUDED.production_chat_model,
        reranker = EXCLUDED.reranker,
-       retrieval_min_score = EXCLUDED.retrieval_min_score,
+       retrieval_admits = EXCLUDED.retrieval_admits,
        escalation_emails = EXCLUDED.escalation_emails,
        policy_overrides = EXCLUDED.policy_overrides,
        updated_at = now()`,
@@ -108,7 +108,7 @@ try {
       DEV_TENANT.embeddingModel,
       DEV_TENANT.productionChatModel,
       DEV_TENANT.reranker,
-      DEV_TENANT.retrievalMinScore,
+      DEV_TENANT.retrievalAdmits,
       DEV_TENANT.escalationEmails as unknown as string[],
       JSON.stringify(DEV_TENANT.policyOverrides),
     ],

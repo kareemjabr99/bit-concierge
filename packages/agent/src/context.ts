@@ -1,3 +1,4 @@
+import type { AdmissionPolicy } from '@bitc/models';
 import type { Channel, Language, Logger, TenantId } from '@bitc/core';
 import type { ShopifyReadClient } from '@bitc/shopify';
 import type { GapRecorder, KnowledgeSearcher } from './knowledge/types.ts';
@@ -27,7 +28,7 @@ export interface TenantRuntimeConfig {
   reranker: string;
   productionChatModel: string | null;
   escalationEmails: string[];
-  retrievalMinScore: number;
+  retrievalAdmits: AdmissionPolicy;
   maxTokensPerConversation: number;
   maxTurnsPerConversation: number;
   maxTokensPerDay: number;

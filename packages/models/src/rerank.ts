@@ -8,7 +8,7 @@ import { BitcError } from '@bitc/core';
  *
  * Candidates arrive ordered by reciprocal rank fusion and carrying cosine
  * similarity as their score. A reranker may reorder them and may replace that
- * score; whatever it returns is what `retrieval_min_score` is compared
+ * score; whatever it returns is what the admission floors below are compared
  * against. That is the contract, and it is why the threshold's meaning does
  * not change when the reranker does.
  *
@@ -38,15 +38,33 @@ export interface RerankerStats {
   fellBack: number;
 }
 
+/**
+ * Which of a reranker's verdicts count as retrieved.
+ *
+ * The tenant chooses a policy, not a number. Translating the policy into a
+ * numeric floor is the reranker's job, because the reranker is the only thing
+ * that knows what its own scores mean — a rubric prompt's 0.5 and a trained
+ * cross-encoder's 0.5 are not the same quantity, and a threshold configured
+ * per tenant would silently change meaning when the reranker changed.
+ */
+export type AdmissionPolicy = 'relevant' | 'relevant_or_partial';
+
 export interface Reranker {
   key: string;
   rerank(query: string, candidates: RerankCandidate[], topN: number): Promise<RerankCandidate[]>;
+  /** The score at or above which a candidate is admitted, per policy. */
+  readonly floors: Record<AdmissionPolicy, number>;
   readonly stats?: RerankerStats;
 }
 
 /** Order by fused rank, keep cosine as the score. No model call. */
 export const fusionReranker: Reranker = {
   key: 'fusion',
+  // Cosine, passed through. Phase 2 measured the band: answerable questions
+  // score 0.64-0.70 and unanswerable ones 0.59-0.63, so neither floor
+  // separates them. These are a guard against nonsense, not a relevance
+  // decision, and the ADR says so rather than the numbers pretending.
+  floors: { relevant: 0.35, relevant_or_partial: 0.2 },
   async rerank(_query, candidates, topN) {
     return [...candidates].sort((a, b) => b.score - a.score).slice(0, topN);
   },
@@ -93,6 +111,10 @@ export const llmReranker = (
   return {
     key,
     stats,
+    // The rubric's own anchors: 1.0 states the answer, 0.5 is on topic but
+    // does not, 0.0 is unrelated. The floors sit just under each anchor so a
+    // model that returns 0.4 for "around 0.5" is not silently reclassified.
+    floors: { relevant: 0.75, relevant_or_partial: 0.35 },
     async rerank(query, candidates, topN) {
       if (candidates.length === 0) return [];
       const window = candidates.slice(0, windowSize);

@@ -5,7 +5,6 @@ import {
   integer,
   jsonb,
   pgTable,
-  real,
   text,
   timestamp,
   uniqueIndex,
@@ -74,8 +73,16 @@ export const tenantConfig = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
 
-    /** Below this, retrieval is treated as "not found" and the agent escalates. */
-    retrievalMinScore: real('retrieval_min_score').notNull().default(0.75),
+    /**
+     * Which of the reranker's verdicts count as retrieved.
+     *
+     * 'relevant' admits only candidates the rubric called a direct answer.
+     * 'relevant_or_partial' also admits on-topic-but-not-answering. There is
+     * no third setting — the reranker emits three classes and nothing between
+     * them, so a numeric threshold here would imply a precision that does not
+     * exist. See docs/adr/0004-embeddings.md.
+     */
+    retrievalAdmits: text('retrieval_admits').notNull().default('relevant_or_partial'),
 
     retentionDays: integer('retention_days').notNull().default(90),
 
@@ -96,6 +103,10 @@ export const tenantConfig = pgTable(
   (table) => [
     check('tenant_config_retention_check', sql`${table.retentionDays} in (30, 90, 365)`),
     check('tenant_config_alert_pct_check', sql`${table.usageAlertPct} between 1 and 99`),
+    check(
+      'tenant_config_retrieval_admits_check',
+      sql`${table.retrievalAdmits} in ('relevant','relevant_or_partial')`,
+    ),
   ],
 );
 

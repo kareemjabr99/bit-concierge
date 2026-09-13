@@ -15,7 +15,8 @@ import type { KnowledgeHit, KnowledgeQuery, KnowledgeSearcher } from '@bitc/agen
  *   nothing on its own and must never be compared to a threshold.
  *
  *   Cosine similarity decides ADMISSION. It is 0–1, comparable across queries,
- *   and it is what `tenant_config.retrieval_min_score` gates on.
+ *   and the admission policy in `tenant_config.retrieval_admits` decides
+ *   which of its verdicts count as retrieved.
  *
  * Below the threshold the agent is told nothing was found, which is what makes
  * it escalate rather than reason its way to a plausible policy.
@@ -176,7 +177,7 @@ export class PgKnowledgeSearcher implements KnowledgeSearcher {
           score: Number((rerankedScore.get(row.id) ?? 0).toFixed(4)),
         };
       })
-      .filter((hit) => hit.score >= query.minScore && !isDuplicate(hit.content))
+      .filter((hit) => hit.score >= this.reranker.floors[query.admits] && !isDuplicate(hit.content))
       .slice(0, query.topK);
   }
 }

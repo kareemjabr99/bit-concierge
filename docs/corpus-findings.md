@@ -36,6 +36,39 @@ sources_, as distinct from grounding in a source.
 `shipping-processing-conflict` in the golden set exists to keep it visible until
 it is fixed. It is not a case the agent can pass its way out of.
 
+### Three more contradictions between the two shipping pages (found 2026-09-14)
+
+The processing-time conflict above is not the only one. `/policies/shipping-policy`
+and `/pages/shipping-policy` are near-identical pages that disagree on three
+customer-facing facts:
+
+| fact                      | `/policies/shipping-policy`   | `/pages/shipping-policy`  |
+| ------------------------- | ----------------------------- | ------------------------- |
+| Tracking number activates | within **24 hours**           | within **72 hours**       |
+| Express delivery          | **1 to 3 days**, 0 SR per 5kg | (table differs)           |
+| DHL Express Worldwide     | **4 to 7 days**               | **5 to 10 business days** |
+
+And across the shipping policy and the terms of service:
+
+| fact                          | `/policies/shipping-policy`                                      | `/policies/terms-of-service`                                                                             |
+| ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Free shipping internationally | "Free shipping is **not applicable** for international shipping" | Free Shipping Promotion eligible in Saudi Arabia, UAE, Bahrain, Kuwait, Oman — regular-priced items only |
+
+That last pair is the sharpest, because the agent answered a customer question
+from it. Asked "do you deliver to Kuwait?", it replied that Kuwait is eligible
+for the free shipping promotion, citing the terms of service. The answer is
+correctly grounded and it contradicts a different live page of the same store.
+
+**This is the structural limit, demonstrated rather than argued.** The citation
+gate checks that a claim traces to a source. It has no view of whether another
+source says the opposite, and it cannot acquire one — a gate that reasoned
+about agreement between sources would be making an editorial judgement about
+the merchant's content, which is not ours to make.
+
+These are the merchant's to resolve. Ours is to keep them visible: every
+contradiction here is a question a customer can ask and get two different
+correct answers to, depending on which page retrieval happens to surface.
+
 ### The same policy is published twice, identically
 
 `/policies/refund-policy` and `/pages/returns-policy` are near-duplicates, as
@@ -80,6 +113,18 @@ wrong in exactly that direction.
 Consequences still visible in the golden set: `unanswerable-opening-hours` and
 `shipping-track-how` expect an escalation because the content is unreachable,
 not because the store has no answer.
+
+**CORRECTED 2026-09-14.** The claim above that `shipping-track-how` has no
+answer in the corpus was also wrong. `/policies/shipping-policy` and
+`/pages/shipping-policy` both publish a "Shipment confirmation & Order
+tracking" section describing the Shipment Confirmation email and its tracking
+number. Retrieval scored those chunks 0.5 and the threshold excluded them, and
+that retrieval failure was written down here as a fact about the corpus. It
+then became the cited evidence for reclassifying the case — which is how a
+measurement of the retrieval stack ends up recorded as a property of the
+merchant's content. See `docs/adr/0005-grounding.md`; the adjudication schema
+now requires a direct text search, because a substring search does not care
+what the reranker thought.
 
 **What would close them:** plain-text exports, dropped in `corpus/1886/clean/`.
 The four policy documents are already offered; the FAQ is the one that matters

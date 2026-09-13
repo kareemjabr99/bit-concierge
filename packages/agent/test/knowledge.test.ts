@@ -9,7 +9,7 @@ describe('fixture knowledge', () => {
       query: 'can I return an item',
       lang: 'en',
       topK: 3,
-      minScore: 0.2,
+      admits: 'relevant',
     });
     expect(hits[0]?.chunkId).toBe('fx-returns-window');
     expect(hits[0]?.score).toBeGreaterThan(0);
@@ -19,18 +19,18 @@ describe('fixture knowledge', () => {
 
   it('returns nothing for a question the corpus cannot answer', async () => {
     expect(
-      await kb.search({ query: 'quantum cryptography', lang: 'en', topK: 3, minScore: 0.35 }),
+      await kb.search({ query: 'quantum cryptography', lang: 'en', topK: 3, admits: 'relevant' }),
     ).toEqual([]);
   });
 
   it('prefers the requested language and falls back when thin', async () => {
-    const ar = await kb.search({ query: 'إرجاع', lang: 'ar', topK: 3, minScore: 0.2 });
+    const ar = await kb.search({ query: 'إرجاع', lang: 'ar', topK: 3, admits: 'relevant' });
     expect(ar[0]?.chunkId).toBe('fx-returns-window-ar');
     const fallback = await kb.search({
       query: 'care wash iron',
       lang: 'ar',
       topK: 3,
-      minScore: 0.2,
+      admits: 'relevant',
     });
     expect(fallback.some((h) => h.chunkId === 'fx-care')).toBe(true);
   });

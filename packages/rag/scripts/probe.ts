@@ -47,7 +47,7 @@ const pace = async (): Promise<void> => {
 
 /** Retrieve with no floor, so the raw scores are visible. */
 const scores = async (query: string): Promise<number[]> => {
-  const hits = await searcher.search({ query, lang: 'en', topK: 3, minScore: 0 });
+  const hits = await searcher.search({ query, lang: 'en', topK: 3, admits: 'relevant_or_partial' });
   return hits.map((hit) => hit.score);
 };
 
@@ -116,9 +116,9 @@ if (has('separation')) {
       query,
       lang: 'en',
       topK: 3,
-      minScore: config.retrievalMinScore,
+      admits: config.retrievalAdmits,
     });
-    console.log(`\nQ: ${query}   (threshold ${config.retrievalMinScore}, reranker ${rerankerKey})`);
+    console.log(`\nQ: ${query}   (admits ${config.retrievalAdmits}, reranker ${rerankerKey})`);
     if (hits.length === 0) console.log('   — nothing above threshold');
     for (const hit of hits) {
       console.log(

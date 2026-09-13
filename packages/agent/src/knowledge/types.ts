@@ -1,4 +1,5 @@
 import type { Language } from '@bitc/core';
+import type { AdmissionPolicy } from '@bitc/models';
 
 export interface KnowledgeHit {
   /** Stable chunk id — the thing a citation marker resolves to. */
@@ -7,7 +8,12 @@ export interface KnowledgeHit {
   title: string | null;
   url: string | null;
   headingPath: string[];
-  /** Calibrated 0–1. The tenant threshold applies to this. */
+  /**
+   * The reranker's verdict. NOT a calibrated probability — with the rubric
+   * reranker it takes three values. Kept for reporting and diagnosis; the
+   * admission decision is made by policy, not by comparing this to a
+   * tenant-configured number. See docs/adr/0004-embeddings.md.
+   */
   score: number;
 }
 
@@ -15,7 +21,8 @@ export interface KnowledgeQuery {
   query: string;
   lang: Language;
   topK: number;
-  minScore: number;
+  /** Which of the reranker's verdicts count as retrieved. */
+  admits: AdmissionPolicy;
 }
 
 /**

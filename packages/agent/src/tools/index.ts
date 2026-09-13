@@ -28,7 +28,7 @@ export const makeTools = (ctx: TurnContext) => ({
           query: input.query,
           lang: input.lang ?? ctx.lang,
           topK: input.top_k,
-          minScore: ctx.config.retrievalMinScore,
+          admits: ctx.config.retrievalAdmits,
         });
         for (const h of hits)
           ctx.recorder.retrievalHits.push({ chunkId: h.chunkId, score: h.score, url: h.url });

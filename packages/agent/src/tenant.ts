@@ -32,7 +32,7 @@ export const loadTenantConfig = async (tenantId: TenantId): Promise<TenantRuntim
     reranker: row.reranker,
     productionChatModel: row.productionChatModel,
     escalationEmails: row.escalationEmails,
-    retrievalMinScore: row.retrievalMinScore,
+    retrievalAdmits: row.retrievalAdmits as TenantRuntimeConfig['retrievalAdmits'],
     maxTokensPerConversation: row.maxTokensPerConversation,
     maxTurnsPerConversation: row.maxTurnsPerConversation,
     maxTokensPerDay: row.maxTokensPerDay,

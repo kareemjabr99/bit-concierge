@@ -13,6 +13,9 @@ interface FixtureChunk {
 
 const SITE = 'https://dev-store.example';
 
+/** Cosine over the fixture text; the same shape as fusionReranker's floors. */
+const FIXTURE_FLOORS = { relevant: 0.35, relevant_or_partial: 0.2 } as const;
+
 /**
  * INVENTED. A synthetic policy corpus in the shape the chunker produces, for
  * tests that need retrieval to be deterministic.
@@ -271,7 +274,7 @@ export class FixtureKnowledge implements KnowledgeSearcher {
     this.chunks = chunks;
   }
 
-  async search({ query, lang, topK, minScore }: KnowledgeQuery): Promise<KnowledgeHit[]> {
+  async search({ query, lang, topK, admits }: KnowledgeQuery): Promise<KnowledgeHit[]> {
     const terms = tokens(query);
     if (terms.length === 0) return [];
 
@@ -287,7 +290,7 @@ export class FixtureKnowledge implements KnowledgeSearcher {
     const rank = (candidates: FixtureChunk[]): KnowledgeHit[] =>
       candidates
         .map((chunk) => ({ chunk, s: score(chunk) }))
-        .filter(({ s }) => s >= minScore)
+        .filter(({ s }) => s >= FIXTURE_FLOORS[admits])
         .sort((a, b) => b.s - a.s)
         .slice(0, topK)
         .map(({ chunk, s }) => ({

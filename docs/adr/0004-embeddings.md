@@ -209,6 +209,57 @@ rather than a rubric prompt — would make the threshold meaningful again. Until
 one is in place, treating the number as a tuning surface is measuring the
 wrong thing.
 
+### The decision: admit the partial class
+
+Run both ways, on the 30 cases a threshold change can reach — the 13 whose top
+candidate scored 0.5, and 17 controls that searched and scored below it. The
+controls are there because the agent is not deterministic, and without them
+every flip looks like the threshold.
+
+| arm                          | treatment (13) | control (17) |
+| ---------------------------- | -------------- | ------------ |
+| exclude 0.5 (threshold 0.75) | 8 fail         | 3 fail       |
+| admit 0.5 (threshold 0.5)    | 4 fail         | 5 fail       |
+| cases that changed           | **6**          | **2**        |
+
+Two of seventeen controls flipped without the threshold touching them. That is
+the noise floor — about 12% — and it is the reason the treatment's 6 of 13 is
+reported next to it rather than alone.
+
+Every changed case was read against the corpus text, not scored from the
+harness:
+
+**Five genuine fixes, all verified.** `shipping-cost` ("charges are calculated
+at checkout" — correct), `returns-proof-of-purchase` ("proof of purchase is
+required for all returns" — verbatim), `returns-sale-exchange` (the policy
+lists "Sale or discounted items (Exchange Only)"), `shipping-gcc` (the terms
+list Kuwait as eligible for the free shipping promotion), and
+`shipping-track-how` (the shipping policy publishes the Shipment Confirmation
+email and its tracking number). Under the 0.75 threshold all five escalated to
+a human on questions the store has already answered in public.
+
+**One genuine harm.** `unanswerable-payment-methods` answered "We accept credit
+cards for purchases. Personal checks, money orders, and direct bank transfers
+are not accepted," citing the terms of service. The corpus does not state the
+store's accepted payment methods anywhere. This is the predicted failure mode
+exactly: an on-topic chunk that does not answer the question, written up as
+though it did.
+
+**Decision: admit the partial class.** Five recovered answers against one
+fabricated one, on questions the merchant has published answers to. The harm is
+real and it is the cost of the decision rather than an argument against it: the
+alternative is escalating to a human on five questions the store answers on its
+own website, which is the failure the product exists to remove.
+
+Recorded as binary, because it is: there is no third setting, and no amount of
+tuning reaches one.
+
+**What makes this decision revisitable rather than permanent.** The harm case
+is a rubric failure, not a threshold failure — a chunk about order-cancellation
+limits should not have scored 0.5 against "what payment methods do you accept".
+Tightening the rubric's 0.0/0.5 boundary shrinks the harm without giving back
+the five fixes. That is the next change here, and it is a prompt edit.
+
 ### Measured with
 
 `packages/models/src/rerank-record.ts` records every verdict, wrapped outside
