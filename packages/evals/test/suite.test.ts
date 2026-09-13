@@ -172,7 +172,10 @@ describe('adjudication discipline', () => {
 describe('the recorded adjudications.json on disk', () => {
   it('parses, and every entry carries the evidence that forced it', () => {
     const path = join(HERE, '..', 'adjudications.json');
-    if (!existsSync(path)) return;
+    // Not skipped when absent. A check that disappears with the file it checks
+    // is a check that can be removed by deleting evidence, which is the exact
+    // move this suite exists to prevent.
+    expect(existsSync(path), 'adjudications.json is committed and must be present').toBe(true);
     const parsed = adjudicationFile.parse(JSON.parse(readFileSync(path, 'utf8')));
     expect(validateAdjudications(parsed.adjudications)).toEqual([]);
     for (const a of parsed.adjudications) {
