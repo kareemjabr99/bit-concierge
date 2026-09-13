@@ -28,6 +28,12 @@ export interface RunOptions {
   adjudications?: Adjudication[];
   /** Called after each case, for progress output. */
   onCase?: (outcome: CaseOutcome, index: number, total: number) => void;
+  /**
+   * Called before each case. The reranker log is keyed on this, so a score can
+   * be attributed to the case that produced it rather than inferred from the
+   * order two files happen to be written in.
+   */
+  onCaseStart?: (testCase: EvalCase, index: number, total: number) => void;
   /** The model the ship bar must be measured on. Mismatch fails the gate. */
   productionChatModel?: string | null;
 }
@@ -258,6 +264,7 @@ export const runSuite = async (options: RunOptions): Promise<RunResult> => {
   const outcomes: CaseOutcome[] = [];
 
   for (const [index, testCase] of cases.entries()) {
+    options.onCaseStart?.(testCase, index, cases.length);
     await wait();
     // A fresh conversation per case: history is what the case declares, never
     // what the previous case happened to leave behind.

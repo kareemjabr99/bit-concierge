@@ -100,11 +100,16 @@ const build = async () => {
   // of this distribution is what decides whether retrieval_min_score is a
   // calibrated threshold or a coin toss wearing a number.
   const rerankLog = process.env.BITC_RERANK_LOG;
-  const reranker = rerankLog ? recordingReranker(cached, rerankLog) : cached;
+  // Advanced by the runner's onCaseStart, so every recorded score names the
+  // case that produced it. Correlating by file order instead would work right
+  // up until a retry or a cache hit shifted one of them by a line.
+  const currentCase = { id: undefined as string | undefined };
+  const reranker = rerankLog ? recordingReranker(cached, rerankLog, () => currentCase.id) : cached;
 
   return {
     tenantId: asTenantId(tenantId),
     config,
+    currentCase,
     embedder,
     deps: {
       chat,
@@ -121,7 +126,7 @@ const build = async () => {
 };
 
 const execute = async () => {
-  const { tenantId, config, embedder, deps } = await build();
+  const { tenantId, config, currentCase, embedder, deps } = await build();
   const only = arg('only')
     .split(',')
     .map((id) => id.trim())
@@ -145,6 +150,9 @@ const execute = async () => {
     cases,
     adjudications,
     productionChatModel: config.productionChatModel,
+    onCaseStart: (testCase) => {
+      currentCase.id = testCase.id;
+    },
     onCase: (outcome, index, total) =>
       process.stderr.write(
         `  [${String(index + 1).padStart(3)}/${total}] ${outcome.passed ? 'pass' : 'FAIL'}  ${outcome.id}${outcome.passed ? '' : ` — ${outcome.failures[0]}`}\n`,
