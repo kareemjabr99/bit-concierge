@@ -1,0 +1,25 @@
+{
+  "comment": "Maps each merchant export onto the document it IS, not a new one. Without this the export lands beside the crawled rendering of the same policy and the index holds two answers to the same question. supersedes lists the other crawled renderings of that policy, which are deleted on ingest — a Shopify store publishes each policy at both /policies/x and /pages/x.",
+  "sources": {
+    "shipping-policy": {
+      "sourceId": "policies/shipping-policy",
+      "url": "https://1886riyadh.com/policies/shipping-policy",
+      "supersedes": ["pages/shipping-policy"]
+    },
+    "returns-and-exchanges": {
+      "sourceId": "policies/refund-policy",
+      "url": "https://1886riyadh.com/policies/refund-policy",
+      "supersedes": ["pages/returns-policy"]
+    },
+    "terms-of-service": {
+      "sourceId": "policies/terms-of-service",
+      "url": "https://1886riyadh.com/policies/terms-of-service",
+      "supersedes": ["pages/terms-condition"]
+    },
+    "privacy-policy": {
+      "sourceId": "policies/privacy-policy",
+      "url": "https://1886riyadh.com/policies/privacy-policy",
+      "supersedes": []
+    }
+  }
+}

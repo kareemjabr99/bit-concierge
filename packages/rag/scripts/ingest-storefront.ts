@@ -20,6 +20,7 @@ import { loadTenantConfig } from '@bitc/agent';
 import { resolveEmbedder } from '@bitc/models';
 import {
   extractPage,
+  deleteDocuments,
   ingestDocument,
   loadCleanText,
   productDocument,
@@ -76,6 +77,19 @@ const SIZE_GUIDES = [
   'japanese-pants',
 ];
 
+// Resolved up front: superseding a crawled policy happens before the exports
+// are ingested, and that needs the tenant.
+const models = readEnv('models');
+const tenantId = await resolveTenantByWidgetKey(widgetKey);
+if (!tenantId) {
+  console.error(`No active tenant for "${widgetKey}". Run: pnpm db:seed`);
+  process.exit(1);
+}
+const config = await loadTenantConfig(asTenantId(tenantId));
+const embedder = resolveEmbedder(config.embeddingModel, {
+  googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY,
+});
+
 const documents: IngestDocument[] = [];
 const skipped: string[] = [];
 // A Shopify store publishes the same policy at /policies/x and /pages/x. Two
@@ -126,7 +140,7 @@ const addPage = (
 // crawl runs and the crawled twin of an exported policy is skipped as a
 // near-duplicate rather than competing with it in the top-k.
 if (cleanDir) {
-  const { documents: clean, notes } = loadCleanText(cleanDir);
+  const { documents: clean, notes, supersedes } = loadCleanText(cleanDir);
   console.log(`\nmerchant exports from ${cleanDir}`);
   for (const note of notes) {
     const stripped = Object.entries(note.stripped)
@@ -139,6 +153,18 @@ if (cleanDir) {
   for (const doc of clean) {
     documents.push(doc);
     seen.set(fingerprint(doc.content), doc.sourceId);
+  }
+  // The store's other rendering of each exported policy. Deleted before the
+  // exports land, so a run cannot leave two answers to the same question in
+  // the index even if it is interrupted afterwards.
+  if (supersedes.length > 0 && !dryRun) {
+    const removed = await deleteDocuments(asTenantId(tenantId), supersedes);
+    for (const r of removed)
+      console.log(`  superseded ${r.sourceId.padEnd(30)} ${r.chunks} chunks removed`);
+    for (const id of supersedes.filter((s) => !removed.some((r) => r.sourceId === s)))
+      console.log(`  superseded ${id.padEnd(30)} (not present)`);
+  } else if (supersedes.length > 0) {
+    for (const id of supersedes) console.log(`  would supersede ${id}`);
   }
   console.log('');
 }
@@ -182,17 +208,6 @@ if (dryRun) {
     console.log(`  ${d.sourceType.padEnd(8)} ${d.sourceId.padEnd(38)} ${d.content.length} chars`);
   process.exit(0);
 }
-
-const models = readEnv('models');
-const tenantId = await resolveTenantByWidgetKey(widgetKey);
-if (!tenantId) {
-  console.error(`No active tenant for "${widgetKey}". Run: pnpm db:seed`);
-  process.exit(1);
-}
-const config = await loadTenantConfig(asTenantId(tenantId));
-const embedder = resolveEmbedder(config.embeddingModel, {
-  googleApiKey: models.GOOGLE_GENERATIVE_AI_API_KEY,
-});
 
 let created = 0,
   updated = 0,

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { Language } from '@bitc/core';
 import type { IngestDocument } from '../ingest.ts';
@@ -92,6 +92,27 @@ const flattenTables = (lines: string[]): { lines: string[]; stripped: Record<str
   return { lines: out, stripped };
 };
 
+/**
+ * `sources.json`, beside the exports.
+ *
+ * An export is a better rendering of a policy the store already publishes, not
+ * a new policy. Ingested under its own filename it lands *beside* the crawled
+ * version and the index ends up holding two answers to the same question —
+ * which is what happened on the first run here: three shipping policies, two
+ * saying 1-10 business days and one saying 2-3.
+ *
+ * So the mapping is declared rather than guessed. `sourceId` is the identity
+ * of the policy, so the export replaces the crawled text in place and every
+ * citation that already points there keeps working. `supersedes` names the
+ * store's other rendering of the same policy — Shopify publishes each at both
+ * /policies/x and /pages/x — and those documents are deleted on ingest.
+ */
+export interface CleanSourceMap {
+  sourceId: string;
+  url?: string;
+  supersedes: string[];
+}
+
 export interface CleanTextNotes {
   sourceId: string;
   title: string;
@@ -154,7 +175,13 @@ const looksLikeHeading = (line: string): boolean =>
 export const loadCleanText = (
   dir: string,
   lang: Language = 'en',
-): { documents: IngestDocument[]; notes: CleanTextNotes[] } => {
+): { documents: IngestDocument[]; notes: CleanTextNotes[]; supersedes: string[] } => {
+  const mapPath = join(dir, 'sources.json');
+  const sourceMap: Record<string, CleanSourceMap> = existsSync(mapPath)
+    ? ((JSON.parse(readFileSync(mapPath, 'utf8')) as { sources: Record<string, CleanSourceMap> })
+        .sources ?? {})
+    : {};
+  const supersedes: string[] = [];
   const files = readdirSync(dir)
     .filter((f) => f.endsWith('.txt'))
     .sort();
@@ -192,17 +219,33 @@ export const loadCleanText = (
       warnings.push(`${leftover.length} unrecognised markup fragment(s), e.g. ${leftover[0]}`);
     }
 
+    const mapped = sourceMap[sourceId];
+    if (!mapped) {
+      warnings.push(
+        `no entry in sources.json, so this is indexed as a new document "${sourceId}" ` +
+          `rather than replacing the store's own copy of the policy. If the store ` +
+          `publishes this, add the mapping or the index will hold both.`,
+      );
+    }
+    supersedes.push(...(mapped?.supersedes ?? []));
+
     documents.push({
       sourceType: 'policy',
-      sourceId,
+      sourceId: mapped?.sourceId ?? sourceId,
       title,
       lang,
       content: body,
-      url: null,
+      url: mapped?.url ?? null,
       metadata: { origin: 'merchant-export', ingestedFrom: file },
     });
-    notes.push({ sourceId, title, stripped, warnings, chars: body.length });
+    notes.push({
+      sourceId: mapped?.sourceId ?? sourceId,
+      title,
+      stripped,
+      warnings,
+      chars: body.length,
+    });
   }
 
-  return { documents, notes };
+  return { documents, notes, supersedes };
 };

@@ -1,4 +1,47 @@
 {
   "suite": "en-core",
-  "adjudications": []
+  "adjudications": [
+    {
+      "caseId": "shipping-gcc",
+      "field": "citesAnyOf",
+      "originalBehaviour": "answer",
+      "newBehaviour": "answer",
+      "originalValue": [],
+      "newValue": ["policies/terms-of-service"],
+      "evidence": {
+        "kind": "sources",
+        "sources": [
+          {
+            "sourceId": "policies/terms-of-service",
+            "score": 1,
+            "excerpt": "Countries Eligible for Free Shipping Promotion: Saudi Arabia, UAE, Bahrain, Kuwait, Oman. Free shipping applies to regular-priced items only."
+          }
+        ]
+      },
+      "rationale": "The note said 'the corpus does not enumerate countries' and told the agent not to confirm a specific country. The terms of service enumerate five, Kuwait among them. A substring search for 'Kuwait' returns two chunks. The expectation was written from a belief about what a storefront publishes rather than from the corpus, and it would have scored a correctly grounded answer as a fabrication.",
+      "adjudicatedBy": "Claude (Bit68 build), pending merchant validation at Phase 5",
+      "adjudicatedAt": "2026-09-14"
+    },
+    {
+      "caseId": "shipping-tracking-not-updating",
+      "field": "mustNotContain",
+      "originalBehaviour": "escalate",
+      "newBehaviour": "escalate",
+      "originalValue": ["72 hour", "within 72"],
+      "newValue": [],
+      "evidence": {
+        "kind": "sources",
+        "sources": [
+          {
+            "sourceId": "policies/shipping-policy",
+            "score": 1,
+            "excerpt": "You will receive a Shipment Confirmation email once your order contains your tracking number(s). The tracking number will be active within 72 hours."
+          }
+        ]
+      },
+      "rationale": "The note called the 72-hour activation window a seed-set invention, 'verified absent from the corpus'. It is published in the shipping policy, in both the crawled page and the merchant's own export. The ban would have failed an agent for repeating the store's own text while escalating. Behaviour stays escalate: the customer is three days in, so the published window has already passed and the policy does not explain why tracking has not moved.",
+      "adjudicatedBy": "Claude (Bit68 build), pending merchant validation at Phase 5",
+      "adjudicatedAt": "2026-09-14"
+    }
+  ]
 }

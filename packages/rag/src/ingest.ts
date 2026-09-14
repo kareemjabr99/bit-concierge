@@ -235,3 +235,40 @@ export const dropEmbeddings = async (tenantId: TenantId, modelKey: string): Prom
       .returning({ id: schema.chunkEmbeddings.chunkId });
     return rows.length;
   });
+
+/**
+ * Removes documents that a merchant export replaces.
+ *
+ * A Shopify store publishes each policy twice — /policies/x and /pages/x — and
+ * the two are not always identical. On this corpus they disagree about how
+ * long an order takes to process. Once the merchant has handed over the
+ * authoritative text, a second rendering of the same policy is not extra
+ * coverage, it is a coin toss about which figure a customer is told.
+ *
+ * Chunks and their embeddings go with the document, by cascade.
+ */
+export const deleteDocuments = async (
+  tenantId: TenantId,
+  sourceIds: string[],
+): Promise<{ sourceId: string; chunks: number }[]> => {
+  if (sourceIds.length === 0) return [];
+  return withTenant(tenantId, async (tx) => {
+    const removed: { sourceId: string; chunks: number }[] = [];
+    for (const sourceId of sourceIds) {
+      const [doc] = await tx
+        .select({ id: schema.documents.id })
+        .from(schema.documents)
+        .where(
+          and(eq(schema.documents.tenantId, tenantId), eq(schema.documents.sourceId, sourceId)),
+        );
+      if (!doc) continue;
+      const [counted] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.chunks)
+        .where(eq(schema.chunks.documentId, doc.id));
+      await tx.delete(schema.documents).where(eq(schema.documents.id, doc.id));
+      removed.push({ sourceId, chunks: counted?.n ?? 0 });
+    }
+    return removed;
+  });
+};

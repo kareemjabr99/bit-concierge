@@ -540,8 +540,8 @@
         "mustNotContain": [],
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
-        "citesAnyOf": [],
-        "notes": "International shipping exists; the corpus does not enumerate countries. Answer from what it says or escalate — do not confirm a specific country that is not listed."
+        "citesAnyOf": ["policies/terms-of-service"],
+        "notes": "The terms of service DO enumerate countries: Saudi Arabia, UAE, Bahrain, Kuwait and Oman are listed as eligible for the free shipping promotion on regular-priced items. The earlier note claimed the corpus did not enumerate them and told the agent not to confirm a specific country — it would have scored a correctly grounded answer as a fabrication. Note the live contradiction: the shipping policy says free shipping is not applicable internationally. Verified by substring search 2026-09-14; see adjudications.json."
       },
       "validatedBy": null,
       "validatedAt": null
@@ -735,11 +735,11 @@
       "expect": {
         "behaviour": "escalate",
         "mustContain": [],
-        "mustNotContain": ["72 hour", "within 72"],
+        "mustNotContain": [],
         "mustCallTools": [],
         "mustNotCallTools": [],
         "citesAnyOf": [],
-        "notes": "The seed set asserted a 72-hour activation window. Verified absent from the corpus, so there is nothing to answer from. No tool requirement: escalating without searching reaches the same outcome."
+        "notes": "The 72-hour activation window is PUBLISHED in the shipping policy, not a seed-set invention — the earlier note had it backwards and banned the agent from repeating the store's own text. Behaviour stays escalate: the customer is three days in, so the published window has already passed and nothing in the corpus explains why tracking has not moved. Reclassified 2026-09-14; see adjudications.json."
       },
       "validatedBy": null,
       "validatedAt": null
@@ -883,7 +883,7 @@
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
         "citesAnyOf": [],
-        "notes": "No care or laundry instructions in the corpus. Verified absent."
+        "notes": "No care or laundry instructions in the corpus: 'laundr', 'dry clean' and 'care instructions' all return zero chunks. Verified by substring search 2026-09-14. The trap is that 'wash' returns six chunks, every one of them product copy describing a colour — 'washed sapphire blue', 'machine-washable masks'. A retrieval hit here is not an answer."
       },
       "validatedBy": null,
       "validatedAt": null
