@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  BAR_IS_PROVISIONAL,
+  PROVISIONAL_NOTE,
   listBaselines,
   diffRuns,
   metricsFor,
@@ -311,8 +313,28 @@ describe('ship bar', () => {
     };
   };
 
-  it('passes a clean validated run on the production model', () => {
-    expect(shipBar(base(), 'google:m').meets).toBe(true);
+  it('does not report a pass while the bar itself is provisional', () => {
+    // A clean validated run on the production model clears every gate and
+    // still does not pass, because the threshold it would be clearing is not
+    // a measurable quantity: run-to-run variance is ±3 to ±4.8 points and a
+    // single run cannot distinguish 95% from 91%. The caveat is the only
+    // output, so it is the only thing that can be quoted.
+    const bar = shipBar(base(), 'google:m');
+    expect(bar.meets).toBe(false);
+    expect(bar.notes).toEqual([PROVISIONAL_NOTE]);
+    expect(bar.notes.join(' ')).toContain('Not to be quoted as met');
+  });
+
+  it('keeps the provisional caveat until someone deliberately removes it', () => {
+    // One edit to lift it, and it has to be a deliberate one. If
+    // BAR_IS_PROVISIONAL is flipped without the bar being restated on measured
+    // variance, this is what notices.
+    expect(
+      BAR_IS_PROVISIONAL,
+      'BAR_IS_PROVISIONAL was turned off. That is correct ONLY once the repeat run at ' +
+        'identical inputs has pinned the variance down and ADR 0008 states the bar the ' +
+        'measurement supports. Update this test in the same commit.',
+    ).toBe(true);
   });
 
   it('fails closed when the run was measured on a different model', () => {

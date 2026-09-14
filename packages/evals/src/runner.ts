@@ -219,6 +219,31 @@ export const metricsFor = (
  * review with no automated score, and it never enters this decision —
  * see ADR 0005.
  */
+/**
+ * Whether the 95% accuracy threshold is a measurable quantity yet.
+ *
+ * It is not. Run-to-run variance on this suite is ±3 to ±4.8 percentage
+ * points — measured from cases whose sources did not change between two runs
+ * and whose verdicts flipped anyway — so a single run cannot distinguish 95%
+ * from 91%. ADR 0008 records that the free tier affords one complete run a
+ * day, which is why the variance has not been pinned down: doing it properly
+ * costs a day of quota on a repeat run at identical inputs.
+ *
+ * Until that measurement exists, a run that clears 95% has not demonstrated
+ * anything the bar can support, so `meetsShipBar` stays false and the report
+ * says why. A number nobody can reproduce should not be quotable to a client.
+ *
+ * **Flip this to false when the repeat run lands and the bar is restated on
+ * the measured variance.** One edit, deliberately — and the test below fails
+ * if the caveat is removed without one.
+ */
+export const BAR_IS_PROVISIONAL = true;
+
+export const PROVISIONAL_NOTE =
+  'PROVISIONAL BAR — 95% is not yet a measurable threshold. Run-to-run variance is ' +
+  '±3 to ±4.8 points, so this run cannot distinguish 95% from 91%. Not to be quoted as met. ' +
+  'See docs/adr/0008-limits.md.';
+
 export const shipBar = (
   result: Omit<RunResult, 'meetsShipBar' | 'shipBarNotes'>,
   productionChatModel: string | null | undefined,
@@ -251,7 +276,11 @@ export const shipBar = (
   if (metrics.deflectionRate < 0.6)
     notes.push(`deflection ${(metrics.deflectionRate * 100).toFixed(1)}% is below 60%`);
 
-  return { meets: notes.length === 0, notes };
+  // A clean run still does not report a pass, because the threshold it would
+  // be passing is not yet measurable. See BAR_IS_PROVISIONAL.
+  if (notes.length === 0) notes.push(PROVISIONAL_NOTE);
+
+  return { meets: BAR_IS_PROVISIONAL ? false : notes.length === 0, notes };
 };
 
 export const runSuite = async (options: RunOptions): Promise<RunResult> => {

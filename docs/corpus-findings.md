@@ -317,3 +317,48 @@ supply. The sample behind the variance estimate is small — 17 and 68 cases —
 and pinning it down properly costs a day of quota for a repeat run at identical
 inputs. That measurement should happen before Phase 5 sets a validation
 schedule, not during it.
+
+---
+
+## The evidence for client validation
+
+This is the argument for why 1886's CX side has to sign the golden set, stated
+in numbers rather than principle.
+
+**Three of twenty-one drafted absence expectations were wrong. All three in the
+same direction.**
+
+| case                             | the expectation asserted        | the corpus actually           |
+| -------------------------------- | ------------------------------- | ----------------------------- |
+| `shipping-track-how`             | no order-tracking instructions  | publishes them, on two pages  |
+| `shipping-tracking-not-updating` | the 72-hour window was invented | publishes it                  |
+| `shipping-gcc`                   | "does not enumerate countries"  | lists five, Kuwait among them |
+
+14% of the audited expectations, and **every one would have scored a correctly
+grounded answer as a fabrication.** Counting the two found earlier in Phase 2,
+five expectations have now been written on a belief about what a storefront
+publishes, and five out of five were wrong the same way.
+
+The direction is the finding. These are not random errors — nobody once
+guessed that the corpus covered something it did not. The bias is consistent:
+**someone who has not read the merchant's policies assumes they say less than
+they do.** No amount of care by the same author fixes a systematic bias in the
+same direction; only someone who knows the content can.
+
+That is what client validation buys, and it is why the suite is marked
+`provisional` until 1886 signs it. The machinery is proved. What is not proved
+is that the expectations describe this store.
+
+Two mechanisms now stand between an author and the next instance of this, both
+enforced rather than documented:
+
+- **At authoring time.** `expect.absenceCheck` records the substrings run
+  against the indexed text and the count they returned, which must be zero.
+  A case claiming the corpus is silent without one fails
+  `packages/evals/test/absence.test.ts`. A hand-over expecting no citation must
+  name its `escalationGround`, and `corpus-silent` is the only one a search can
+  settle — the others are grounds no published policy could ever change.
+- **After every ingest.** `pnpm --filter @bitc/evals run verify-absence`
+  re-runs all fourteen recorded checks against the live index. A corpus that
+  gains the content makes a recorded absence stale rather than wrong, and
+  stale is the quieter failure.

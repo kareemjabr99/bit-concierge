@@ -248,3 +248,42 @@ Prints the status line and always exits 0. **This line goes in every gate
 report, green or red.** A red pipeline stayed red for three days because nothing
 carried that fact to anyone who would act on it; the fix is not vigilance, it is
 putting the status in a document someone is already reading.
+
+---
+
+## Running an eval suite
+
+**One eval run per day. Nothing else touches the model key on a run day.**
+
+That is the whole operational rule, and it follows from arithmetic in ADR 0008:
+a 103-case run costs about 392 chat requests, the free tier allows 500 a day,
+and a 429 costs three requests because the SDK retries twice. One run fits with
+about 28% headroom. Two do not. Neither does one run plus the 30-case re-check
+that a fix-and-verify cycle needs.
+
+What "nothing else" covers, because all three have already eaten a run:
+
+- no second suite run, not even `--only` on a handful of cases
+- no `probe.ts`, no `quota-probe.ts`, no ad-hoc script against the chat model
+- no re-run after a fix — that is tomorrow
+
+A run that exhausts the quota does not fail loudly. It returns `error` for
+every remaining case, and those score as failures. Run 3 lost its last five
+that way and reported an accuracy four points lower than the truth. The runner
+refuses to write a baseline from an incomplete run, and `incompleteCases` is in
+every report — check it before reading any other number.
+
+```bash
+pnpm evals run -- --suite en-core --out run.md --out-json run.json
+```
+
+Before a gate, also:
+
+```bash
+pnpm --filter @bitc/evals run verify-absence
+```
+
+Re-runs every recorded absence check against the live index. A case asserting
+the corpus cannot answer something it has since started answering will score a
+correct answer as a fabrication; this is what catches that after an ingest.
+Costs no model calls.

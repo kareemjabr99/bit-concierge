@@ -33,6 +33,51 @@ export const evalCase = z.object({
     citesAnyOf: z.array(z.string()).default([]),
     /** Why this case exists and what a wrong answer would cost. */
     notes: z.string().default(''),
+    /**
+     * Proof that "the corpus does not cover this" was checked rather than
+     * assumed.
+     *
+     * Five expectations have now been written on the strength of a belief
+     * about what a storefront publishes, and all five were wrong in the same
+     * direction — the corpus answered the question. Three were still in the
+     * set at the Phase 2 gate: order tracking, the 72-hour activation window,
+     * and the list of countries eligible for free shipping. **Every one would
+     * have scored a correctly grounded answer as a fabrication.**
+     *
+     * So an absence is not a thing an author may simply believe. `terms` are
+     * substrings run against the indexed chunk text, `matchedChunks` is what
+     * came back, and it has to be zero. A substring search does not care what
+     * the reranker thought, which is the whole point: three of those five were
+     * retrieval failures written down as facts about the corpus.
+     *
+     * Checked with `pnpm --filter @bitc/rag run grep -- --count <terms>` and
+     * re-checked against the live index by
+     * `pnpm --filter @bitc/evals run verify-absence`, because a corpus that
+     * gains the content makes a recorded absence stale rather than wrong.
+     */
+    absenceCheck: z
+      .object({
+        terms: z.array(z.string().min(3)).min(1),
+        matchedChunks: z.number().int().min(0),
+        checkedAt: z.string().min(10),
+      })
+      .optional(),
+    /**
+     * Why a hand-over is the right answer, when no citation is expected.
+     *
+     * `corpus-silent` is the only ground a corpus search can settle, and it
+     * requires `absenceCheck`. The rest are grounds no published policy could
+     * ever change: moving money, identifying a customer, a question about
+     * live checkout state, an adversarial turn, or something simply outside
+     * what a store assistant does.
+     *
+     * A field rather than a phrase in the notes, because the first version of
+     * this rule read the prose and an author could pass it by rewording.
+     * Naming the ground is a claim someone can disagree with.
+     */
+    escalationGround: z
+      .enum(['corpus-silent', 'money', 'identity', 'tool-only', 'adversarial', 'out-of-scope'])
+      .optional(),
   }),
 
   /** Category, for reporting. Section 9 names the ones that must be covered. */
