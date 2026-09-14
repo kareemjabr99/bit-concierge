@@ -6,7 +6,14 @@
  * Reads nothing but public URLs. Nothing here touches customer data.
  *
  *   pnpm --filter @bitc/rag ingest -- --store https://1886riyadh.com --tenant pk_dev_1886
+ *   pnpm --filter @bitc/rag ingest -- --clean corpus/1886/clean --tenant pk_dev_1886
+ *
+ * --clean ingests merchant-exported plain text instead of crawling. Those
+ * documents take precedence over the crawled version of the same policy: an
+ * export is cleaner than a page reconstructed from theme markup.
  */
+import { isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readEnv, createLogger, asTenantId } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig } from '@bitc/agent';
@@ -14,6 +21,7 @@ import { resolveEmbedder } from '@bitc/models';
 import {
   extractPage,
   ingestDocument,
+  loadCleanText,
   productDocument,
   type IngestDocument,
   type PublicProduct,
@@ -29,6 +37,13 @@ const store = arg('store', 'https://1886riyadh.com').replace(/\/$/, '');
 const widgetKey = arg('tenant', 'pk_dev_1886');
 const productLimit = Number(arg('products', '40'));
 const dryRun = flag('dry-run');
+// Resolved against the repo root, not the package the script happens to run
+// from. The README's command is `--clean corpus/1886/clean`, and a documented
+// command that only works from a directory the docs never mention is a
+// documented command that does not work.
+const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
+const cleanArg = arg('clean', '');
+const cleanDir = cleanArg ? (isAbsolute(cleanArg) ? cleanArg : join(REPO_ROOT, cleanArg)) : '';
 
 const UA = 'BitConcierge/0.1 (+https://bit68.com; evaluation crawl for a licensed store assistant)';
 const logger = createLogger({ level: 'info', write: (l) => process.stderr.write(`${l}\n`) });
@@ -107,16 +122,46 @@ const addPage = (
   });
 };
 
-for (const slug of POLICIES)
-  await addPage('policy', `policies/${slug}`, `/policies/${slug}`, await get(`/policies/${slug}`));
-for (const slug of PAGES)
-  await addPage('page', `pages/${slug}`, `/pages/${slug}`, await get(`/pages/${slug}`));
-for (const slug of SIZE_GUIDES)
-  await addPage('page', `pages/${slug}`, `/pages/${slug}`, await get(`/pages/${slug}`));
+// Merchant exports first, so their fingerprints are in `seen` before the
+// crawl runs and the crawled twin of an exported policy is skipped as a
+// near-duplicate rather than competing with it in the top-k.
+if (cleanDir) {
+  const { documents: clean, notes } = loadCleanText(cleanDir);
+  console.log(`\nmerchant exports from ${cleanDir}`);
+  for (const note of notes) {
+    const stripped = Object.entries(note.stripped)
+      .map(([name, n]) => `${n} ${name}`)
+      .join(', ');
+    console.log(`  ${note.sourceId.padEnd(24)} "${note.title}"  ${note.chars} chars`);
+    if (stripped) console.log(`  ${' '.repeat(24)} stripped: ${stripped}`);
+    for (const w of note.warnings) console.log(`  ${' '.repeat(24)} WARNING: ${w}`);
+  }
+  for (const doc of clean) {
+    documents.push(doc);
+    seen.set(fingerprint(doc.content), doc.sourceId);
+  }
+  console.log('');
+}
 
-const catalogue = JSON.parse(await get('/products.json?limit=250')) as {
-  products: PublicProduct[];
-};
+if (!flag('clean-only')) {
+  for (const slug of POLICIES)
+    await addPage(
+      'policy',
+      `policies/${slug}`,
+      `/policies/${slug}`,
+      await get(`/policies/${slug}`),
+    );
+  for (const slug of PAGES)
+    await addPage('page', `pages/${slug}`, `/pages/${slug}`, await get(`/pages/${slug}`));
+  for (const slug of SIZE_GUIDES)
+    await addPage('page', `pages/${slug}`, `/pages/${slug}`, await get(`/pages/${slug}`));
+}
+
+const catalogue = flag('clean-only')
+  ? { products: [] }
+  : (JSON.parse(await get('/products.json?limit=250')) as {
+      products: PublicProduct[];
+    });
 for (const product of catalogue.products.slice(0, productLimit)) {
   const doc = productDocument(product, store);
   documents.push({
