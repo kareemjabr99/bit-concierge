@@ -154,12 +154,27 @@ importers:
 
   apps/web:
     dependencies:
+      '@bitc/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@bitc/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@bitc/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@bitc/models':
+        specifier: workspace:*
+        version: link:../../packages/models
+      '@bitc/rag':
+        specifier: workspace:*
+        version: link:../../packages/rag
+      '@bitc/shopify':
+        specifier: workspace:*
+        version: link:../../packages/shopify
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
 
   apps/widget:
     devDependencies:

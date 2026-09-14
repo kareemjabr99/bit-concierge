@@ -1,6 +1,6 @@
-import { sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { Language, TenantId } from '@bitc/core';
-import { withTenant } from '@bitc/db';
+import { schema, withTenant } from '@bitc/db';
 import type { Embedder, Reranker } from '@bitc/models';
 import type { KnowledgeHit, KnowledgeQuery, KnowledgeSearcher } from '@bitc/agent';
 
@@ -181,3 +181,33 @@ export class PgKnowledgeSearcher implements KnowledgeSearcher {
       .slice(0, query.topK);
   }
 }
+
+/**
+ * Turns cited chunk ids into something a customer can click.
+ *
+ * The gate works in chunk ids; a reader needs a title and a URL. Deduplicated
+ * by document, because three chunks of one policy are one link to a person,
+ * and ordered by title so the same answer renders the same way twice.
+ *
+ * Lives here rather than in the web app so that no HTTP layer needs a database
+ * client — the widget endpoint has no business composing SQL.
+ */
+export const citationSources = async (
+  tenantId: TenantId,
+  chunkIds: string[],
+): Promise<{ title: string; url: string | null }[]> => {
+  if (chunkIds.length === 0) return [];
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx
+      .select({ title: schema.documents.title, url: schema.documents.url })
+      .from(schema.chunks)
+      .innerJoin(schema.documents, eq(schema.documents.id, schema.chunks.documentId))
+      .where(inArray(schema.chunks.id, chunkIds));
+    const byTitle = new Map<string, { title: string; url: string | null }>();
+    for (const row of rows) {
+      const title = row.title ?? 'Store policy';
+      if (!byTitle.has(title)) byTitle.set(title, { title, url: row.url });
+    }
+    return [...byTitle.values()].sort((a, b) => a.title.localeCompare(b.title));
+  });
+};

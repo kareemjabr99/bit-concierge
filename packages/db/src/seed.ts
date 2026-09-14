@@ -37,6 +37,10 @@ export const DEV_TENANT = {
   embeddingModel: 'google:gemini-embedding-001@1536',
   reranker: 'llm:google:gemini-3.5-flash-lite',
   retrievalAdmits: 'relevant_or_partial',
+  // The storefront the widget is embedded on. Scheme and host, no path — that
+  // is what a browser sends. localhost is here because Phase 3 is developed
+  // against it; it comes out before a tenant is handed to a merchant.
+  widgetOrigins: ['https://1886riyadh.com', 'http://localhost:8787'],
   escalationEmails: ['escalations@bitc.example'],
   policyOverrides: {
     // Published shipping terms.
@@ -85,8 +89,8 @@ try {
   await sql.unsafe(
     `INSERT INTO tenant_config
        (tenant_id, brand_name, brand_description, brand_voice, chat_model, embedding_model,
-        production_chat_model, reranker, retrieval_admits, escalation_emails, policy_overrides)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+        production_chat_model, reranker, retrieval_admits, widget_origins, escalation_emails, policy_overrides)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
      ON CONFLICT (tenant_id) DO UPDATE SET
        brand_name = EXCLUDED.brand_name,
        brand_description = EXCLUDED.brand_description,
@@ -96,6 +100,7 @@ try {
        production_chat_model = EXCLUDED.production_chat_model,
        reranker = EXCLUDED.reranker,
        retrieval_admits = EXCLUDED.retrieval_admits,
+       widget_origins = EXCLUDED.widget_origins,
        escalation_emails = EXCLUDED.escalation_emails,
        policy_overrides = EXCLUDED.policy_overrides,
        updated_at = now()`,
@@ -109,6 +114,7 @@ try {
       DEV_TENANT.productionChatModel,
       DEV_TENANT.reranker,
       DEV_TENANT.retrievalAdmits,
+      DEV_TENANT.widgetOrigins as unknown as string[],
       DEV_TENANT.escalationEmails as unknown as string[],
       JSON.stringify(DEV_TENANT.policyOverrides),
     ],

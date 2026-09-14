@@ -74,6 +74,23 @@ export const tenantConfig = pgTable(
       .default(sql`'{}'::jsonb`),
 
     /**
+     * Storefront origins allowed to call the chat endpoint, scheme + host.
+     *
+     * The widget key is public — it is in the page source — so it identifies
+     * a tenant and authorises nothing. This is what stops the cheap misuse:
+     * someone lifting the key and embedding the widget on their own domain,
+     * where it would answer as this store and spend this store's quota.
+     *
+     * Empty allows no browser origin. A tenant that has not registered its
+     * storefront gets a widget that fails visibly rather than one that works
+     * for everybody.
+     */
+    widgetOrigins: text('widget_origins')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+
+    /**
      * Which of the reranker's verdicts count as retrieved.
      *
      * 'relevant' admits only candidates the rubric called a direct answer.

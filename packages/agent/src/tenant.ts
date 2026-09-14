@@ -33,6 +33,7 @@ export const loadTenantConfig = async (tenantId: TenantId): Promise<TenantRuntim
     productionChatModel: row.productionChatModel,
     escalationEmails: row.escalationEmails,
     retrievalAdmits: row.retrievalAdmits as TenantRuntimeConfig['retrievalAdmits'],
+    widgetOrigins: row.widgetOrigins,
     maxTokensPerConversation: row.maxTokensPerConversation,
     maxTurnsPerConversation: row.maxTurnsPerConversation,
     maxTokensPerDay: row.maxTokensPerDay,

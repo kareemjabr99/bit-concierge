@@ -29,6 +29,8 @@ export interface TenantRuntimeConfig {
   productionChatModel: string | null;
   escalationEmails: string[];
   retrievalAdmits: AdmissionPolicy;
+  /** Storefront origins allowed to call the chat endpoint. Empty allows none. */
+  widgetOrigins: string[];
   maxTokensPerConversation: number;
   maxTurnsPerConversation: number;
   maxTokensPerDay: number;
