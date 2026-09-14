@@ -505,7 +505,7 @@
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
         "citesAnyOf": ["policies/shipping-policy", "pages/shipping-policy"],
-        "notes": "The store publishes TWO processing times: 1-10 business days on /pages/shipping-policy and 2-3 on /policies/shipping-policy. Whichever is cited, the citation resolves and is on topic, so the gate cannot catch it. The case exists to keep the conflict visible until the merchant fixes it."
+        "notes": "RESOLVED IN THE INDEX 2026-09-14. The store published TWO processing times — 1-10 business days on /pages/shipping-policy and 2-3 on /policies/shipping-policy — and whichever was cited the citation resolved and was on topic, so the gate could not catch it. The merchant's export settled it at 1-10 and superseded the second page, so the index now holds one figure. BOTH ARE STILL LIVE ON THE STOREFRONT; the merchant is being asked to reconcile them. The case stays as a regression guard: a re-crawl that reintroduces /pages/shipping-policy brings the conflict back, and this is what would notice."
       },
       "validatedBy": null,
       "validatedAt": null
