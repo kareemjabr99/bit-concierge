@@ -183,3 +183,74 @@ carrier and keeps the packaging.
 **Two separate non-refundable charges** sit on the returns path: the pickup fee,
 and the original shipping fee. An answer that mentions one and not the other
 understates what a return costs.
+
+---
+
+## After the merchant exports (2026-09-14)
+
+Four plain-text policy exports landed in `corpus/1886/clean/` and were ingested
+in place of the crawled renderings of the same policies. 37 documents and 121
+chunks became 35 and 91: the store's second copy of each exported policy —
+`/pages/shipping-policy`, `/pages/returns-policy`, `/pages/terms-condition` —
+is no longer indexed, because a second rendering of one policy is not extra
+coverage, it is a coin toss about which figure a customer is told.
+
+### What the exports resolved
+
+| conflict              | before                    | now                                             |
+| --------------------- | ------------------------- | ----------------------------------------------- |
+| Order processing time | 1–10 business days vs 2–3 | **1–10**, one chunk, from the merchant's export |
+| Tracking activation   | 24 hours vs 72            | **72 hours**, one chunk                         |
+| DHL delivery estimate | 4–7 days vs 5–10          | **5–10 business days**                          |
+
+The merchant has taken a side rather than reconciled the pages: both figures
+are still live on the storefront and that is being raised with them separately.
+What changed here is that the agent now says one thing instead of whichever
+thing retrieval surfaced.
+
+### What the exports did not resolve
+
+**Free shipping.** `/policies/shipping-policy` says "Free shipping is not
+applicable for international shipping." `/policies/terms-of-service` lists
+"Countries Eligible for Free Shipping Promotion: Saudi Arabia, UAE, Bahrain,
+Kuwait, Oman." Both are now merchant exports, so this is not a crawl artefact
+and no cleaner text will fix it. The agent has already answered a customer from
+the second — correctly grounded, contradicting the first.
+
+**Payment methods are absent.** Confirmed by substring search: `"we accept"`
+returns zero chunks, and every `"payment method"` hit is "the same payment
+method used for your purchase", about refunds. This is the topic that produced
+the only fabricated answer in the partial-class A/B — an on-topic terms clause
+about order-cancellation limits, written up as an accepted-payments list.
+
+### A citation now points at a page whose text may differ
+
+Preferring an export means the indexed text is the merchant's document while
+the cited URL is the merchant's live page, and on the shipping policy those two
+already disagree. The precedence rule is the right one and this is its cost:
+until the merchant reconciles the pages, a customer who follows a citation may
+read a different number from the one they were told. Worth stating because it
+is a new way for a correctly-gated answer to be wrong.
+
+### Absence-claim audit
+
+Twenty-one golden-set cases assert something is not in the corpus. Every claim
+was re-checked by substring search against the indexed text. **Three were
+wrong, all in the same direction, all about shipping:**
+
+| case                             | claimed                                   | actually                           |
+| -------------------------------- | ----------------------------------------- | ---------------------------------- |
+| `shipping-track-how`             | no tracking instructions                  | published, on two pages            |
+| `shipping-tracking-not-updating` | 72-hour window "verified absent"          | published in the shipping policy   |
+| `shipping-gcc`                   | "the corpus does not enumerate countries" | five are listed, Kuwait among them |
+
+All three would have scored a correctly grounded answer as a fabrication. The
+remaining eighteen hold — gift wrapping, price match, BNPL, opening hours,
+careers, restock dates and care instructions all return zero chunks.
+
+One is worth keeping visible: `care-wash` is correctly absent —
+`"laundr"`, `"dry clean"` and `"care instructions"` return nothing — but
+`"wash"` returns six chunks, every one of them product copy describing a
+colour: "washed sapphire blue", "machine-washable masks". A retrieval hit there
+is not an answer, and it is the shape that produced the payment-methods
+fabrication.
