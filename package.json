@@ -17,10 +17,11 @@
     "db:migrate": "pnpm --filter @bitc/db run migrate",
     "db:rollback": "pnpm --filter @bitc/db run rollback",
     "db:reset": "pnpm --filter @bitc/db run reset",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "verify": "pnpm lint && pnpm typecheck && pnpm format && pnpm test",
     "verify:clean": "bash scripts/verify-clean.sh",
     "db:seed": "pnpm --filter @bitc/db run seed",
-    "evals": "pnpm --filter @bitc/evals run evals"
+    "evals": "pnpm --filter @bitc/evals run evals",
+    "gate": "bash scripts/gate-check.sh"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

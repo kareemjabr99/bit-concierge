@@ -205,3 +205,46 @@ stops a number from outliving the model that produced it.
 
 Keep the old baseline file. It is the record of what the previous model did,
 and the only way to answer "was this always like that?".
+
+---
+
+## Closing a phase
+
+Run these three, in order, and put the output of the third in the gate report.
+
+```bash
+pnpm verify:clean
+```
+
+A fresh clone, a fresh `HOME`, a fresh Postgres volume, and the README's own
+sequence. It closes the class of bug where the repository is green because of
+something on your machine that is not in the repository.
+
+**What it does not cover, and never did:** whether CI runs a check that
+`pnpm verify` does not. That gap put two pushes red on `prettier --check`
+while this command passed, because this command did not run that check.
+`test/ci-parity.test.ts` closes it — the workflow is the source of truth, and a
+step added to CI that `verify` cannot run fails the suite on the machine of
+whoever adds it.
+
+```bash
+pnpm gate
+```
+
+Reads CI status **for the exact commit at HEAD** and exits non-zero unless every
+run on it succeeded. Three states are deliberately not green: no run for this
+commit, a run still in progress, and a dirty working tree. `gh run list` without
+a commit filter answers "how did the last push go", which is a different
+question from "is the thing I am about to sign off green".
+
+**A phase does not close over a red pipeline.** If `pnpm gate` is red, the gate
+is not open, regardless of what the eval numbers say.
+
+```bash
+pnpm gate --report
+```
+
+Prints the status line and always exits 0. **This line goes in every gate
+report, green or red.** A red pipeline stayed red for three days because nothing
+carried that fact to anyone who would act on it; the fix is not vigilance, it is
+putting the status in a document someone is already reading.

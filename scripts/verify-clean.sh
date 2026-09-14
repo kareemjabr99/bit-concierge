@@ -67,3 +67,11 @@ docker exec -i "$CONTAINER" psql -U postgres -d bitconcierge -q -v ON_ERROR_STOP
 pnpm verify
 
 echo "✓ clean verification passed"
+
+# The other half of the parity problem, and the one that stayed invisible for
+# three days: a clean local run says nothing about whether the pipeline is
+# green. Reported here because this is the command someone actually runs before
+# a gate. Non-fatal — a red pipeline is the gate's decision to make, not this
+# script's — but it is no longer silent.
+echo
+bash "$ROOT/scripts/gate-check.sh" --report
