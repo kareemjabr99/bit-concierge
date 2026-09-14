@@ -101,6 +101,20 @@ Three consequences worth having on record before Phase 5 rather than during it:
   the day and hit the wall at case 98; on its own it would have completed. The
   binding constraint is not the run, it is everything else that happened first.
 
+### The constraint that compounds it
+
+Run-to-run variance is high. Cases whose sources did not change between two
+runs still flip verdict 5.9% of the time (4 of ~68, run 3 → run 4) and 11.8%
+in the cleanest measurement available (2 of 17 A/B controls, identical corpus
+and configuration). That puts the run-to-run standard deviation of suite
+accuracy at **±3 to ±4.8 percentage points**.
+
+One run a day, ±4 points of noise. **A single run cannot establish that a build
+clears 95% rather than 91%**, and repeated runs are what the free tier will not
+pay for. Nailing the variance down properly costs one day of quota — a repeat
+run at byte-identical inputs — and that should be spent before Phase 5 sets a
+validation schedule rather than during it.
+
 **This is a scheduling constraint, not a blocker.** It becomes one if Phase 5
 needs same-day turnaround on validation rounds, and that is the point at which
 a paid key stops being an ADR 0006 data-protection requirement and becomes an

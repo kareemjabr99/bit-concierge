@@ -193,3 +193,36 @@ is not simply too high: the remaining work is real and is listed at the gate.
   over the indexed text.
 - Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 6.7 h
   across three sittings.
+
+## Phase 2 — CI parity and the merchant exports
+
+**Wall clock: 2.6 h** (2026-09-14 06:50 – 09:25 UTC)
+
+| Activity                                                   | Hours |
+| ---------------------------------------------------------- | ----- |
+| Run 4, full 103 cases on the clean corpus (mostly waiting) | 1.10  |
+| Clean-text ingest: normaliser, source manifest, supersede  | 0.55  |
+| CI parity test, gate check, runbook                        | 0.35  |
+| Absence-claim audit and two adjudications                  | 0.25  |
+| Corpus diff, variance analysis                             | 0.20  |
+| Findings, ADR 0008 quota answer, build log                 | 0.15  |
+
+### Notes
+
+- **CI was red for two pushes on `prettier --check`, which `pnpm verify` did
+  not run.** `verify:clean` closed environmental drift and never covered
+  step-list drift; nobody had seen that half before. Both are closed now, and
+  the second failure — that a red pipeline produced no signal for three days —
+  is closed by `pnpm gate`.
+- **The merchant exports are net −3 on comparable cases.** The headline
+  75.7% → 79.6% is almost entirely run 3's five quota errors resolving. What
+  the exports did buy is corpus consistency: one processing time instead of
+  two, one tracking window instead of two.
+- **Run-to-run variance is 6–12%, or ±3 to ±4.8 points of suite accuracy.**
+  Neither the improvement nor the regression is distinguishable from noise.
+  Combined with one run a day on the free tier, this is the real obstacle to
+  measuring a 95% ship bar, and it is now in ADR 0008 rather than in Phase 5.
+- **The absence audit found two more false absence claims**, both about
+  shipping, both the same bias as the tracking one. Three of twenty-one.
+- Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 9.3 h
+  across four sittings.

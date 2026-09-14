@@ -254,3 +254,66 @@ One is worth keeping visible: `care-wash` is correctly absent —
 colour: "washed sapphire blue", "machine-washable masks". A retrieval hit there
 is not an answer, and it is the shape that produced the payment-methods
 fabrication.
+
+### Which cases changed, and what the exports are actually owed
+
+Run 4 is the first full suite on the exports. Accuracy went 75.7% → 79.6%.
+**Almost none of that is the corpus.**
+
+Run 3 hit the daily quota wall and five cases came back as errors, scored as
+failures. A later run that merely completes shows them as fixed, and four did.
+Excluding them leaves 98 comparable cases:
+
+|                  |        |
+| ---------------- | ------ |
+| Comparable cases | 98     |
+| Changed          | 15     |
+| Fixed            | 6      |
+| Broke            | 9      |
+| **Net**          | **−3** |
+
+The exports cost three net passes on cases that can be compared. The headline
+improvement is a measurement artefact of the baseline being incomplete, which
+is the third time an incomplete run has produced a misleading number and the
+first time the guard caught it before a baseline was written.
+
+**Six fixes, all on re-ingested documents.** `returns-who-pays-pickup`,
+`returns-how-to-start-online` and `returns-refund-method` were suppressed by
+the citation gate on the crawled text and now answer and cite correctly — the
+export's cleaner structure produced chunks the model could cite properly.
+`unanswerable-payment-methods` and `unanswerable-discount-code` stopped
+answering from terms-of-service boilerplate and now escalate, which is right.
+
+**Nine regressions**, of which five touch re-ingested documents and four do
+not. `shipping-gcc` is the one that matters: it answered correctly from the
+free-shipping country list in the A/B arm and now escalates. The chunk is still
+there — `"Kuwait"` returns two — so re-chunking moved it out of retrieval
+reach. That is a real cost of the re-ingest.
+
+### How much of this is noise
+
+Four of the fifteen changed cases touch no re-ingested document at all: three
+sizing cases and `store-address`. Their sources are byte-identical to run 3 and
+their verdicts flipped anyway. That is pure run-to-run variance, and it gives a
+floor:
+
+| measurement                                  | flip rate           |
+| -------------------------------------------- | ------------------- |
+| Cases with unchanged sources, this run       | 4 of ~68 — **5.9%** |
+| A/B control group (same corpus, same config) | 2 of 17 — **11.8%** |
+
+At those rates the run-to-run standard deviation of suite accuracy is **±3 to
+±4.8 percentage points**. So:
+
+> **The 75.7% → 79.6% movement is not distinguishable from noise, and neither
+> is the −3 net.** Neither number should be quoted as an effect of the clean
+> text.
+
+This matters well beyond this diff. **A 95% ship bar cannot be resolved by a
+single run at this variance**, and ADR 0008 records that the free tier affords
+one complete run a day. Those two constraints multiply: establishing that a
+build clears 95% rather than 91% needs repeated runs the free tier cannot
+supply. The sample behind the variance estimate is small — 17 and 68 cases —
+and pinning it down properly costs a day of quota for a repeat run at identical
+inputs. That measurement should happen before Phase 5 sets a validation
+schedule, not during it.
