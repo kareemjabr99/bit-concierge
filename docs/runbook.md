@@ -287,3 +287,47 @@ Re-runs every recorded absence check against the live index. A case asserting
 the corpus cannot answer something it has since started answering will score a
 correct answer as a fabrication; this is what catches that after an ingest.
 Costs no model calls.
+
+---
+
+## Mutation testing
+
+**Standard, not optional.** Every security- or correctness-critical component
+is mutation-tested before its gate closes, and the results go in the gate
+report.
+
+Three for three so far, and each time the ordinary tests were green:
+
+| component                    | what a passing test suite missed                                  |
+| ---------------------------- | ----------------------------------------------------------------- |
+| Row-level security           | a policy that filtered without isolating                          |
+| The citation gate            | exemptions a fabricated policy inherited from a real carrier name |
+| The storefront session token | a client-chosen token letting two visitors share a transcript     |
+
+The method is not elaborate. Break the thing on purpose, one property at a
+time, and run the suite:
+
+```bash
+cp src/thing.ts /tmp/thing.bak
+# ...apply one mutation...
+npx vitest run path/to/thing.test.ts
+cp /tmp/thing.bak src/thing.ts
+```
+
+What matters is what you mutate. Useful mutations invert a **security or
+correctness property**, not a line of code: take the first forwarded hop
+instead of the last, skip the signature check, return the raw model text, allow
+any origin, remove the exemption guard. A mutation nobody would plausibly write
+proves nothing.
+
+**A surviving mutation is a finding, not a test to patch.** Twice now the
+survivor meant the control itself was decorative rather than the test being
+weak — the session token's shape check was never what made it safe, and
+patching the test would have preserved the hole. Read a survivor as a question
+about the code first.
+
+**Two traps, both hit here.** A mutation applied by string replacement may not
+match after formatting — check it actually applied before believing it
+survived. And prose that repeats a marker can act as a decoy: removing the real
+declaration left a copy behind in a comment, and the test passed for the wrong
+reason.

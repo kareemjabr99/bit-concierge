@@ -29,6 +29,12 @@ correct answer, not the model inventing one. All twelve classes are fixed. A
 failure here suppresses a reply and calls a human; it does not ship a wrong
 one.
 
+**Mutation testing is standard, and it keeps paying.** Three for three: row
+security, the citation gate, and the storefront session token. Each time the
+ordinary tests were green and a deliberately broken version of the code still
+passed them. Every security- or correctness-critical component is
+mutation-tested before its gate closes and the results go in the gate report.
+
 **Order, price and stock facts never come from retrieval.** "Where is my
 order" is a tool call. Architectural, and enforced by the case set.
 
@@ -126,6 +132,45 @@ Phase 5.
 **"It's connected to the store."** It is not. Order lookup, product search and
 stock checks run against synthetic fixtures and have never touched a real
 Shopify store. Phase 4.
+
+---
+
+## The worst bug found in this build
+
+Worth stating plainly, because a client will reasonably ask what was found and
+when.
+
+The storefront chat endpoint issues a conversation token; the browser stores it
+and sends it back on the next turn. The first version issued sixteen random
+bytes and checked the returned token's _shape_.
+
+That is not safe, and it looks safe, which is the problem. **The client sends
+the token back, so the client can send back anything.** A visitor posting
+`token: "AAAAAAAAAAAAAAAAAAAAAA"` gets the conversation belonging to that
+string — and so does everyone else who posts it. Two strangers would have
+shared a transcript, and on this product a transcript holds **order numbers and
+email addresses**, because the whole point is that customers ask where their
+order is.
+
+Checking the shape does nothing against this: a chosen token can be perfectly
+well-shaped.
+
+**Found by mutation testing, before anything real touched it.** Deleting the
+shape check changed no test — correctly, because the shape check was never what
+made it safe. A test suite that goes green when a security control is removed
+is telling you the control was decorative.
+
+Fixed by signing: tokens carry an HMAC the server verifies, so only a token
+this server issued is adopted, and the signing key is derived from the
+application encryption key rather than reused, so a session token and an
+encrypted Shopify credential never share key material. Nine mutations now cover
+the endpoint, including that one.
+
+**No customer data has ever been through this code.** The endpoint has never
+been deployed, the Shopify connection does not exist yet, and every order in
+the fixtures is invented. The exposure was zero and the finding is still worth
+having: it is the class of bug that ships quietly, and it was caught by a
+discipline applied on purpose rather than by luck.
 
 ---
 
