@@ -41,10 +41,25 @@ DIRTY=""
 [ -n "$(git status --porcelain)" ] && DIRTY=" (working tree dirty — CI has not seen these changes)"
 
 # --json emits [] rather than failing when the sha is unknown to GitHub.
-RUNS="$(gh run list --commit "$SHA" --json status,conclusion,workflowName,url 2>/dev/null)"
-if [ -z "$RUNS" ] || [ "$RUNS" = "[]" ]; then
+ALL_RUNS="$(gh run list --commit "$SHA" --json status,conclusion,workflowName,url,createdAt 2>/dev/null)"
+if [ -z "$ALL_RUNS" ] || [ "$ALL_RUNS" = "[]" ]; then
   fail "NO RUN — this commit has not been pushed, or no workflow triggered on it$DIRTY"
 fi
+
+# One commit can have several runs of the same workflow, and only the newest is
+# a verdict on it. The workflow cancels in-progress runs for a ref, so two
+# pushes seconds apart leave a cancelled attempt behind — and a cancelled
+# attempt is not a failed one.
+#
+# This narrows what is examined rather than what counts as failure: if the
+# newest run of a workflow failed, was cancelled, or is still going, that is
+# still not green. A re-run that passes is a pass, which is what re-running
+# means.
+RUNS="$(echo "$ALL_RUNS" | jq -c '
+  group_by(.workflowName)
+  | map(sort_by(.createdAt) | last)')"
+SUPERSEDED=$(( $(echo "$ALL_RUNS" | jq 'length') - $(echo "$RUNS" | jq 'length') ))
+[ "$SUPERSEDED" -gt 0 ] && DIRTY="$DIRTY ($SUPERSEDED superseded run(s) ignored)"
 
 PENDING="$(echo "$RUNS" | jq -r '[.[] | select(.status != "completed")] | length')"
 FAILED="$(echo "$RUNS" | jq -r '[.[] | select(.conclusion != "success" and .status == "completed")] | length')"
