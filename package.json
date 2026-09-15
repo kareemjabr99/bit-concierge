@@ -7,7 +7,7 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/widget",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:write": "prettier --write .",

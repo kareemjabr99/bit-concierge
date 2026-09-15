@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The only browser code in the repo. Everything else is Node, and the root
+    // config says so — a stray `document` in a server package should not
+    // typecheck, which is why the DOM lib lives here rather than at the root.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

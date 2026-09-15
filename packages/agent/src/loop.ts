@@ -173,7 +173,14 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   };
 
   // Section 8: once escalated, the thread belongs to a human until resolved.
-  if (conversation.status === 'escalated') return finish('with_team', null);
+  //
+  // The agent stops ANSWERING, not speaking. A null reply here reached the
+  // storefront widget as an empty bubble — the customer typed again after an
+  // escalation and got a blank box back. The acknowledgement is system copy
+  // rather than model output for the obvious reason: there is no model call on
+  // this path, and there must not be one.
+  if (conversation.status === 'escalated')
+    return finish('with_team', systemMessage('with_team', lang, config.messages));
 
   // Section 11 / ADR 0008: caps are checked before any model call.
   if (

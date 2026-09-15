@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig, runTurn } from '@bitc/agent';
@@ -26,6 +28,7 @@ const env = readEnv('encryption');
 const models = readEnv('models');
 const port = Number(process.env.PORT ?? 8787);
 const trustProxy = process.env.TRUST_PROXY === 'true';
+const isProduction = process.env.NODE_ENV === 'production';
 const logger = createLogger({ level: 'info' });
 
 const sessionKey = deriveSigningKey(env.ENCRYPTION_KEY);
@@ -46,8 +49,78 @@ const chatModelFor = async (tenantId: string) => {
   return { config, chat, embedder };
 };
 
+/**
+ * A bare page that embeds the widget, for looking at it.
+ *
+ * Deliberately almost empty: the widget has to survive a merchant's theme, and
+ * a demo page with its own styling would hide exactly the bleed-through this
+ * is meant to expose. The paragraph of aggressive CSS is there on purpose — if
+ * the shadow boundary ever stops working, this page shows it immediately.
+ *
+ * The script tag carries a timestamp because a browser that has cached the
+ * bundle will happily keep serving it after a rebuild, and ten minutes went
+ * into chasing a fix that had already been applied.
+ */
+const demoPage = (): string => `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1886 — widget harness</title>
+<style>
+  /* Hostile on purpose. A merchant theme that styles every element is normal. */
+  * { font-family: 'Comic Sans MS', cursive; color: #b00; }
+  div, button, input { border: 3px dotted #b00 !important; background: #ffe !important; }
+  body { margin: 0; padding: 48px; background: #fffdf5; }
+</style>
+</head>
+<body>
+  <h1>Widget harness</h1>
+  <p>This page styles every element badly on purpose. If any of it reaches
+     inside the widget, the shadow boundary is not doing its job.</p>
+  <p>Try: <em>how long do I have to return something?</em> · <em>do you deliver to Kuwait?</em></p>
+  <script src="/widget.js?v=${Date.now()}" data-bitc-key="pk_dev_1886" data-bitc-endpoint="/api/chat" defer></script>
+</body>
+</html>`;
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+  // The built embed, and a page that embeds it. Served from here in Phase 3
+  // because there is one process and no CDN yet; Phase 4 moves the bundle to
+  // one and this route goes away.
+  if (url.pathname === '/widget.js') {
+    try {
+      const bundle = readFileSync(
+        fileURLToPath(new URL('../../widget/dist/widget.js', import.meta.url)),
+      );
+      res
+        .writeHead(200, {
+          'content-type': 'text/javascript; charset=utf-8',
+          // Any storefront may load the script itself; what it may then DO is
+          // governed by the tenant's widget_origins on /api/chat.
+          'access-control-allow-origin': '*',
+          // Five minutes in production is right for a file every storefront
+          // page loads. In development it means a rebuilt bundle silently does
+          // not reach the browser, which cost a confusing ten minutes chasing
+          // a fix that was already applied.
+          'cache-control': isProduction ? 'public, max-age=300' : 'no-store',
+        })
+        .end(bundle);
+    } catch {
+      res
+        .writeHead(404, { 'content-type': 'text/plain' })
+        .end('run: pnpm --filter @bitc/widget build');
+    }
+    return;
+  }
+
+  if (url.pathname === '/demo') {
+    res
+      .writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+      .end(demoPage());
+    return;
+  }
 
   if (url.pathname === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');

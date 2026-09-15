@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "echo 'Phase 3: esbuild IIFE bundle'"
+    "build": "esbuild src/widget.ts --bundle --format=iife --target=es2020 --minify --outfile=dist/widget.js"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

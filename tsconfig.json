@@ -7,5 +7,5 @@
     "apps/*/test/**/*.ts",
     "*.ts"
   ],
-  "exclude": ["**/node_modules", "**/dist", "**/build"]
+  "exclude": ["**/build", "**/dist", "**/node_modules", "apps/widget"]
 }

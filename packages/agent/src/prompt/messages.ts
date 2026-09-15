@@ -8,7 +8,7 @@ import type { Language } from '@bitc/core';
  * Arabic strings are placeholders until the Phase 5 native review.
  */
 export type SystemMessageKey =
-  'escalated' | 'suppressed' | 'conversation_cap' | 'daily_cap' | 'error';
+  'escalated' | 'suppressed' | 'conversation_cap' | 'daily_cap' | 'error' | 'with_team';
 
 const MESSAGES: Record<Language, Record<SystemMessageKey, string>> = {
   en: {
@@ -21,6 +21,12 @@ const MESSAGES: Record<Language, Record<SystemMessageKey, string>> = {
       'Our assistant is taking a short break. Please leave your message and the team will reply.',
     error:
       'Something went wrong on our side. I have let the team know, and someone will follow up.',
+    // Once a thread is escalated it belongs to a human until they close it, so
+    // the agent stops answering. It must not stop SPEAKING: the customer who
+    // types again is owed an acknowledgement, and the first version of the
+    // widget rendered the null reply as an empty bubble. Found by using it.
+    with_team:
+      'The team has this one and will reply here. I have added your message to the thread.',
   },
   ar: {
     escalated: 'شكراً لك، حوّلت طلبك للفريق وبيتواصلون معك هنا.',
@@ -28,6 +34,7 @@ const MESSAGES: Record<Language, Record<SystemMessageKey, string>> = {
     conversation_cap: 'المحادثة طوّلت، فحوّلتها للفريق وبيكملون معك من هنا.',
     daily_cap: 'المساعد في استراحة قصيرة. اترك رسالتك والفريق بيرد عليك.',
     error: 'صار خلل من عندنا. بلّغت الفريق وبيتواصلون معك.',
+    with_team: 'الفريق مستلم الموضوع وبيردون عليك هنا. أضفت رسالتك للمحادثة.',
   },
 };
 

@@ -16,3 +16,8 @@ coverage/
 .drizzle-generated/
 .embed-cache/
 .rerank-cache/
+
+# Local preview config. Points at whatever Node 24 this machine has; .nvmrc is
+# the committed answer to "which node", and this file is the machine's own.
+.claude/launch.json
+apps/widget/dist/

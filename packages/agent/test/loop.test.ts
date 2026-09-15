@@ -231,7 +231,7 @@ describe('agent turn', () => {
     expect(r.recorder.escalation?.reason).toBe('step_limit');
   });
 
-  it('once escalated, the thread belongs to the team: no reply, no model call', async () => {
+  it('once escalated, the thread belongs to the team: acknowledged, no model call', async () => {
     const conv = uniqueId('c');
     await turn(
       'I want a refund',
@@ -252,7 +252,11 @@ describe('agent turn', () => {
     const model = scripted([{ text: 'this must never be generated' }]);
     const r = await turn('hello?', model, conv);
     expect(r.status).toBe('with_team');
-    expect(r.reply).toBeNull();
+    // The agent stops ANSWERING, not speaking. A null reply here reached the
+    // storefront widget as an empty bubble: the customer typed again after an
+    // escalation and got a blank box. System copy, because there is no model
+    // call on this path and there must not be one.
+    expect(r.reply).toContain('The team has this one');
     expect(model.doGenerateCalls).toHaveLength(0);
   });
 
