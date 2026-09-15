@@ -101,19 +101,34 @@ Three consequences worth having on record before Phase 5 rather than during it:
   the day and hit the wall at case 98; on its own it would have completed. The
   binding constraint is not the run, it is everything else that happened first.
 
-### The constraint that compounds it
+### MEASURED 2026-09-15: the variance, and what it does to the bar
 
-Run-to-run variance is high. Cases whose sources did not change between two
-runs still flip verdict 5.9% of the time (4 of ~68, run 3 → run 4) and 11.8%
-in the cleanest measurement available (2 of 17 A/B controls, identical corpus
-and configuration). That puts the run-to-run standard deviation of suite
-accuracy at **±3 to ±4.8 percentage points**.
+The repeat run happened. Two complete runs, byte-identical inputs.
+`docs/variance-measurement.md` has the full analysis; the part that belongs
+here is what it does to the ship bar.
 
-One run a day, ±4 points of noise. **A single run cannot establish that a build
-clears 95% rather than 91%**, and repeated runs are what the free tier will not
-pay for. Nailing the variance down properly costs one day of quota — a repeat
-run at byte-identical inputs — and that should be spent before Phase 5 sets a
-validation schedule rather than during it.
+**12 of 103 cases are nondeterministic** — 11.7%. A single run's accuracy
+carries a 95% interval of ±3.3 points.
+
+**95% is unreachable, and not because the agent is not good enough.** Fix every
+one of the 15 deterministic failures and the 12 coin flips remain: expected
+accuracy 94.2%, and a single run clears 95% **38.7% of the time**. A perfect
+system fails this bar six times in ten.
+
+**The instability is in the metric.** Every one of the 12 flips is between two
+_acceptable_ behaviours — handing over versus a safe refusal, answering versus
+the gate withholding. Nothing leaked, nothing was invented. The suite encodes
+one right answer where several exist and scores the others as failures.
+
+So the earlier estimate of ±3 to ±4.8 was right at the top of its range, and
+the conclusion it pointed at was wrong. The problem is not that one run a day
+is too few. **More runs would measure the wrong number more precisely.**
+
+See `docs/variance-measurement.md` for the five options costed. The
+recommendation is a deterministic bar — zero fabricated literals and zero
+uncited claims reaching a customer, both already stable on every run — with
+accuracy reported as a measured figure carrying its interval rather than as a
+threshold.
 
 **This is a scheduling constraint, not a blocker.** It becomes one if Phase 5
 needs same-day turnaround on validation rounds, and that is the point at which
