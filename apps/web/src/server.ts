@@ -80,7 +80,7 @@ const server = createServer((req, res) => {
     res,
     {
       resolveTenant: async (widgetKey) => (await resolveTenantByWidgetKey(widgetKey)) ?? null,
-      runTurn: async (input) => {
+      runTurn: async (input, onStage) => {
         const { config, chat, embedder } = await chatModelFor(input.tenantId);
         return runTurn(input, {
           chat,
@@ -92,6 +92,7 @@ const server = createServer((req, res) => {
           ),
           gaps: new PgGapRecorder(input.tenantId),
           logger,
+          onStage,
         });
       },
       sourcesFor: (tenantId, chunkIds) => citationSources(asTenantId(tenantId), chunkIds),

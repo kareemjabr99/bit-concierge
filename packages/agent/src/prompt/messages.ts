@@ -69,3 +69,45 @@ export const MERCHANT_COPY_NOTICE: Record<Language, string> = {
     'قواعد الدقة تنطبق فقط على الإجابات اللي يكتبها المساعد بنفسه، وما تنطبق هنا. ' +
     'إذا كان اللي كتبته غلط أو قديم، بيوصل للعميل مثل ما هو.',
 };
+
+/**
+ * What the customer is told while a tool runs.
+ *
+ * The reply cannot stream — the gate runs on the finished text and can withhold
+ * it, see docs/adr/0010-no-streaming.md — so the wait is 3.2s at the median and
+ * 8.1s at p95 with nothing to show. Eight seconds of nothing reads as broken.
+ *
+ * These are the honest thing to show instead: the agent really is searching the
+ * store's policies or reading an order, and saying so is more informative than
+ * a spinner and more truthful than a progress bar. Each string is emitted only
+ * when the named tool actually begins.
+ *
+ * Deliberately about the ACTION, never the result. "Checking your order" is
+ * safe to say the moment lookup_order is called; "found your order" would be a
+ * claim about an answer that has not been through the gate.
+ *
+ * Kept here with the rest of the customer-facing copy so it is reviewed as
+ * copy. Arabic is a placeholder until the Phase 5 native review.
+ */
+export const STAGE_LABELS: Record<Language, Record<string, string>> = {
+  en: {
+    search_knowledge: "Checking the store's policies",
+    lookup_order: 'Looking up your order',
+    search_products: 'Searching the catalogue',
+    check_availability: 'Checking the catalogue for stock',
+    get_shipping_estimate: 'Checking delivery options',
+    escalate_to_human: 'Passing this to the team',
+  },
+  ar: {
+    search_knowledge: 'أراجع سياسات المتجر',
+    lookup_order: 'أبحث عن طلبك',
+    search_products: 'أبحث في المنتجات',
+    check_availability: 'أتحقق من التوفر',
+    get_shipping_estimate: 'أتحقق من خيارات التوصيل',
+    escalate_to_human: 'أحوّل طلبك للفريق',
+  },
+};
+
+/** The label for a tool, or nothing. An unlabelled tool shows no stage at all. */
+export const stageLabel = (tool: string, lang: Language): string | null =>
+  STAGE_LABELS[lang][tool] ?? null;

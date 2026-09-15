@@ -84,6 +84,16 @@ export interface TurnContext {
   recorder: TurnRecorder;
   logger: Logger;
   now: () => Date;
+  /**
+   * Called with a tool's name as that tool begins, so a caller can show the
+   * customer what is happening during the wait.
+   *
+   * The reply itself cannot stream — see docs/adr/0010-no-streaming.md — so
+   * this is the only honest thing there is to show. It carries no output and
+   * no arguments: a stage says which tool ran, never what it found, because
+   * what it found has not been through the gate yet.
+   */
+  onStage?: ((tool: string) => void) | undefined;
 }
 
 /** Every tool answers in this shape. Errors are values the model can read, not exceptions. */
@@ -105,6 +115,14 @@ export const recorded = async <I, O extends { ok: boolean }>(
   input: I,
   run: () => Promise<O>,
 ): Promise<O> => {
+  // Announced BEFORE the work, because the point of a stage is to describe
+  // what is happening now. Emitting after would make it a log line.
+  //
+  // This is the only place a stage can come from, which is deliberate: a
+  // customer-visible "checking your order" must mean lookup_order was called,
+  // not that someone thought it probably would be. Invented progress is a
+  // small lie told by a product whose pitch is that it does not tell them.
+  ctx.onStage?.(name);
   const started = performance.now();
   let output: O;
   try {

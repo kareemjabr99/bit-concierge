@@ -47,6 +47,12 @@ export interface TurnDeps {
   now?: () => Date;
   /** Wall-clock budget for the model loop. */
   timeoutMs?: number;
+  /**
+   * Called with each tool's name as it begins. The storefront widget renders
+   * these so an eight-second wait describes itself; see
+   * docs/adr/0010-no-streaming.md.
+   */
+  onStage?: ((tool: string) => void) | undefined;
 }
 
 export type TurnStatus = 'answered' | 'escalated' | 'suppressed' | 'capped' | 'with_team' | 'error';
@@ -110,6 +116,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     recorder,
     logger,
     now,
+    onStage: deps.onStage,
   };
   const zero: TurnUsage = { inputTokens: 0, outputTokens: 0 };
 

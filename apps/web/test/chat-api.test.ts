@@ -29,7 +29,19 @@ interface Captured {
   status: number;
   headers: Record<string, unknown>;
   body: Record<string, unknown>;
+  raw: string;
 }
+
+/** Parses an SSE body into the events it carries, in order. */
+const events = (raw: string): { event: string; data: Record<string, unknown> }[] =>
+  raw
+    .split('\n\n')
+    .filter(Boolean)
+    .map((block) => {
+      const event = /^event: (.+)$/m.exec(block)?.[1] ?? '';
+      const data = /^data: (.+)$/m.exec(block)?.[1] ?? '{}';
+      return { event, data: JSON.parse(data) as Record<string, unknown> };
+    });
 
 const capture = (): { res: ServerResponse; out: () => Captured } => {
   const res = new ServerResponse(new IncomingMessage(new Socket()));
@@ -45,6 +57,11 @@ const capture = (): { res: ServerResponse; out: () => Captured } => {
     headers[name] = value;
     return res;
   }) as typeof res.setHeader;
+  res.write = ((chunk?: string) => {
+    if (chunk) chunks.push(chunk);
+    return true;
+  }) as typeof res.write;
+  res.getHeader = ((name: string) => headers[name]) as typeof res.getHeader;
   res.end = ((chunk?: string) => {
     if (chunk) chunks.push(chunk);
     return res;
@@ -54,7 +71,11 @@ const capture = (): { res: ServerResponse; out: () => Captured } => {
     out: () => ({
       status,
       headers,
-      body: chunks.length > 0 ? (JSON.parse(chunks.join('')) as Record<string, unknown>) : {},
+      raw: chunks.join(''),
+      body:
+        chunks.length > 0 && chunks[0]!.startsWith('{')
+          ? (JSON.parse(chunks.join('')) as Record<string, unknown>)
+          : {},
     }),
   };
 };
@@ -75,13 +96,16 @@ const turn = (over: Record<string, unknown> = {}) => ({
 
 let deps: ChatApiDeps;
 let calls: { text: string; externalConversationId: string }[];
+let stageEmitter: (onStage: (tool: string) => void) => void;
 
 beforeEach(() => {
   calls = [];
+  stageEmitter = () => {};
   deps = {
     resolveTenant: async (key) => (key === 'pk_dev_1886' ? TENANT : null),
-    runTurn: async (input) => {
+    runTurn: async (input, onStage) => {
       calls.push({ text: input.text, externalConversationId: input.externalConversationId });
+      stageEmitter(onStage);
       return turn() as never;
     },
     sourcesFor: async () => [{ title: 'Refund policy', url: 'https://example.test/policies' }],
@@ -280,6 +304,112 @@ describe('chat endpoint', () => {
     expect(out().body.sources).toEqual([
       { title: 'Refund policy', url: 'https://example.test/policies' },
     ]);
+  });
+});
+
+describe('progress streams, the answer does not', () => {
+  const sse = { accept: 'text/event-stream' };
+
+  it('emits a stage for each tool as it begins, then the reply in one piece', async () => {
+    stageEmitter = (onStage) => {
+      onStage('search_knowledge');
+      onStage('lookup_order');
+    };
+    const { res, out } = capture();
+    await handleChat(
+      request({ widgetKey: 'pk_dev_1886', text: 'where is my order' }, sse),
+      res,
+      deps,
+    );
+
+    const seen = events(out().raw);
+    expect(seen.map((e) => e.event)).toEqual(['open', 'stage', 'stage', 'reply']);
+    expect(seen[1]!.data).toEqual({
+      tool: 'search_knowledge',
+      label: "Checking the store's policies",
+    });
+    expect(seen[2]!.data).toEqual({ tool: 'lookup_order', label: 'Looking up your order' });
+    expect(seen[3]!.data.reply).toContain('7 days');
+  });
+
+  it('never puts reply text in a stage event', async () => {
+    // The guarantee ADR 0010 is about. A stage says which tool ran; it must
+    // not leak any part of an answer that has not cleared the gate.
+    stageEmitter = (onStage) => onStage('search_knowledge');
+    const { res, out } = capture();
+    await handleChat(request({ widgetKey: 'pk_dev_1886', text: 'hi' }, sse), res, deps);
+    const seen = events(out().raw);
+    for (const stage of seen.filter((e) => e.event === 'stage')) {
+      expect(Object.keys(stage.data).sort()).toEqual(['label', 'tool']);
+      expect(JSON.stringify(stage.data)).not.toContain('7 days');
+    }
+  });
+
+  it('collapses a repeated stage rather than stuttering', async () => {
+    // The model often searches twice. "Checking the store's policies" twice in
+    // a row reads as a stutter, not as progress.
+    stageEmitter = (onStage) => {
+      onStage('search_knowledge');
+      onStage('search_knowledge');
+      onStage('lookup_order');
+      onStage('lookup_order');
+    };
+    const { res, out } = capture();
+    await handleChat(request({ widgetKey: 'pk_dev_1886', text: 'hi' }, sse), res, deps);
+    expect(events(out().raw).filter((e) => e.event === 'stage')).toHaveLength(2);
+  });
+
+  it('says nothing for a tool it has no label for', async () => {
+    // A stage must correspond to something a customer can be told truthfully.
+    // An unlabelled tool shows nothing rather than a raw identifier —
+    // "some_future_tool" is not a sentence.
+    //
+    // The labelled call first is load-bearing: with an unlabelled tool alone,
+    // a suppression keyed only on repetition would swallow it by accident and
+    // the test would pass for the wrong reason.
+    stageEmitter = (onStage) => {
+      onStage('search_knowledge');
+      onStage('some_future_tool');
+    };
+    const { res, out } = capture();
+    await handleChat(request({ widgetKey: 'pk_dev_1886', text: 'hi' }, sse), res, deps);
+    const stages = events(out().raw).filter((e) => e.event === 'stage');
+    expect(stages).toHaveLength(1);
+    expect(stages[0]!.data.tool).toBe('search_knowledge');
+    expect(out().raw).not.toContain('some_future_tool');
+  });
+
+  it('labels stages in the requested language', async () => {
+    stageEmitter = (onStage) => onStage('lookup_order');
+    const { res, out } = capture();
+    await handleChat(
+      request({ widgetKey: 'pk_dev_1886', text: 'وين طلبي', locale: 'ar' }, sse),
+      res,
+      deps,
+    );
+    const stage = events(out().raw).find((e) => e.event === 'stage');
+    expect(stage!.data.label).toBe('أبحث عن طلبك');
+  });
+
+  it('reports a failure as an event once the stream has started', async () => {
+    // The status code is already sent, so an error cannot be a 500.
+    deps.runTurn = async () => {
+      throw new Error('postgres is on fire');
+    };
+    const { res, out } = capture();
+    await handleChat(request({ widgetKey: 'pk_dev_1886', text: 'hi' }, sse), res, deps);
+    const seen = events(out().raw);
+    expect(seen[seen.length - 1]!.event).toBe('error');
+    expect(out().raw).not.toContain('postgres');
+  });
+
+  it('still answers a plain POST with JSON and no events', async () => {
+    stageEmitter = (onStage) => onStage('search_knowledge');
+    const { res, out } = capture();
+    await handleChat(request({ widgetKey: 'pk_dev_1886', text: 'hi' }), res, deps);
+    expect(out().status).toBe(200);
+    expect(out().raw).not.toContain('event:');
+    expect(out().body.reply).toContain('7 days');
   });
 });
 

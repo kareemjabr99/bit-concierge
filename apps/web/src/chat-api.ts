@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { asTenantId, type Logger } from '@bitc/core';
 import type { TurnInput, TurnResult } from '@bitc/agent';
+import { stageLabel } from '@bitc/agent';
 import { externalIdFor, isOurToken, issueToken } from './session.ts';
 import type { SlidingWindowLimiter } from './rate-limit.ts';
 
@@ -47,7 +48,7 @@ export interface ChatResponse {
 export interface ChatApiDeps {
   /** Widget key → tenant id. Returns null for an unknown or suspended tenant. */
   resolveTenant: (widgetKey: string) => Promise<string | null>;
-  runTurn: (input: TurnInput) => Promise<TurnResult>;
+  runTurn: (input: TurnInput, onStage: (tool: string) => void) => Promise<TurnResult>;
   /** Resolves cited chunk ids to something a customer can click. */
   sourcesFor: (tenantId: string, chunkIds: string[]) => Promise<ChatResponse['sources']>;
   limiter: SlidingWindowLimiter;
@@ -173,27 +174,85 @@ export const handleChat = async (
       ? parsed.token
       : issueToken(deps.sessionKey);
 
-  try {
-    const turn = await deps.runTurn({
-      tenantId: asTenantId(tenantId),
-      channel: 'web',
-      externalConversationId: externalIdFor(token),
-      text: parsed.text,
-      ...(parsed.locale ? { localeHint: parsed.locale } : {}),
+  // Server-sent events when the client asks for them. What streams is
+  // PROGRESS, never the answer: stage events describe which tool is running,
+  // and the reply arrives in one piece at the end, after the gate has cleared
+  // it. See docs/adr/0010-no-streaming.md — a reply that can be withheld
+  // cannot be streamed, but a wait can still describe itself.
+  const wantsStream = (req.headers.accept ?? '').includes('text/event-stream');
+  const send = wantsStream
+    ? (event: string, data: unknown) => {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
+    : () => {};
+
+  if (wantsStream) {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-store',
+      connection: 'keep-alive',
+      // Proxies that buffer would defeat the entire point of the stage events.
+      'x-accel-buffering': 'no',
+      ...(res.getHeader('access-control-allow-origin')
+        ? { 'access-control-allow-origin': String(res.getHeader('access-control-allow-origin')) }
+        : {}),
     });
+    // Sent immediately so the widget can show the conversation as live before
+    // the first tool has been chosen.
+    send('open', { token });
+  }
+
+  // Stages are announced in the customer's language, so the label is resolved
+  // here rather than in the browser. Duplicates are suppressed: the model
+  // often searches twice, and "Checking the store's policies" twice in a row
+  // reads as a stutter rather than as progress.
+  const locale = parsed.locale ?? 'en';
+  let lastStage: string | null = null;
+  const onStage = (tool: string): void => {
+    const label = stageLabel(tool, locale);
+    if (!label || label === lastStage) return;
+    lastStage = label;
+    send('stage', { tool, label });
+  };
+
+  try {
+    const turn = await deps.runTurn(
+      {
+        tenantId: asTenantId(tenantId),
+        channel: 'web',
+        externalConversationId: externalIdFor(token),
+        text: parsed.text,
+        ...(parsed.locale ? { localeHint: parsed.locale } : {}),
+      },
+      onStage,
+    );
 
     // Only what the gate cleared. rawModelText, tool calls, retrieval scores
     // and chunk ids stay on this side of the wire — they are diagnostics, and
     // some of them are the merchant's business rather than the visitor's.
-    json(res, 200, {
+    const body: ChatResponse = {
       token,
       status: turn.status,
       reply: turn.reply ?? '',
       lang: turn.lang,
       sources: await deps.sourcesFor(tenantId, turn.grounding?.citations.cited ?? []),
-    } satisfies ChatResponse);
+    };
+
+    if (wantsStream) {
+      send('reply', body);
+      res.end();
+      return;
+    }
+    json(res, 200, body);
   } catch (error) {
     deps.logger.error('chat turn failed', { tenantId, err: String(error) });
+    if (wantsStream) {
+      // A stream that has already started cannot change its status code, so
+      // the error is an event. The widget treats it exactly like a failed POST.
+      send('error', { error: 'turn_failed' });
+      res.end();
+      return;
+    }
     json(res, 500, { error: 'turn_failed' });
   }
 };
