@@ -379,15 +379,14 @@ export const runSuite = async (options: RunOptions): Promise<RunResult> => {
     metrics,
     outcomes,
   };
+  // shipBar already fails closed on incomplete cases, so the note it produces
+  // is the only one. This used to prepend a second copy of the same sentence,
+  // which read as two separate problems in the report.
   const bar = shipBar(base, options.productionChatModel);
-  const notes =
-    quotaExhausted > 0
-      ? [`${quotaExhausted} case(s) never reached the model — this run is incomplete`, ...bar.notes]
-      : bar.notes;
   return {
     ...base,
-    meetsShipBar: bar.meets && quotaExhausted === 0,
-    shipBarNotes: notes,
+    meetsShipBar: bar.meets,
+    shipBarNotes: bar.notes,
     incompleteCases: quotaExhausted,
   };
 };

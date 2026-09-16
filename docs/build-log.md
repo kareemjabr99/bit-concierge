@@ -226,3 +226,39 @@ is not simply too high: the remaining work is real and is listed at the gate.
   shipping, both the same bias as the tracking one. Three of twenty-one.
 - Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 9.3 h
   across four sittings.
+
+## Phase 3 — widget, and the bar
+
+**Wall clock: 5.8 h** (2026-09-14 09:00 – 2026-09-16 13:30 UTC, across three sittings)
+
+| Activity                                               | Hours |
+| ------------------------------------------------------ | ----- |
+| Runs 5 and 6, full suite (mostly waiting)              | 2.20  |
+| Storefront chat endpoint, session tokens, SSE progress | 1.10  |
+| The widget: shadow DOM, stages, citations, tap targets | 0.90  |
+| Retiring the 95% bar; property-based bar; metric fix   | 0.70  |
+| Variance analysis and the five costed options          | 0.35  |
+| CI parity test, gate check, and its superseded-run bug | 0.30  |
+| ADRs 0010 and 0011, demo script, docs                  | 0.25  |
+
+### Notes
+
+- **The 95% bar was retired on measurement, not opinion.** 12 of 103 cases are
+  nondeterministic, so a system with every defect fixed clears 95% on 38.7% of
+  runs. Replaced by two properties that hold today.
+- **All twelve flips were between two correct behaviours.** Reading them rather
+  than counting them is what turned "the system is unstable" into "the metric
+  is". Eight widened with evidence; four left as real instability.
+- **Three security findings, all from mutation testing, none from ordinary
+  tests.** The session token was the worst: an unsigned client-supplied token
+  would have let two visitors share a transcript containing order numbers and
+  email addresses. Exposure zero — never deployed.
+- **Two bugs only running the widget could find**: Enter not submitting inside
+  a shadow root, and an escalated thread rendering an empty bubble. Neither was
+  visible to a unit test.
+- **A 29px close button** that looked fine in every desktop screenshot. Found
+  by checking tap targets structurally after the browser could not be driven.
+- 23 mutations this phase, all caught; six survived first passes, including one
+  test that was vacuous because of a typo in its own fixture.
+- Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 9.3 h;
+  Phase 3 5 d → 5.8 h and not yet closed.

@@ -511,6 +511,16 @@ describe('ship bar', () => {
     expect(bar.meets).toBe(true);
   });
 
+  it('says a run is incomplete exactly once', () => {
+    // Two code paths used to add the same sentence, and the report read as
+    // though there were two separate problems.
+    const bar = shipBar(
+      base({ outcomes: [outcome(), outcome({ id: 'e', behaviour: 'error' })] }),
+      'google:m',
+    );
+    expect(bar.notes.filter((n) => n.includes('never reached the model'))).toHaveLength(1);
+  });
+
   it('fails closed when cases never reached the model', () => {
     const bar = shipBar(
       base({ outcomes: [outcome(), outcome({ id: 'e', behaviour: 'error' })] }),

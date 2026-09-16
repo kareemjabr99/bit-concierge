@@ -239,3 +239,63 @@ against expectations the merchant has not signed — and fix the metric (option 
 is now measurably the wrong instrument: a perfect system clears it 39% of the
 time, and the variance that stops it is the suite encoding one right answer
 where several exist.
+
+---
+
+# Re-measured after the metric fix (2026-09-16)
+
+Run 6, on the widened expectations. Three runs now exist at effectively
+identical inputs.
+
+## How many of the twelve were artefacts
+
+**Eight. Four are real.** The classification made at adjudication time holds
+when checked against a third run: each of the eight flips between behaviours
+that the widened set accepts, and each of the four does not.
+
+|                                 |     |
+| ------------------------------- | --- |
+| Metric artefacts, now absorbed  | 8   |
+| Real instability, still failing | 4   |
+
+The four share one shape: **`returns-gift`, `returns-quality-check`,
+`shipping-track-how` and `sizing-true-to-size` flip between answering and
+giving up on a question the corpus answers.** That is a usefulness failure
+rather than a safety one, it is the agent abandoning work it could do, and it
+is now isolated rather than buried among eleven others.
+
+## What the fix did, measured fairly
+
+The first comparison available was misleading: 12 came from two runs and the
+new figure from three, and three runs surface variation two cannot. Same three
+runs, same 101 comparable cases, only the acceptance sets differing:
+
+| acceptance sets          | unstable cases       | single-run accuracy SD |
+| ------------------------ | -------------------- | ---------------------- |
+| Old — one behaviour each | 18 of 101 (17.8%)    | ±2.1pp                 |
+| New — 8 widened          | **10 of 101 (9.9%)** | **±1.6pp**             |
+
+Exactly the eight, removed. Nothing else moved.
+
+## The thing not to misread
+
+**Behaviour instability did not change and was never going to.** The agent
+varies its behaviour on 21 of 103 cases across three runs — 20.4% — and that
+is the same agent it was before.
+
+What changed is that the measurement stopped charging it for eight cases where
+the variation was between two correct actions. **The system is exactly as
+nondeterministic as it was; the metric is less wrong about it.**
+
+That distinction is worth keeping, because the tempting summary — "we reduced
+instability from 18% to 10%" — describes work that was not done.
+
+## Run 6 was incomplete
+
+Two cases hit the daily quota wall: `order-status-when-will-it-arrive` and
+`returns-damaged-item`. The bar failed closed on it, which is correct and is
+the third time that guard has earned its place.
+
+It also means run 6's headline — zero fabricated literals and zero uncited
+claims reaching a customer — is measured over 101 cases, not 103. The property
+has now held on six consecutive runs, but that sentence carries this footnote.
