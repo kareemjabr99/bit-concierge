@@ -22,6 +22,7 @@
     "distribution": "node --env-file-if-exists=../../.env.local scripts/rerank-distribution.ts",
     "middle": "node scripts/middle-class.ts",
     "corpus-diff": "node scripts/corpus-diff.ts",
-    "verify-absence": "node --env-file-if-exists=../../.env.local scripts/verify-absence.ts"
+    "verify-absence": "node --env-file-if-exists=../../.env.local scripts/verify-absence.ts",
+    "cost": "node scripts/cost.ts"
   }
 }

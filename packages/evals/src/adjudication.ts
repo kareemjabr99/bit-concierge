@@ -65,7 +65,28 @@ const nothingFound = z.object({
   alsoChecked: z.string().min(10),
 });
 
-export const evidence = z.discriminatedUnion('kind', [sourcesFound, nothingFound]);
+/**
+ * Two runs produced two different behaviours and both were correct.
+ *
+ * The evidence is the replies themselves, quoted, because the claim being made
+ * is about them: that neither leaked, invented, or promised anything. A
+ * reviewer who disagrees can read them and say so.
+ */
+const bothSafe = z.object({
+  kind: z.literal('both-safe'),
+  observed: z
+    .array(
+      z.object({
+        behaviour: z.string().min(3),
+        /** Verbatim. A paraphrase is the adjudicator marking their own work. */
+        reply: z.string().min(20),
+      }),
+    )
+    .min(2),
+  whyBothSafe: z.string().min(60),
+});
+
+export const evidence = z.discriminatedUnion('kind', [sourcesFound, nothingFound, bothSafe]);
 
 export const adjudication = z.object({
   caseId: z.string().min(3),
@@ -76,7 +97,14 @@ export const adjudication = z.object({
    * answers. An expectation editable without a record is an expectation that
    * will be edited without a record.
    */
-  field: z.enum(['behaviour', 'mustContain', 'mustNotContain', 'citesAnyOf', 'mustCallTools']),
+  field: z.enum([
+    'behaviour',
+    'mustContain',
+    'mustNotContain',
+    'citesAnyOf',
+    'mustCallTools',
+    'alsoAcceptable',
+  ]),
   /** What the case asserted before. Kept so the original score stays computable. */
   originalBehaviour: z.enum(['answer', 'escalate', 'refuse']),
   newBehaviour: z.enum(['answer', 'escalate', 'refuse']),
@@ -126,6 +154,32 @@ export const validate = (adjudications: Adjudication[]): string[] => {
     // Evidence is required in both shapes; the schema guarantees each is
     // non-empty. This catches the one thing the schema cannot: an absence
     // claim asserting nothing was found when something scored well.
+    // Widening a case to accept more behaviours is the move that turns a
+    // metric into a formality, so it carries its own rules on top of the
+    // evidence requirement.
+    if (a.field === 'alsoAcceptable') {
+      if (a.evidence.kind !== 'both-safe') {
+        problems.push(
+          `${a.caseId}: widening the accepted behaviours needs 'both-safe' evidence — the ` +
+            `replies themselves, so a reviewer can disagree with them.`,
+        );
+      }
+      // The erosion that would be hardest to notice: an answerable question
+      // whose expectation quietly grows to accept giving up on it. Escalating
+      // is SAFE, so it would pass the both-safe test, and the suite would stop
+      // being able to see the agent abandoning questions the corpus answers.
+      //
+      // Suppression is different and is allowed: that is the gate acting on a
+      // reply, not the agent declining to try.
+      if (a.originalBehaviour === 'answer' && a.newValue.includes('escalate')) {
+        problems.push(
+          `${a.caseId}: an 'answer' case may not also accept 'escalate'. Handing over a ` +
+            `question the corpus answers is safe but useless, and accepting it here would ` +
+            `make the suite blind to exactly that.`,
+        );
+      }
+    }
+
     if (a.evidence.kind === 'absence') {
       if (a.evidence.bestScore >= 0.75) {
         problems.push(

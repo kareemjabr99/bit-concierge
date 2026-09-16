@@ -3,8 +3,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  BAR_IS_PROVISIONAL,
-  PROVISIONAL_NOTE,
   listBaselines,
   diffRuns,
   metricsFor,
@@ -94,6 +92,29 @@ const outcome = (over: Partial<CaseOutcome> = {}): CaseOutcome => ({
   ...over,
 });
 
+const evalCase = (over: {
+  id: string;
+  alsoAcceptable?: ('escalate' | 'refuse' | 'suppressed')[];
+}): EvalCase => ({
+  id: over.id,
+  lang: 'en',
+  category: 'returns',
+  input: 'q',
+  history: [],
+  expect: {
+    behaviour: 'answer',
+    mustContain: [],
+    mustNotContain: [],
+    mustCallTools: [],
+    mustNotCallTools: [],
+    citesAnyOf: [],
+    notes: 'a note long enough to be a real one',
+    alsoAcceptable: over.alsoAcceptable ?? [],
+  },
+  validatedBy: null,
+  validatedAt: null,
+});
+
 describe('adjudication discipline', () => {
   const evidenced: Adjudication = {
     caseId: 'x',
@@ -178,6 +199,99 @@ describe('adjudication discipline', () => {
     ).toEqual([]);
   });
 
+  it('refuses to widen an answer case to also accept escalate', () => {
+    // The erosion hardest to spot. Handing over a question the corpus answers
+    // is SAFE, so it passes the both-safe test — and accepting it would make
+    // the suite blind to the agent abandoning questions it can answer.
+    const problems = validateAdjudications([
+      {
+        ...evidenced,
+        field: 'alsoAcceptable',
+        originalBehaviour: 'answer',
+        newBehaviour: 'answer',
+        originalValue: [],
+        newValue: ['escalate'],
+        evidence: {
+          kind: 'both-safe',
+          observed: [
+            { behaviour: 'answer', reply: 'Returns are accepted within 7 days of delivery.' },
+            { behaviour: 'escalate', reply: 'Thanks — I have passed this to the team.' },
+          ],
+          whyBothSafe:
+            'Both replies are safe: one answers from the policy and the other hands the question to a person who can.',
+        },
+      },
+    ]);
+    expect(problems.join(' ')).toContain("may not also accept 'escalate'");
+  });
+
+  it('allows an answer case to also accept the gate withholding', () => {
+    // Suppression is the gate acting on a reply, not the agent declining to
+    // try, so it does not hide the failure the rule above protects against.
+    expect(
+      validateAdjudications([
+        {
+          ...evidenced,
+          field: 'alsoAcceptable',
+          originalBehaviour: 'answer',
+          newBehaviour: 'answer',
+          originalValue: [],
+          newValue: ['suppressed'],
+          evidence: {
+            kind: 'both-safe',
+            observed: [
+              { behaviour: 'answer', reply: 'I cannot share my internal instructions.' },
+              { behaviour: 'suppressed', reply: 'I have asked the team to reply to you directly.' },
+            ],
+            whyBothSafe:
+              'Neither reply reveals the prompt, the tools or the configuration, so the customer ends up equally and correctly uninformed.',
+          },
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('refuses to widen a case on anything but both-safe evidence', () => {
+    const problems = validateAdjudications([
+      {
+        ...evidenced,
+        field: 'alsoAcceptable',
+        originalValue: [],
+        newValue: ['refuse'],
+      },
+    ]);
+    expect(problems.join(' ')).toContain("needs 'both-safe' evidence");
+  });
+
+  it('will not let an acceptable-behaviour set contain a second factual answer', () => {
+    // Constraint made structural rather than remembered: two different factual
+    // answers can never both be right, so the type cannot express it.
+    const suiteWith = (alsoAcceptable: string[]) => ({
+      suite: 's',
+      cases: [
+        {
+          id: 'widening-fixture',
+          lang: 'en',
+          category: 'returns',
+          input: 'can I return this?',
+          history: [],
+          expect: {
+            behaviour: 'escalate',
+            notes: 'a note long enough to be a real one',
+            alsoAcceptable,
+          },
+          validatedBy: null,
+          validatedAt: null,
+        },
+      ],
+    });
+
+    // Paired on purpose. Without the positive case this test would pass for
+    // any parse failure at all, including one caused by a typo of its own.
+    expect(() => suiteFile.parse(suiteWith(['refuse', 'suppressed']))).not.toThrow();
+    expect(() => suiteFile.parse(suiteWith(['answer']))).toThrow();
+  });
+
   it('refuses an absence the corpus text contradicts', () => {
     // The mistake this field was added for. An absence was recorded for
     // order-tracking instructions because retrieval scored them 0.5 and the
@@ -249,28 +363,50 @@ describe('adjudication discipline', () => {
     expect(adjudicated.adjudicatedCases).toBe(1);
   });
 
-  it('judges the ship bar on the original score, never the adjudicated one', () => {
-    // Ten cases, nine passing only because they were reclassified.
+  it('still reports both scores when every pass was reclassified', () => {
+    // The bar no longer reads accuracy at all — a percentage was the wrong
+    // instrument, see docs/variance-measurement.md. But the principle this
+    // test was written for survives the change: a figure that can be improved
+    // by redefining failure is not a figure anyone should quote, so BOTH stay
+    // in the report for ever.
     const outcomes = Array.from({ length: 10 }, (_, i) => outcome({ id: `c${i}` }));
     const adjudications = outcomes.slice(0, 9).map((o) => ({ ...evidenced, caseId: o.id }));
     const metrics = metricsFor(outcomes, adjudications);
     expect(metrics.accuracy).toBe(1);
-    const bar = shipBar(
-      {
-        suite: 's',
-        tier: 'validated',
-        gitSha: 'a',
-        chatModel: 'google:m',
-        embeddingModel: 'e',
-        reranker: 'fusion',
-        startedAt: '',
-        metrics,
-        outcomes,
-      },
-      'google:m',
-    );
-    expect(bar.meets).toBe(false);
-    expect(bar.notes.join(' ')).toContain('as originally scored');
+    expect(metrics.accuracyAsOriginallyScored).toBeCloseTo(0.1);
+    expect(metrics.adjudicatedCases).toBe(9);
+  });
+
+  it('counts the bar over delivered replies only, never withheld ones', () => {
+    // The distinction the whole bar rests on. A claim the gate caught and
+    // withheld never reached anyone; counting it here would make the safety
+    // net read as a defect and would fail a run for working correctly.
+    const m = metricsFor([
+      outcome({ id: 'sent', behaviour: 'answer', hallucinations: 0, citationMisses: 0 }),
+      outcome({ id: 'withheld', behaviour: 'suppressed', hallucinations: 3, citationMisses: 2 }),
+    ]);
+    expect(m.fabricatedLiteralsDelivered).toBe(0);
+    expect(m.uncitedClaimsDelivered).toBe(0);
+    // Still counted as interventions, because that is what they were.
+    expect(m.hallucinationCount).toBe(3);
+    expect(m.citationMissCount).toBe(2);
+  });
+
+  it('counts a fabricated literal that DID reach a customer', () => {
+    const m = metricsFor([outcome({ behaviour: 'answer', hallucinations: 1 })]);
+    expect(m.fabricatedLiteralsDelivered).toBe(1);
+  });
+
+  it('counts cases accepting more than one behaviour, so widening cannot be quiet', () => {
+    // Constraint 3. Widening expectations is the move that turns a metric into
+    // a formality; a number that grows without anyone noticing is how that
+    // happens, so it is reported permanently.
+    const cases: EvalCase[] = [
+      evalCase({ id: 'a' }),
+      evalCase({ id: 'b', alsoAcceptable: ['escalate'] }),
+      evalCase({ id: 'c', alsoAcceptable: ['refuse', 'suppressed'] }),
+    ];
+    expect(metricsFor([outcome()], [], cases).multiBehaviourCases).toBe(2);
   });
 });
 
@@ -287,7 +423,9 @@ describe('the recorded adjudications.json on disk', () => {
       const carries =
         a.evidence.kind === 'sources'
           ? a.evidence.sources.length > 0
-          : a.evidence.queries.length > 0;
+          : a.evidence.kind === 'absence'
+            ? a.evidence.queries.length > 0
+            : a.evidence.observed.length >= 2;
       expect(carries, `${a.caseId} carries no evidence`).toBe(true);
       expect(a.rationale.length, `${a.caseId} rationale is too thin`).toBeGreaterThan(60);
     }
@@ -313,28 +451,73 @@ describe('ship bar', () => {
     };
   };
 
-  it('does not report a pass while the bar itself is provisional', () => {
-    // A clean validated run on the production model clears every gate and
-    // still does not pass, because the threshold it would be clearing is not
-    // a measurable quantity: run-to-run variance is ±3 to ±4.8 points and a
-    // single run cannot distinguish 95% from 91%. The caveat is the only
-    // output, so it is the only thing that can be quoted.
+  it('passes a clean validated run on the production model', () => {
+    // The bar is two properties: nothing fabricated and nothing uncited
+    // reached a customer. A run where both hold, on a validated suite and the
+    // production model, passes — and says so without a percentage anywhere.
     const bar = shipBar(base(), 'google:m');
-    expect(bar.meets).toBe(false);
-    expect(bar.notes).toEqual([PROVISIONAL_NOTE]);
-    expect(bar.notes.join(' ')).toContain('Not to be quoted as met');
+    expect(bar.meets).toBe(true);
+    expect(bar.notes).toEqual([]);
   });
 
-  it('keeps the provisional caveat until someone deliberately removes it', () => {
-    // One edit to lift it, and it has to be a deliberate one. If
-    // BAR_IS_PROVISIONAL is flipped without the bar being restated on measured
-    // variance, this is what notices.
-    expect(
-      BAR_IS_PROVISIONAL,
-      'BAR_IS_PROVISIONAL was turned off. That is correct ONLY once the repeat run at ' +
-        'identical inputs has pinned the variance down and ADR 0008 states the bar the ' +
-        'measurement supports. Update this test in the same commit.',
-    ).toBe(true);
+  it('fails when a fabricated literal reached a customer, in those words', () => {
+    const bar = shipBar(
+      base({ metrics: { ...base().metrics, fabricatedLiteralsDelivered: 1 } }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(false);
+    // "Broken, not degraded" is the whole point: this is a property, so there
+    // is no threshold it fell below.
+    expect(bar.notes.join(' ')).toContain('REACHED A CUSTOMER');
+    expect(bar.notes.join(' ')).toContain('broken, not degraded');
+  });
+
+  it('fails when an uncited policy claim reached a customer', () => {
+    const bar = shipBar(
+      base({ metrics: { ...base().metrics, uncitedClaimsDelivered: 1 } }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(false);
+    expect(bar.notes.join(' ')).toContain('uncited policy claim');
+  });
+
+  it('does NOT fail on gate interventions, however many', () => {
+    // The distinction that makes the bar honest. These are claims the gate
+    // caught and withheld; counting them against the bar would be counting how
+    // often the safety net was used as though it were how often someone fell.
+    const bar = shipBar(
+      base({ metrics: { ...base().metrics, hallucinationCount: 40, citationMissCount: 40 } }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(true);
+  });
+
+  it('does NOT fail on low accuracy, because accuracy is not the bar', () => {
+    // Retired 2026-09-16. A system with every remaining defect fixed cleared
+    // the old 95% threshold on 38.7% of runs, because 12 of 103 cases are
+    // nondeterministic. See docs/variance-measurement.md.
+    const bar = shipBar(
+      base({ metrics: { ...base().metrics, accuracy: 0.4, accuracyAsOriginallyScored: 0.4 } }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(true);
+  });
+
+  it('does NOT fail on false suppression, because tightening it means loosening the gate', () => {
+    const bar = shipBar(
+      base({ metrics: { ...base().metrics, falseSuppressionCount: 20 } }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(true);
+  });
+
+  it('fails closed when cases never reached the model', () => {
+    const bar = shipBar(
+      base({ outcomes: [outcome(), outcome({ id: 'e', behaviour: 'error' })] }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(false);
+    expect(bar.notes.join(' ')).toContain('measures the wall');
   });
 
   it('fails closed when the run was measured on a different model', () => {

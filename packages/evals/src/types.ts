@@ -23,6 +23,30 @@ export const evalCase = z.object({
      * refuse   — a reply that declines to reveal or promise, without escalating
      */
     behaviour: z.enum(['answer', 'escalate', 'refuse']),
+    /**
+     * Other behaviours that are also correct for this case.
+     *
+     * Twelve of 103 cases were nondeterministic across two runs at identical
+     * inputs, and every one flipped between two behaviours that were BOTH
+     * right — handing over versus a safe refusal, answering versus the gate
+     * withholding. Nothing leaked and nothing was invented. The suite was
+     * encoding one acceptable answer where several exist and scoring the rest
+     * as failures.
+     *
+     * **`answer` is deliberately not available here, and that is the point.**
+     * A set may contain only behaviours that are independently safe: hand it
+     * to a human, decline, or withhold. Two different factual answers can
+     * never both be acceptable, and making that a type rather than a rule
+     * means nobody has to remember it.
+     *
+     * Content expectations still apply to whichever behaviour occurs, so a
+     * refusal that leaks an order number still fails.
+     *
+     * Widening a case requires an adjudication with evidence, one at a time —
+     * see adjudication.ts. The count of cases using this is in every run
+     * report, permanently.
+     */
+    alsoAcceptable: z.array(z.enum(['escalate', 'refuse', 'suppressed'])).default([]),
     /** Case-insensitive substrings the reply must contain. */
     mustContain: z.array(z.string()).default([]),
     /** Substrings that would make the reply wrong. The sharpest signal here. */
@@ -162,9 +186,42 @@ export interface RunMetrics {
   escalationPrecision: number;
   /** Of cases naming acceptable sources, how many retrieved one. */
   retrievalHitRate: number;
+  /**
+   * THE BAR. Fabricated literals and uncited policy claims that reached a
+   * customer, counted over delivered replies only.
+   *
+   * These are **properties, not percentages**. The gate inspects every reply
+   * and withholds any that fails, so both are zero by construction — and that
+   * is exactly why they are worth checking: if either ever goes above zero,
+   * the guarantee has been broken rather than degraded. There is no threshold
+   * to tune and no confidence interval to quote.
+   */
+  fabricatedLiteralsDelivered: number;
+  uncitedClaimsDelivered: number;
+  /**
+   * How often the gate intervened. **Not a quality metric**, and not part of
+   * the bar.
+   *
+   * This counts claims the gate CAUGHT and withheld. Quoting it as a defect
+   * rate would be quoting how often the safety net was used as though it were
+   * how often someone fell. It also inherits the model's nondeterminism —
+   * across two runs at identical inputs it read 9 then 8, with only three of
+   * eleven cases in common — so it is reported and never thresholded.
+   */
   hallucinationCount: number;
   citationMissCount: number;
+  /**
+   * The cost the guarantee charges: replies withheld that should have been
+   * sent. Reported alongside the bar, never a gate on it — tightening this
+   * means loosening the gate, which is the wrong direction.
+   */
   falseSuppressionCount: number;
+  /**
+   * Cases accepting more than one behaviour. Reported permanently and on
+   * purpose: widening expectations is the move that turns a metric into a
+   * formality, and a number that grows quietly is how that happens.
+   */
+  multiBehaviourCases: number;
   p95LatencyMs: number;
   costPerConversationUsd: number | null;
 }

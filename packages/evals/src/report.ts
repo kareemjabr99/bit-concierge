@@ -32,19 +32,51 @@ export const reportRun = (result: RunResult): string => {
     lines.push('');
   }
 
-  lines.push('### Enforced at runtime — a property of the system');
+  lines.push('### The bar — a SAFETY guarantee. A property, not a percentage.');
+  lines.push('');
+  lines.push(
+    'Zero is the whole bar, and it has no error bars: the gate inspects every reply and ' +
+      'withholds any that fails, so above zero means the guarantee is **broken, not degraded**.',
+  );
   lines.push('');
   lines.push('| | |');
   lines.push('| --- | --- |');
-  lines.push(`| Fabricated literals | **${m.hallucinationCount}** |`);
-  lines.push(`| Uncited policy claims | **${m.citationMissCount}** |`);
-  lines.push(`| Replies withheld that should have been sent | ${m.falseSuppressionCount} |`);
+  lines.push(`| Fabricated literals reaching a customer | **${m.fabricatedLiteralsDelivered}** |`);
+  lines.push(`| Uncited policy claims reaching a customer | **${m.uncitedClaimsDelivered}** |`);
   lines.push('');
-  lines.push('### Measured');
+  lines.push('**This says nothing about whether the answers are useful.** ');
+  lines.push('');
+  lines.push('### What the guarantee costs, and how often the net was used');
+  lines.push('');
+  lines.push(
+    'Reported, never thresholded. Gate interventions count claims that were CAUGHT and ' +
+      'withheld — quoting them as a defect rate would be quoting how often the safety net was ' +
+      'used as though it were how often someone fell.',
+  );
+  lines.push('');
+  lines.push('| | |');
+  lines.push('| --- | --- |');
+  lines.push(
+    `| Replies withheld that should have been sent | ${m.falseSuppressionCount} (${pct(m.cases ? m.falseSuppressionCount / m.cases : 0)}) |`,
+  );
+  lines.push(`| Gate interventions — fabricated literals caught | ${m.hallucinationCount} |`);
+  lines.push(`| Gate interventions — uncited claims caught | ${m.citationMissCount} |`);
+  lines.push('');
+  lines.push('### Measured — NOT a bar, and not a quality claim');
+  lines.push('');
+  lines.push(
+    'These are figures against expectations the merchant has not signed, and they carry a ' +
+      '±3.3 point interval from run-to-run nondeterminism. **Deflection is the number that ' +
+      'would show the agent is worth paying for, and it does not hold yet** — it needs a ' +
+      'validated question set, which is Phase 5. See docs/variance-measurement.md.',
+  );
   lines.push('');
   lines.push('| | |');
   lines.push('| --- | --- |');
   lines.push(`| Cases | ${m.cases} (${m.passed} passed, ${m.failed} failed) |`);
+  lines.push(
+    `| Cases accepting more than one behaviour | ${m.multiBehaviourCases}${m.multiBehaviourCases > 0 ? ' — each one adjudicated with evidence' : ''} |`,
+  );
   // Both figures, always, in the same table. A reader who sees one without the
   // other cannot tell whether the number moved because the system improved or
   // because an expectation was rewritten.

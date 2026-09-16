@@ -38,9 +38,27 @@ describe('model registry', () => {
         outputTokens: 0,
       }),
     ).toBe(0.15);
+    // The chat model is priced at the PAID standard rate even though the
+    // development key runs on the free tier. A licence has to be priced
+    // against what it will cost, not against what a capped development key
+    // happens to charge, and a zero would make every projection read as free.
     expect(
-      estimateCostUsd('google:gemini-3.5-flash-lite', { inputTokens: 10, outputTokens: 10 }),
+      estimateCostUsd('google:gemini-3.5-flash-lite', {
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      }),
+    ).toBeCloseTo(2.8);
+    expect(
+      estimateCostUsd('anthropic:claude-sonnet-5', { inputTokens: 10, outputTokens: 10 }),
     ).toBeNull();
+  });
+
+  it('records where every rate came from and when', () => {
+    // A stale rate makes a licence wrong. An unchecked one makes it fiction.
+    for (const [key, price] of Object.entries(PRICING)) {
+      if (!price) continue;
+      expect(price.checkedAt, `${key} has no checked date`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
   });
 
   it('keeps the embedding key and dimensions bound together', () => {
