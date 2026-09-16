@@ -331,3 +331,25 @@ match after formatting — check it actually applied before believing it
 survived. And prose that repeats a marker can act as a decoy: removing the real
 declaration left a copy behind in a comment, and the test passed for the wrong
 reason.
+
+---
+
+## Reporting numbers
+
+Two claims. They do not get merged, in a gate report or anywhere else.
+
+**The safety claim — the bar.** Zero fabricated literals and zero uncited
+policy claims reaching a customer. A property, stated as one: no percentage, no
+interval, no "99.8%". Above zero means the guarantee is broken, not degraded.
+
+**The quality claim — not established.** Deflection, accuracy, escalation
+precision. Every one of these is measured against a suite the merchant has not
+signed and carries a ±3.3 point interval from run-to-run nondeterminism. They
+are figures, not bars, and they stay that way until Phase 5 client validation
+regardless of how good they get.
+
+The sentence to keep: **the bar proves the agent never invents a fact;
+deflection proves it is worth paying for; only the first one currently holds.**
+
+A report that puts them in one table has merged them. `reportRun` keeps them in
+separate sections with that wording, and it should stay that way.

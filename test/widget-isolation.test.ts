@@ -55,4 +55,38 @@ describe('storefront isolation', () => {
   it('opens citation links without handing over window.opener', () => {
     expect(SOURCE).toMatch(/link\.rel = 'noopener noreferrer'/);
   });
+
+  it('gives every control a 44px tap target', () => {
+    // KSA storefront traffic is roughly 78% mobile, so a phone is the common
+    // case rather than an accessibility afterthought. Apple and Material both
+    // say 44 CSS px; WCAG 2.2's floor of 24 is too low to be useful here.
+    //
+    // This is a structural check on the stylesheet, not a rendered
+    // measurement, and it is here because the worst offender — the close
+    // button at about 29px — looked completely fine in a desktop screenshot.
+    // Interactive verification on a real phone is still an open item in the
+    // Phase 3 demo script.
+    const style = SOURCE.slice(SOURCE.indexOf('const STYLE'), SOURCE.indexOf('export interface'));
+    const blockFor = (selector: string): string => {
+      const at = style.indexOf(`${selector} {`);
+      if (at < 0) return '';
+      return style.slice(at, style.indexOf('}', at) + 1);
+    };
+    for (const selector of ['.launcher', 'header button', 'input', 'form button']) {
+      const block = blockFor(selector);
+      expect(block, `no style block found for "${selector}"`).not.toBe('');
+      expect(block, `"${selector}" has no min-height — it is a tap target`).toContain(
+        'min-height: 44px',
+      );
+    }
+  });
+
+  it('uses a 16px input font, so iOS does not zoom on focus', () => {
+    // Safari zooms the whole page when a focused input is under 16px, which on
+    // a storefront means the merchant's page jumps the moment someone taps the
+    // chat box. Nothing in the widget can undo it afterwards.
+    const style = SOURCE.slice(SOURCE.indexOf('const STYLE'), SOURCE.indexOf('export interface'));
+    const input = /\binput\s*\{[^}]*\}/.exec(style)?.[0] ?? '';
+    expect(input).toMatch(/font-size:\s*1[6-9]px/);
+  });
 });

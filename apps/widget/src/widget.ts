@@ -47,6 +47,17 @@ const COPY = {
   },
 } as const;
 
+/**
+ * Minimum tap target, in CSS pixels.
+ *
+ * WCAG 2.2 sets 24; Apple and Material both say 44, and they are right about
+ * phones. KSA storefront traffic is roughly 78% mobile, so this is the common
+ * case rather than an accessibility afterthought.
+ *
+ * Enforced by test/widget-isolation.test.ts, because the control that was
+ * worst — the close button at about 29px — looked perfectly fine on a desktop
+ * screenshot.
+ */
 const STYLE = `
   :host { all: initial; }
   * { box-sizing: border-box; font-family: inherit; }
@@ -57,7 +68,7 @@ const STYLE = `
     font-size: 15px; line-height: 1.5; color: #14110f;
   }
   .launcher {
-    border: 0; border-radius: 999px; padding: 13px 20px;
+    border: 0; border-radius: 999px; padding: 13px 20px; min-height: 44px;
     background: #14110f; color: #faf8f5; font-size: 15px; font-weight: 500;
     cursor: pointer; box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
   }
@@ -75,7 +86,15 @@ const STYLE = `
     padding: 14px 16px; background: #14110f; color: #faf8f5;
   }
   header h2 { margin: 0; font-size: 15px; font-weight: 500; }
-  header button { background: none; border: 0; color: inherit; cursor: pointer; padding: 4px; font-size: 18px; }
+  /* 44px square. At 29px this was the hardest thing in the widget to hit on a
+     phone, and it is the control someone reaches for when they are done. */
+  header button {
+    background: none; border: 0; color: inherit; cursor: pointer;
+    font-size: 20px; line-height: 1;
+    min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    margin: -10px -8px -10px 0;
+  }
   .log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .msg { max-width: 85%; padding: 10px 13px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .msg.them { background: #fff; border: 1px solid #e8e2da; align-self: flex-start; }
@@ -93,12 +112,14 @@ const STYLE = `
   @media (prefers-reduced-motion: reduce) { .stage.live .dot { animation: none; } }
   form { display: flex; gap: 8px; padding: 12px; border-block-start: 1px solid #e8e2da; background: #fff; }
   input {
-    flex: 1; border: 1px solid #ddd5cb; border-radius: 9px; padding: 10px 12px;
-    font-size: 15px; background: #fff; color: inherit; min-width: 0;
+    flex: 1; border: 1px solid #ddd5cb; border-radius: 9px; padding: 11px 12px;
+    font-size: 16px; background: #fff; color: inherit; min-width: 0;
+    min-height: 44px;
   }
   form button {
     border: 0; border-radius: 9px; padding: 0 16px; background: #14110f;
     color: #faf8f5; font-size: 15px; cursor: pointer;
+    min-height: 44px; min-width: 64px;
   }
   form button[disabled] { opacity: 0.45; cursor: default; }
 `;
