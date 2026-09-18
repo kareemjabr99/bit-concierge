@@ -104,6 +104,44 @@ between answering and giving up on questions the corpus _does_ answer. That is
 real instability, it costs usefulness rather than safety, and it stays a
 failure.
 
+## The quality problem, isolated
+
+After the metric fix, **four cases are the whole measurable quality problem**,
+and they are all the same shape: `returns-gift`, `returns-quality-check`,
+`shipping-track-how`, `sizing-true-to-size` flip between answering a question
+and handing it to a human — on questions the corpus _does_ answer.
+
+That is a usefulness failure, not a safety one. Nothing leaks and nothing is
+invented; the agent sometimes gives up on work it could do.
+
+It is carried into Phase 5 rather than fixed now, for a reason worth stating:
+**there is currently no principled basis for preferring one behaviour over the
+other.** Both are defensible. A merchant-validated question set is what
+supplies the preference, and until it exists, "fix" would mean picking the
+answer the author likes — which is how three absence expectations came to be
+wrong in the first place.
+
+## Costs, at volume
+
+Verified rates: model $0.30/1M in and $2.50/1M out (2026-09-16), Fly
+infrastructure (2026-09-18). Three turns per conversation is an assumption, not
+a measurement.
+
+| conversations/month | variable | all-in, 1 tenant | all-in, 20 tenants |
+| ------------------- | -------- | ---------------- | ------------------ |
+| 500                 | $2.38    | $55.74           | $5.05              |
+| 2,000               | $9.53    | $62.89           | $12.20             |
+| 10,000              | $47.66   | $101.02          | $50.33             |
+
+The shape matters more than the numbers: **$53/month of shared platform against
+half a cent per conversation.** This is a fixed-cost business at low volume and
+a near-free one at high volume, and the first tenant carries the platform alone.
+
+Excluded, and the largest of them by far: **human escalation.** At roughly 30%
+escalation, 10,000 conversations is 3,000 tickets the merchant still handles.
+That is the number to put in front of a merchant as a saving rather than a cost,
+and it is also why deflection — not the bar — is the commercial argument.
+
 ## Unmeasurable at current precision
 
 ## Unmeasurable at current precision

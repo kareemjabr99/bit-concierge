@@ -23,6 +23,7 @@
     "middle": "node scripts/middle-class.ts",
     "corpus-diff": "node scripts/corpus-diff.ts",
     "verify-absence": "node --env-file-if-exists=../../.env.local scripts/verify-absence.ts",
-    "cost": "node scripts/cost.ts"
+    "cost": "node scripts/cost.ts",
+    "licence-cost": "node scripts/licence-cost.ts"
   }
 }

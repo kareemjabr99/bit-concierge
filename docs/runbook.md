@@ -353,3 +353,37 @@ deflection proves it is worth paying for; only the first one currently holds.**
 
 A report that puts them in one table has merged them. `reportRun` keeps them in
 separate sections with that wording, and it should stay that way.
+
+---
+
+## Verifying anything a customer touches
+
+**Desktop screenshots are not verification for this product.**
+
+Written down because it cost a real defect. The widget's close button was a
+29px tap target — comfortably clickable with a mouse, unpleasant with a thumb,
+and invisible in every desktop screenshot taken of it. It was found by checking
+the stylesheet against a 44px minimum, not by looking.
+
+KSA storefront traffic is roughly **78% mobile**. A phone is the common case
+here, not an accessibility edge case, so "it looked right" on a laptop is not
+evidence about the majority of users.
+
+What this means in practice:
+
+- **A screenshot proves layout, not usability.** Sizes, contrast and reach need
+  measuring or asserting, not eyeballing.
+- **Structural checks beat visual ones where a rule exists.** `min-height: 44px`
+  is testable in CI and a screenshot is not. `test/widget-isolation.test.ts`
+  holds the tap targets and the 16px input font that stops Safari zooming the
+  merchant's page.
+- **Neither replaces a finger on glass.** Touch events, the on-screen keyboard
+  moving the viewport under a focused input, and momentum scrolling inside a
+  panel are not reachable from either. That verification is an open item in
+  `docs/demo-script.md` and closes against a tunnel on a real phone before the
+  Phase 5 demo.
+
+The general form, which applies beyond mobile: **when a check is cheap to
+automate and the failure is invisible to inspection, automate it.** The same
+reasoning produced the citation gate, the CI parity test and the absence
+checks.
