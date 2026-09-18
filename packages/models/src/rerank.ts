@@ -142,6 +142,19 @@ export const llmReranker = (
         });
 
         const byIndex = new Map(object.scores.map((entry) => [entry.i, entry.relevance]));
+
+        // A model that scores only some of what it was shown has failed inside
+        // a successful response. Defaulting the rest to 0 would silently mark
+        // them irrelevant — a quiet demotion that reads as a confident
+        // judgement, and `scored` would tick up as though the reranker had
+        // worked. Falling back to fusion order is the honest answer, and
+        // `fellBack` is what makes it visible.
+        const missing = window.filter((_, index) => !byIndex.has(index)).length;
+        if (missing > 0) {
+          stats.fellBack += 1;
+          return fusionReranker.rerank(query, candidates, topN);
+        }
+
         stats.scored += 1;
         return window
           .map((candidate, index) => ({ ...candidate, score: byIndex.get(index) ?? 0 }))

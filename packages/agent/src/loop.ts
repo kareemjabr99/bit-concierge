@@ -82,6 +82,16 @@ const count = (value: unknown): number => {
 const HARD_TOOL_FAILURES = new Set(['tool_error', 'rate_limited']);
 
 /**
+ * Finish reasons that mean the text is not a whole answer.
+ *
+ * `stop` and `tool-calls` are normal. Everything here means generation ended
+ * for a reason other than the model being finished, and the text — if any —
+ * is a fragment. See the handling below for why the grounding gate cannot
+ * substitute for this check.
+ */
+const INCOMPLETE_FINISH = new Set(['length', 'content-filter', 'error', 'other', 'unknown']);
+
+/**
  * One customer message in, one reply out. Not retrieve-then-answer: the model
  * chooses tools inside a loop capped at MAX_TOOL_STEPS, and the reply passes
  * both halves of the deterministic grounding gate before anyone sees it.
@@ -283,6 +293,34 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
       summary: 'The assistant could not resolve the request within its tool budget.',
     });
     return finish('escalated', systemMessage('escalated', lang, config.messages), {
+      usage,
+      steps,
+      modelKey,
+      rawModelText: text,
+    });
+  }
+
+  // The reply is incomplete, and the call reported success anyway.
+  //
+  // This is the same shape as Shopify reporting a throttle with HTTP 200: a
+  // failure arriving inside a successful response. `length` means the model
+  // hit its output cap mid-sentence; `content-filter` means generation was
+  // stopped part-way.
+  //
+  // **Neither gate can catch this, and that is why it is handled here.** A
+  // truncated policy answer is not wrong in any of its literals — every figure
+  // in it still traces to a source, so the literal check passes and the
+  // citation check passes. What truncation removes is the QUALIFICATION:
+  // "you can return within 7 days, unless the item is from the Archive
+  // Collection, in which case" is a correctly grounded sentence and a
+  // materially false answer.
+  if (INCOMPLETE_FINISH.has(finishReason)) {
+    logger.warn('reply incomplete', { finishReason, length: text.length });
+    await escalate(ctx, {
+      reason: 'system_error',
+      summary: `The reply was cut short (${finishReason}) and was not sent.`,
+    });
+    return finish('suppressed', systemMessage('suppressed', lang, config.messages), {
       usage,
       steps,
       modelKey,

@@ -225,6 +225,46 @@ Shopify store. Phase 4.
 
 ---
 
+## Failure reported inside a successful response
+
+A class of bug worth naming, because it produced the two most dangerous
+findings in the build and both were found before anything real touched them.
+
+**Shopify reports throttling as HTTP 200 with a GraphQL error code.** A client
+that checks `response.ok` sees success with no data — and whatever is
+downstream reads absence as _"no order found"_. On the most-asked question in
+the product, that tells a customer their order does not exist. The transport
+treats a throttled 200 as a failure, retries, and escalates if it cannot
+complete. **A lookup that cannot complete must fail, never guess.**
+
+**The model reports a truncated reply as a successful generation.**
+`finishReason: 'length'` means it hit its output cap mid-sentence, and the call
+returns normally. This one is worse, because **neither grounding gate can catch
+it**: every literal in a truncated answer still traces to a source, so both
+halves pass. What truncation removes is the _qualification_ — "you can return
+within 7 days, unless the item is from the Archive Collection, in which case"
+is a correctly grounded sentence and a materially false answer. Incomplete
+replies are now withheld and handed to a human.
+
+An audit of every API the system calls found one more instance and one
+near-miss:
+
+- **A reranker scoring only some candidates** silently marked the rest
+  irrelevant, while its own counter recorded a successful scoring. Now it falls
+  back to fusion order and says it did.
+- **An embedding provider returning fewer vectors than inputs** — guarded
+  already by the AI SDK, which throws first. Recorded as a near-miss rather
+  than a find. The check stays because the consequence if it stopped holding is
+  the worst in the codebase: results are zipped onto rows by index, so a gap
+  shifts every later chunk onto the wrong vector, and the citation gate would
+  **pass** the result because the chunk id resolves to a real document.
+
+**One limit remains open and is written down rather than assumed:** nothing
+verifies that embeddings come back in the order they were asked for. An
+embedding carries nothing identifying, so a provider returning the right count
+in the wrong order would be undetectable here and would produce exactly that
+contamination. It is the provider's contract, and we rely on it.
+
 ## The worst bug found in this build
 
 Worth stating plainly, because a client will reasonably ask what was found and

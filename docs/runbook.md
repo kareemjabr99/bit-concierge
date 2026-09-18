@@ -387,3 +387,49 @@ The general form, which applies beyond mobile: **when a check is cheap to
 automate and the failure is invisible to inspection, automate it.** The same
 reasoning produced the citation gate, the CI parity test and the absence
 checks.
+
+---
+
+## Secret scanning: we fix the fixture, we do not click past it
+
+**Standing policy. Never use GitHub's push-protection bypass URL.**
+
+It has already been offered once. A test fixture was `shpat_` followed by 32
+hex characters — the exact shape of a real Shopify token — and both
+`test/secrets.test.ts` and GitHub push protection rejected it. The value was
+fake and the bypass was one click.
+
+Using it would have taught everyone who saw the commit that push protection is
+advisory. It is not, and a fixture that looks exactly like a credential is
+wrong regardless of whether the credential is real: it trains the eye to skim
+past token-shaped strings, and it is the same mistake as the invented shipping
+rates — content indistinguishable from the real thing.
+
+What to do instead:
+
+- **If the commits are unpushed, rewrite them.** `git reset --soft` back to the
+  last pushed commit and recommit. Costs nothing.
+- **Fix the fixture structurally, not cosmetically.** The second attempt was
+  `FAKE-CREDENTIAL-NOT-A-REAL-TOKEN-0001`, which still tripped the rule against
+  long opaque literals assigned to secret-shaped names — correctly, because
+  that is what a leaked token looks like from the outside. The fixtures now
+  contain spaces and an em dash, which no token format can accommodate. The way
+  to satisfy a structural rule is structurally.
+- **If a real secret was committed, it is burned.** Rotate it first, then clean
+  the history. Do not rely on a force-push having been fast enough.
+
+The only case for the bypass is a false positive on content that genuinely
+cannot be changed, and none has occurred. If one does, it is a conversation
+rather than a click.
+
+## Running verify before a commit
+
+**Chain it, do not read it.**
+
+```bash
+pnpm verify && git commit -m "..."
+```
+
+A commit was once made over a failing test because `verify` and `git commit`
+ran in the same block and the output scrolled past. `&&` makes that impossible;
+reading carefully does not.

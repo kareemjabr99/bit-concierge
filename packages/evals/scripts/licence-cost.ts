@@ -124,5 +124,33 @@ console.log(
 console.log(
   `\n  The model line is ~87% input tokens, because every turn resends the system\n` +
     `  prompt, the tool definitions and the retrieved chunks. Prompt caching is the\n` +
-    `  one change that would move this curve materially, and it is not built.\n`,
+    `  one change that would move this curve materially, and it is not built.\n` +
+    `  Scoped in docs/prompt-caching.md.\n`,
 );
+
+console.log('## Two arguments, priced differently\n');
+console.log(
+  [
+    '  DEFLECTION is the VALUE argument. At ~30% escalation, 10,000 conversations',
+    '  is 3,000 tickets the merchant does not answer. That is the largest number on',
+    '  this page by an order of magnitude, it sits in the excluded list because it',
+    '  is their cost rather than ours, and it is what the licence is actually sold',
+    '  against. It is also the claim that does NOT hold yet: it needs a',
+    '  merchant-validated question set.',
+    '',
+    '  THE BAR is the TRUST argument. Zero fabricated literals and zero uncited',
+    '  claims reaching a customer. It is what makes the assistant safe to put in',
+    '  front of customers at all, and it holds today — but a system that escalated',
+    '  every question would satisfy it perfectly and save nobody anything.',
+    '',
+    '  They are priced differently because they are different products. Trust is a',
+    '  precondition — a floor, and a reason to charge for the platform rather than',
+    '  per conversation. Value scales with deflection, and until Phase 5 measures',
+    '  it against a signed question set there is no honest number to attach to it.',
+    '',
+    '  Quoting one as though it were the other is the mistake to avoid in front of',
+    '  a merchant: "it never makes things up" is true and is not a reason to buy;',
+    '  "it handles 70% of your tickets" is a reason to buy and is not yet proven.',
+  ].join('\n'),
+);
+console.log('');

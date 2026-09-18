@@ -260,6 +260,54 @@ describe('agent turn', () => {
     expect(model.doGenerateCalls).toHaveLength(0);
   });
 
+  it('suppresses a reply the model cut short, which no gate could catch', async () => {
+    // Failure inside a successful response — the same shape as Shopify
+    // reporting a throttle with HTTP 200.
+    //
+    // Every literal in this sentence traces to a source, so BOTH halves of the
+    // grounding gate pass it. What truncation removed is the qualification,
+    // and the qualification is what made it true.
+    const model = scripted([
+      { tools: [{ name: 'search_knowledge', input: { query: 'returns' } }] },
+      {
+        text: 'You can return within 14 days of delivery [[c:fx-returns-window]], unless the item is',
+        finishReason: 'length',
+      },
+    ]);
+    const r = await turn('what is your return policy', model);
+
+    expect(r.status).toBe('suppressed');
+    expect(r.reply).not.toContain('unless the item is');
+    expect(r.reply).toBe(systemMessage('suppressed', 'en'));
+    // Kept for audit: someone reading this later needs to see what was cut.
+    expect(r.rawModelText).toContain('unless the item is');
+  });
+
+  it.each(['content-filter', 'error', 'other', 'unknown'])(
+    'suppresses a reply that ended with finishReason %s',
+    async (finishReason) => {
+      const model = scripted([
+        { tools: [{ name: 'search_knowledge', input: { query: 'returns' } }] },
+        { text: 'You can return within 14 days [[c:fx-returns-window]].', finishReason },
+      ]);
+      expect((await turn('returns?', model)).status).toBe('suppressed');
+    },
+  );
+
+  it('still sends a reply that finished normally', async () => {
+    // The control. Without it the rule above could be "suppress everything".
+    const model = scripted([
+      { tools: [{ name: 'search_knowledge', input: { query: 'returns' } }] },
+      {
+        text: 'You can return within 14 days of delivery [[c:fx-returns-window]].',
+        finishReason: 'stop',
+      },
+    ]);
+    const r = await turn('returns?', model);
+    expect(r.status).toBe('answered');
+    expect(r.reply).toContain('14 days');
+  });
+
   it('a provider failure after a successful escalation is still an escalation', async () => {
     const model = scripted([
       {

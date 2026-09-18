@@ -65,6 +65,22 @@ export const makeEmbedder = (spec: EmbeddingModelSpec, model: EmbeddingModel): E
         google: { outputDimensionality: spec.dims, taskType: 'RETRIEVAL_DOCUMENT' },
       },
     });
+    // A provider that returns fewer vectors than it was given inputs is
+    // reporting a failure inside a successful response, and this one is the
+    // most dangerous shape of it in the codebase: callers zip the result back
+    // onto their rows by index, so a gap does not drop a chunk — it shifts
+    // every chunk after it onto the wrong vector.
+    //
+    // Retrieval would then return confidently wrong passages, and the citation
+    // gate would PASS them, because the chunk id resolves to a real document.
+    // Contamination indistinguishable from correct grounding. Fail loudly.
+    if (embeddings.length !== texts.length) {
+      throw new BitcError(
+        'embedding_count_mismatch',
+        `asked for ${texts.length} embeddings and got ${embeddings.length}`,
+        { customerSafe: false },
+      );
+    }
     return embeddings.map((e) => {
       assertDims(spec, e);
       return l2normalize(e);

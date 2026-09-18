@@ -79,6 +79,11 @@ export interface ScriptStep {
   /** Simulate the provider failing on this call. */
   throws?: string;
   tools?: { name: string; input: Record<string, unknown> }[];
+  /**
+   * Override the finish reason. 'length' is a truncated reply, which arrives
+   * as a perfectly successful call carrying a fragment.
+   */
+  finishReason?: string;
 }
 
 /**
@@ -107,7 +112,10 @@ export const scripted = (steps: ScriptStep[]): MockLanguageModelV4 => {
       );
       return {
         content,
-        finishReason: { unified: step.tools?.length ? 'tool-calls' : 'stop', raw: undefined },
+        finishReason: {
+          unified: step.finishReason ?? (step.tools?.length ? 'tool-calls' : 'stop'),
+          raw: undefined,
+        },
         usage: {
           inputTokens: { total: 100, noCache: 100, cacheRead: 0, cacheWrite: 0 },
           outputTokens: { total: 20, text: 20, reasoning: 0 },
