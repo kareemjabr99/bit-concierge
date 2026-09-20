@@ -433,3 +433,24 @@ pnpm verify && git commit -m "..."
 A commit was once made over a failing test because `verify` and `git commit`
 ran in the same block and the output scrolled past. `&&` makes that impossible;
 reading carefully does not.
+
+**And do not pipe it.** This looks equivalent and is not:
+
+```bash
+pnpm verify | grep -E 'Tests |error' && git commit -m "..."   # WRONG
+```
+
+A pipeline's exit status is the LAST command's. `grep` succeeds when it finds
+the word "error", so a failing verify whose output contains that word makes the
+`&&` pass. That is not a hypothetical — it pushed a commit that failed lint,
+one commit after this section was written telling everyone to chain it.
+
+If output needs filtering, capture first and let the exit status stand alone:
+
+```bash
+pnpm verify > /tmp/verify.log 2>&1 && git commit -m "..."
+```
+
+or `set -o pipefail` before the pipeline. The general shape is the one this
+project keeps rediscovering: **a check whose result passes through something
+that can swallow it is not a check.**
