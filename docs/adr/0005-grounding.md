@@ -408,6 +408,45 @@ Phase 6 owns the schema migration, the dashboard surface and the
 unattested-is-absent default. The design is recorded here so that it is not
 reconstructed from memory when the dashboard is built.
 
+### Known limit: the gates do not check that a reply is COMPLETE
+
+The third limit, alongside merchant-attested facts and cross-source
+contradiction, and the one the design did not anticipate.
+
+**The gates verify that claims trace to sources. They do not verify that a
+reply finished.**
+
+A model that hits its output cap mid-sentence reports a successful generation —
+`finishReason: 'length'` on an otherwise normal response. The text that comes
+back is a fragment, and **both halves of the gate pass it**, because every
+literal in a fragment still traces to a source and every sentence in it still
+cites one.
+
+What truncation removes is the qualification:
+
+> "You can return within 7 days of delivery, unless the item is from the
+> Archive Collection, in which case"
+
+Correctly grounded. Correctly cited. Materially false, and expensive: a
+customer told that returns the merchant will refuse.
+
+This is not a weakness in the checks — it is outside what either can see. A
+gate that reasons about whether a reply _says enough_ would be judging
+completeness of meaning, which is the semantic half, which is sampled human
+review.
+
+**Handled in the loop instead**, because it is detectable at the source: an
+incomplete finish reason means the text is a fragment, so the reply is withheld
+and a human is fetched. `content-filter`, `error`, `other` and `unknown` are
+treated the same way. The fragment is kept for audit.
+
+It belongs in this list because the general shape recurs: **a failure reported
+inside a successful response.** Shopify does it too — a throttle arrives as
+HTTP 200 with a GraphQL error, and a naive client turns that into "no order
+found" on the most-asked question in the product. An audit of every external
+call found one more instance and one near-miss; see
+`docs/where-this-stands.md`.
+
 ### Known limit: attribution is not faithfulness
 
 A citation that resolves and covers the right concept can still misrepresent

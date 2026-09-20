@@ -511,6 +511,28 @@ describe('ship bar', () => {
     expect(bar.meets).toBe(true);
   });
 
+  it('names WHY cases were lost, because quota and timeout mean opposite things', () => {
+    // Run 6 lost two cases to 45-second timeouts and the report called it a
+    // quota wall. Those call for opposite responses — wait a day, or go and
+    // look at latency — so the report names the cause.
+    const bar = shipBar(
+      base({
+        outcomes: [
+          outcome(),
+          outcome({ id: 'a', behaviour: 'error', errorKind: 'timeout' }),
+          outcome({ id: 'b', behaviour: 'error', errorKind: 'timeout' }),
+          outcome({ id: 'c', behaviour: 'error', errorKind: 'quota' }),
+        ],
+      }),
+      'google:m',
+    );
+    expect(bar.meets).toBe(false);
+    const note = bar.notes.find((n) => n.includes('never produced a verdict'))!;
+    expect(note).toContain('2 timeout');
+    expect(note).toContain('1 quota');
+    expect(note).not.toContain('hit the wall');
+  });
+
   it('says a run is incomplete exactly once', () => {
     // Two code paths used to add the same sentence, and the report read as
     // though there were two separate problems.
@@ -518,7 +540,7 @@ describe('ship bar', () => {
       base({ outcomes: [outcome(), outcome({ id: 'e', behaviour: 'error' })] }),
       'google:m',
     );
-    expect(bar.notes.filter((n) => n.includes('never reached the model'))).toHaveLength(1);
+    expect(bar.notes.filter((n) => n.includes('never produced a verdict'))).toHaveLength(1);
   });
 
   it('fails closed when cases never reached the model', () => {
@@ -527,7 +549,7 @@ describe('ship bar', () => {
       'google:m',
     );
     expect(bar.meets).toBe(false);
-    expect(bar.notes.join(' ')).toContain('measures the wall');
+    expect(bar.notes.join(' ')).toContain('measures less than it claims');
   });
 
   it('fails closed when the run was measured on a different model', () => {

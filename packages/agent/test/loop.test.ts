@@ -308,6 +308,28 @@ describe('agent turn', () => {
     expect(r.reply).toContain('14 days');
   });
 
+  it('names a timeout as a timeout, not as a quota wall', async () => {
+    // Two runs that lost cases to quota and to timeouts look identical in the
+    // outcomes and call for opposite responses. Run 6 lost two cases to
+    // 45-second timeouts and was reported as having exhausted its quota.
+    const r = await turn(
+      'hello',
+      scripted([{ throws: 'The operation was aborted due to timeout' }]),
+    );
+    expect(r.status).toBe('error');
+    expect(r.errorKind).toBe('timeout');
+  });
+
+  it('names a quota refusal as quota', async () => {
+    const r = await turn('hello', scripted([{ throws: '429 Too Many Requests: quota exceeded' }]));
+    expect(r.errorKind).toBe('quota');
+  });
+
+  it('falls back to provider for anything it cannot place', async () => {
+    const r = await turn('hello', scripted([{ throws: 'socket hang up' }]));
+    expect(r.errorKind).toBe('provider');
+  });
+
   it('a provider failure after a successful escalation is still an escalation', async () => {
     const model = scripted([
       {

@@ -14,6 +14,17 @@ import { EMBEDDING_MODELS } from '../src/embed.ts';
 const spec = EMBEDDING_MODELS['google:gemini-embedding-001@1536']!;
 const vector = (fill: number) => Array.from({ length: spec.dims }, () => fill);
 
+/** A distinct, deterministic vector per text, so a reorder is visible. */
+const vectorFor = (text: string): number[] => {
+  const seed = [...text].reduce((n, c) => n + c.charCodeAt(0), 1);
+  return Array.from({ length: spec.dims }, (_, i) => Math.sin(seed * (i + 1)));
+};
+/** First component after L2 normalisation, for comparing without exporting it. */
+const l2first = (v: number[]): number => {
+  const norm = Math.sqrt(v.reduce((n, x) => n + x * x, 0));
+  return v[0]! / norm;
+};
+
 describe('an embedding provider that returns fewer vectors than inputs', () => {
   it('throws rather than returning a short array', async () => {
     // This one turned out to be guarded already: the AI SDK checks the count
@@ -50,21 +61,111 @@ describe('an embedding provider that returns fewer vectors than inputs', () => {
       modelId: 'exact',
       maxEmbeddingsPerCall: 100,
       supportsParallelCalls: true,
-      doEmbed: async () => ({ embeddings: [vector(1), vector(2), vector(3)] }),
+      doEmbed: async ({ values }: { values: string[] }) => ({
+        embeddings: values.map(() => vector(1)),
+      }),
     } as never);
     expect(await embedder.embedDocuments(['a', 'b', 'c'])).toHaveLength(3);
   });
 
-  it('what NOBODY checks: that the vectors came back in the order asked', () => {
-    // Neither the SDK nor this code can verify ordering — an embedding carries
-    // nothing identifying, so a provider that returned the right count in the
-    // wrong order would be undetectable here and would produce exactly the
-    // contamination described above.
+  it('detects a provider returning the right count in the WRONG order', async () => {
+    // The limit that was open until now. Nothing else in the system could see
+    // this: an embedding carries nothing identifying, so a vector cannot be
+    // checked against the text it describes. Every chunk would be stored
+    // against someone else's vector, and the citation gate would PASS the
+    // result because the chunk id resolves to a real document.
     //
-    // Recorded as a known limit rather than left implicit. It is the
-    // provider's contract, and this test exists so the assumption is written
-    // down somewhere rather than only being relied upon.
-    expect(true).toBe(true);
+    // What CAN be checked is that identical text embedded twice in one call
+    // comes back identical — so the batch carries a canary at each end.
+    let call = 0;
+    const embedder = makeEmbedder(spec, {
+      specificationVersion: 'v3',
+      provider: 'mock',
+      modelId: 'rotating',
+      maxEmbeddingsPerCall: 100,
+      supportsParallelCalls: true,
+      doEmbed: async ({ values }: { values: string[] }) => {
+        call += 1;
+        // Correct vectors, rotated by one. Right count, wrong order.
+        const correct = values.map((v) => vectorFor(v));
+        return { embeddings: [...correct.slice(1), correct[0]!] };
+      },
+    } as never);
+
+    await expect(embedder.embedDocuments(['a', 'b', 'c'])).rejects.toThrow(
+      /embedded twice in one call disagreed|out of order/,
+    );
+    expect(call).toBe(1);
+  });
+
+  it('passes when the provider preserves order, and strips the canaries', async () => {
+    // The control. Without it the check above could be "always throw", and the
+    // caller must get back exactly its own texts — not the probes.
+    const embedder = makeEmbedder(spec, {
+      specificationVersion: 'v3',
+      provider: 'mock',
+      modelId: 'honest',
+      maxEmbeddingsPerCall: 100,
+      supportsParallelCalls: true,
+      doEmbed: async ({ values }: { values: string[] }) => ({
+        embeddings: values.map((v) => vectorFor(v)),
+      }),
+    } as never);
+
+    const out = await embedder.embedDocuments(['a', 'b', 'c']);
+    expect(out).toHaveLength(3);
+    // Each returned vector is the one for its own text, canaries removed.
+    for (const [i, text] of ['a', 'b', 'c'].entries()) {
+      expect(out[i]![0]).toBeCloseTo(l2first(vectorFor(text)), 6);
+    }
+  });
+
+  it('is tight enough to catch a swap between two SIMILAR passages', async () => {
+    // The threshold has to be near 1, not merely "high". Two related store
+    // passages embed close together — the two shipping policies on this corpus
+    // are near-duplicates — so a transposition between them produces vectors
+    // that are 0.9-ish similar and utterly wrong to serve.
+    //
+    // Identical text must give an identical vector, so anything below 1 is a
+    // disagreement. This pins that: a canary pair 0.9 apart must still fail.
+    const base = Array.from({ length: spec.dims }, (_, i) => Math.sin(i + 1));
+    const nudged = base.map((x, i) => x + (i < spec.dims * 0.1 ? 0.6 : 0));
+    let call = 0;
+    const embedder = makeEmbedder(spec, {
+      specificationVersion: 'v3',
+      provider: 'mock',
+      modelId: 'similar',
+      maxEmbeddingsPerCall: 100,
+      supportsParallelCalls: true,
+      doEmbed: async ({ values }: { values: string[] }) => {
+        call += 1;
+        // Canary positions 0 and 1 get SIMILAR but not identical vectors.
+        return {
+          embeddings: values.map((_, i) => (i === 1 ? nudged : base)),
+        };
+      },
+    } as never);
+
+    await expect(embedder.embedDocuments(['a', 'b', 'c'])).rejects.toThrow(/out of order/);
+    expect(call).toBe(1);
+  });
+
+  it('catches a reversal, which an end-to-end canary would miss', async () => {
+    const embedder = makeEmbedder(spec, {
+      specificationVersion: 'v3',
+      provider: 'mock',
+      modelId: 'reversing',
+      maxEmbeddingsPerCall: 100,
+      supportsParallelCalls: true,
+      doEmbed: async ({ values }: { values: string[] }) => ({
+        embeddings: values.map((v) => vectorFor(v)).reverse(),
+      }),
+    } as never);
+    // The first design placed one canary at each end, which a reversal maps
+    // onto each other: both ends still hold a canary, the check agrees, and
+    // every chunk between them is silently transposed. This test is why the
+    // probes are at 0, 1 and last instead.
+    await expect(embedder.embedDocuments(['a', 'b', 'c'])).rejects.toThrow(/out of order/);
   });
 });
 

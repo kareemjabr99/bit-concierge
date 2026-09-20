@@ -158,6 +158,7 @@ const evaluate = async (
     retrievedSources,
     hallucinations,
     citationMisses,
+    ...(turn.errorKind ? { errorKind: turn.errorKind } : {}),
     falseSuppression,
     latencyMs: turn.latencyMs,
     inputTokens: turn.usage.inputTokens,
@@ -309,10 +310,19 @@ export const shipBar = (
       `measured on ${result.chatModel}, ship bar is ${productionChatModel} — every number here describes a different system`,
     );
   }
-  const incomplete = result.outcomes.filter((o) => o.behaviour === 'error').length;
-  if (incomplete > 0) {
+  const incomplete = result.outcomes.filter((o) => o.behaviour === 'error');
+  if (incomplete.length > 0) {
+    // Named by cause. A run that lost cases to a provider quota and one that
+    // lost them to timeouts look identical here and call for opposite
+    // responses — wait a day, or go and look at latency. Reporting both as
+    // "hit the wall" said the wrong thing about run 6, which lost two cases to
+    // 45-second timeouts and was described as having exhausted its quota.
+    const byKind = new Map<string, number>();
+    for (const o of incomplete)
+      byKind.set(o.errorKind ?? 'unknown', (byKind.get(o.errorKind ?? 'unknown') ?? 0) + 1);
+    const detail = [...byKind].map(([kind, n]) => `${n} ${kind}`).join(', ');
     notes.push(
-      `${incomplete} case(s) never reached the model — a run that hit the wall measures the wall`,
+      `${incomplete.length} case(s) never produced a verdict (${detail}) — a run missing cases measures less than it claims`,
     );
   }
 

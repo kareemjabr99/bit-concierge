@@ -62,6 +62,15 @@ export interface TurnResult {
   status: TurnStatus;
   /** Customer-visible text. Null when the thread belongs to the team. */
   reply: string | null;
+  /**
+   * Why a turn ended in `error`, when it did.
+   *
+   * Not cosmetic. A run that lost cases to a provider quota and a run that
+   * lost them to timeouts look identical in the outcomes and call for opposite
+   * responses — wait a day, or go and look at latency. Reporting both as "hit
+   * the wall" sent exactly that wrong signal once.
+   */
+  errorKind?: 'timeout' | 'quota' | 'provider' | undefined;
   lang: Language;
   steps: number;
   usage: TurnUsage;
@@ -90,6 +99,22 @@ const HARD_TOOL_FAILURES = new Set(['tool_error', 'rate_limited']);
  * substitute for this check.
  */
 const INCOMPLETE_FINISH = new Set(['length', 'content-filter', 'error', 'other', 'unknown']);
+
+/**
+ * What kind of failure ended the turn.
+ *
+ * Matched on shape rather than on an SDK error class, because the SDK wraps
+ * provider errors and the wrapper has changed before. A misclassification here
+ * is not dangerous — it changes a label, not a behaviour — which is why a
+ * string match is an acceptable instrument for it.
+ */
+const classifyModelError = (error: unknown): 'timeout' | 'quota' | 'provider' => {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === 'TimeoutError' || /timeout|aborted due to timeout/i.test(message)) return 'timeout';
+  if (/429|quota|rate.?limit|resource.?exhausted/i.test(message)) return 'quota';
+  return 'provider';
+};
 
 /**
  * One customer message in, one reply out. Not retrieve-then-answer: the model
@@ -139,6 +164,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
       grounding?: TurnResult['grounding'];
       rawModelText?: string | null;
       modelKey?: string | null;
+      errorKind?: TurnResult['errorKind'];
     } = {},
   ): Promise<TurnResult> => {
     const usage = extra.usage ?? zero;
@@ -166,6 +192,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
       steps: extra.steps ?? 0,
       latencyMs,
       ...usage,
+      ...(extra.errorKind ? { errorKind: extra.errorKind } : {}),
       tools: recorder.toolCalls.map((t) => t.name),
     });
     return {
@@ -179,6 +206,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
       recorder,
       grounding: extra.grounding ?? null,
       rawModelText: extra.rawModelText ?? null,
+      ...(extra.errorKind ? { errorKind: extra.errorKind } : {}),
     };
   };
 
@@ -249,6 +277,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     finishReason = result.finishReason;
   } catch (error) {
     logger.error('model call failed', { error });
+    const errorKind = classifyModelError(error);
     // The model already handed the thread over before failing; that stands.
     if (recorder.escalation) {
       return finish('escalated', systemMessage('escalated', lang, config.messages), {
@@ -263,6 +292,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     return finish('error', systemMessage('error', lang, config.messages), {
       steps,
       modelKey: deps.chat.spec.key,
+      errorKind,
     });
   }
   const modelKey = deps.chat.spec.key;

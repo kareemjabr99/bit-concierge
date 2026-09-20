@@ -155,6 +155,11 @@ export interface CaseOutcome {
   hallucinations: number;
   /** Deterministic: policy claims with no resolvable, on-topic citation. */
   citationMisses: number;
+  /**
+   * Why a turn ended in `error`. Quota and timeout call for opposite
+   * responses, so the report names which.
+   */
+  errorKind?: 'timeout' | 'quota' | 'provider' | undefined;
   /** The reply was withheld although the case expected an answer. */
   falseSuppression: boolean;
   latencyMs: number;

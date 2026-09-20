@@ -290,11 +290,33 @@ nondeterministic as it was; the metric is less wrong about it.**
 That distinction is worth keeping, because the tempting summary — "we reduced
 instability from 18% to 10%" — describes work that was not done.
 
-## Run 6 was incomplete
+## Run 6 was incomplete — and NOT for the reason first reported
 
-Two cases hit the daily quota wall: `order-status-when-will-it-arrive` and
-`returns-damaged-item`. The bar failed closed on it, which is correct and is
-the third time that guard has earned its place.
+**Correction, 2026-09-20.** Run 6 lost two cases, and they were reported here
+and in the gate report as having hit the daily quota wall. They did not.
+
+Both were `TimeoutError` against the 45-second per-turn budget, at 45s and 79s,
+at cases 22 and 58 — scattered mid-run, not a contiguous tail. Quota
+exhaustion produces a tail; two isolated failures in the middle are transient.
+
+The mistake was in the instrument, not just the write-up: `quotaExhausted`
+counted any turn ending in `error` and the report called every one of them "a
+run that hit the wall". Those call for opposite responses — wait a day, or go
+and look at latency — and a run losing cases to 45-second timeouts is telling
+you about p95, not about quota. Turn results now carry an `errorKind` and the
+report names the cause.
+
+What this does and does not change:
+
+- **The per-run request arithmetic stands.** 3.80 requests per case and ~392
+  per run were counted from reranker-log lines and tool calls, not inferred
+  from a wall.
+- **Run 3's wall was probably real** — five errors on its last cases, the shape
+  quota produces. It was attributed to being the third run of that day; the
+  logs are gone, so that attribution can no longer be distinguished from other
+  consumers sharing the key, and it should be read as unconfirmed.
+- **The bar failing closed on run 6 was still correct.** A case with no verdict
+  is a case with no verdict, whatever caused it.
 
 It also means run 6's headline — zero fabricated literals and zero uncited
 claims reaching a customer — is measured over 101 cases, not 103. The property

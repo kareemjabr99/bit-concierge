@@ -83,3 +83,19 @@ The development store, per `docs/shopify-dev-store.md`. Order numbers are
 assigned by Shopify and cannot be chosen, so 16 golden-set cases need remapping
 once the store exists — a fixture correction, recorded, not an expectation
 change.
+
+## Carried to Phase 5, alongside the four unstable cases
+
+**Latency. p95 is 8–9 seconds and two cases in run 6 exceeded the 45-second
+budget entirely.**
+
+The widget now shows the wait rather than hiding it, which is the right
+handling and is not a fix. `docs/prompt-caching.md` establishes that the model
+bill is not worth optimising — but the same two thirds of every turn that make
+up the token cost are retrieved chunks and history, and fewer or smaller
+passages would move latency far more visibly than they would move the bill.
+
+That is the better reason to touch retrieval, and it belongs with the
+validated question set: changing what is retrieved changes what can be
+answered, and there is currently no principled basis for trading one against
+the other.
