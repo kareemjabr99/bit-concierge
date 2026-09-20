@@ -21,3 +21,4 @@ coverage/
 # the committed answer to "which node", and this file is the machine's own.
 .claude/launch.json
 apps/widget/dist/
+.shopify-token-cache/

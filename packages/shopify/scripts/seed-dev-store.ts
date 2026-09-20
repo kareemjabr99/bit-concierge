@@ -23,46 +23,47 @@
 const API_VERSION = '2026-07';
 const SEED_TAG = 'bitc-seed';
 
+import { adminToken, diagnose } from './auth.ts';
+
 const domain = (process.env.SHOPIFY_STORE_DOMAIN ?? '').trim();
-const token = (process.env.SHOPIFY_SEED_TOKEN ?? '').trim().replace(/^['"]|['"]$/g, '');
+const clientId = (process.env.SHOPIFY_CLIENT_ID ?? '').trim();
+const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET ?? process.env.SHOPIFY_SEED_TOKEN ?? '')
+  .trim()
+  .replace(/^['"]|['"]$/g, '');
+/** A static shpat_ token, if anyone still has one. Optional. */
+const staticToken = (process.env.SHOPIFY_SEED_TOKEN ?? '').trim().startsWith('shpat_')
+  ? (process.env.SHOPIFY_SEED_TOKEN ?? '').trim()
+  : '';
+
 const mode = process.argv.includes('--check')
   ? 'check'
-  : process.argv.includes('--dry-run')
-    ? 'dry-run'
-    : 'create';
+  : process.argv.includes('--diagnose')
+    ? 'diagnose'
+    : process.argv.includes('--dry-run')
+      ? 'dry-run'
+      : 'create';
 
-if (!domain || !token) {
-  console.error('SHOPIFY_STORE_DOMAIN and SHOPIFY_SEED_TOKEN must both be set in .env.local');
+if (!domain) {
+  console.error('SHOPIFY_STORE_DOMAIN must be set in .env.local');
+  process.exit(1);
+}
+if (!staticToken && (!clientId || !clientSecret)) {
+  console.error(
+    '\nSet SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET in .env.local.\n\n' +
+      '  Apps created in the Dev Dashboard do not hand out a static shpat_ token — that\n' +
+      '  flow is gone. The Client ID and the shpss_ Client Secret are exchanged for a\n' +
+      '  24-hour token via the client credentials grant, which this script does for you.\n' +
+      '  https://shopify.dev/docs/apps/build/dev-dashboard/get-api-access-tokens\n',
+  );
   process.exit(1);
 }
 
-/**
- * Catch the wrong CREDENTIAL TYPE before spending a request on it.
- *
- * Shopify hands out several secrets from the same page and they are easy to
- * confuse. `shpss_` is the app's secret key — used to verify webhook
- * signatures — and it will never authenticate an Admin API call. The API says
- * only "Invalid API key or access token", which does not tell you that you
- * have the right app and the wrong secret.
- */
-const TOKEN_PREFIXES: Record<string, string> = {
-  shpss_: 'an app SECRET key (used to verify webhooks). It cannot authenticate Admin API calls.',
-  shpca_:
-    'a custom-app token from the older flow. It may work; if it does not, use the shpat_ one.',
+/** Resolved once, then reused. Tokens last 24h and are cached on disk. */
+let token = staticToken;
+const ensureToken = async (): Promise<string> => {
+  if (!token) token = await adminToken(domain, clientId, clientSecret);
+  return token;
 };
-if (!token.startsWith('shpat_')) {
-  const prefix = Object.keys(TOKEN_PREFIXES).find((p) => token.startsWith(p));
-  console.error(
-    `\nSHOPIFY_SEED_TOKEN starts with "${token.slice(0, 6)}", not "shpat_".\n\n` +
-      (prefix ? `  That is ${TOKEN_PREFIXES[prefix]}\n\n` : '') +
-      `  The Admin API access token is at:\n` +
-      `    Settings -> Apps and sales channels -> Develop apps -> bit-concierge-seed\n` +
-      `    -> API credentials -> "Admin API access token"\n\n` +
-      `  It is revealed ONCE, when the app is installed. If it was never revealed,\n` +
-      `  uninstall and reinstall the app on the store to get a fresh one.\n`,
-  );
-  if (!process.argv.includes('--force')) process.exit(1);
-}
 
 // ---------------------------------------------------------------------------
 // Prices and measurements.
@@ -369,20 +370,18 @@ let calls = 0;
 
 const gql = async <T>(query: string, variables: Record<string, unknown> = {}): Promise<T> => {
   calls += 1;
+  const bearer = await ensureToken();
   const response = await fetch(`https://${domain}/admin/api/${API_VERSION}/graphql.json`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-shopify-access-token': token },
+    headers: { 'content-type': 'application/json', 'x-shopify-access-token': bearer },
     body: JSON.stringify({ query, variables }),
   });
 
   if (response.status === 401 || response.status === 403) {
     throw new Error(
-      `HTTP ${response.status}. The token was rejected.\n` +
-        `  A Shopify Admin API access token starts with "shpat_". If yours starts with\n` +
-        `  "shpss_" that is the app's SECRET key, not an access token — they are different\n` +
-        `  credentials and only one of them works here.\n` +
-        `  Find it at: Settings -> Apps and sales channels -> Develop apps -> your app ->\n` +
-        `  API credentials -> "Admin API access token" (revealed once, on install).`,
+      `HTTP ${response.status}. The store rejected the token.\n` +
+        `  It was minted from the client credentials grant, so this usually means the app's\n` +
+        `  released version does not carry the scope this call needs. Run --check.`,
     );
   }
   if (!response.ok)
@@ -775,6 +774,20 @@ const seedOrder = async (
 // ---------------------------------------------------------------------------
 
 const main = async (): Promise<void> => {
+  if (mode === 'diagnose') {
+    console.log(`\ndiagnosing the client credentials grant for ${domain}\n`);
+    const result = await diagnose(domain, clientId, clientSecret);
+    if (result.ok) {
+      console.log('  the grant works. Run --check next.\n');
+      return;
+    }
+    console.log(`  OAuth error: ${result.error}\n`);
+    if (result.explanation) console.log(`  ${result.explanation}\n`);
+    if (result.nextStep) console.log(`  NEXT: ${result.nextStep}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
   if (mode === 'check') {
     process.exitCode = (await check()) ? 0 : 1;
     return;

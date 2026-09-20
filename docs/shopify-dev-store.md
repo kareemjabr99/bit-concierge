@@ -18,10 +18,14 @@ metric, Riyadh time zone, order prefix `1886-`.
 Seeded by script rather than by hand:
 
 ```bash
+pnpm --filter @bitc/shopify run seed:diagnose  # explain an auth failure
 pnpm --filter @bitc/shopify run seed:check     # verify access, writes nothing
 pnpm --filter @bitc/shopify run seed:dry-run   # show the plan, writes nothing
 pnpm --filter @bitc/shopify run seed           # create
 ```
+
+Requires `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_CLIENT_ID` and
+`SHOPIFY_CLIENT_SECRET` in `.env.local`.
 
 `--check` runs first on purpose. It confirms the token, the currency, every
 mutation the script needs and every write scope, and reports what is missing —
@@ -54,16 +58,59 @@ or absent — and the script is the source.
 Two tees with different measurements is the point: `sizing-tee-chest` exists
 because the agent must say measurements vary by style rather than pick one.
 
+### Authentication: the classic custom-app flow is gone
+
+**There is no longer a screen that hands you a static `shpat_` token** for an
+app created in the Dev Dashboard. Store admin → Apps → Develop apps routes into
+the dashboard, and the dashboard shows a **Client ID** and a **`shpss_` Client
+Secret** instead. That secret is not a token and will never authenticate an API
+call — but it is not useless, it is half of the credential pair.
+
+The replacement is the **client credentials grant**: POST the pair to
+`https://{shop}/admin/oauth/access_token` with
+`grant_type=client_credentials`, and get back a token that lasts **24 hours**.
+The seed script does this for you and caches the token to a gitignored file.
+
+Two dead ends worth naming, because both look right:
+
+- **The "Create automation token" button.** It authenticates the Shopify CLI in
+  CI/CD, not API requests. It will not produce a token for this.
+- **Hunting for the classic custom-app page.** It is not hidden; for Dev
+  Dashboard apps it does not exist.
+
+Docs: https://shopify.dev/docs/apps/build/dev-dashboard/get-api-access-tokens
+
+#### When the grant is refused
+
+The endpoint returns an HTML page whose only useful content is a title like
+`400 - Oauth error invalid_request`. No JSON, no detail, and quite different
+problems share one code. `pnpm --filter @bitc/shopify run seed:diagnose` maps
+them:
+
+| error                         | what it means                                                                                | fix                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `application_cannot_be_found` | the store does not recognise the Client ID                                                   | check `SHOPIFY_CLIENT_ID` for a typo                                                    |
+| `invalid_request`             | Client ID recognised, token refused before the secret is even checked                        | **the app is not installed on this store** — a released version is not an installed one |
+| `shop_not_permitted`          | app and store in different organizations, or the store was created outside the Dev Dashboard | client credentials only works within one org                                            |
+| `invalid_client`              | Client ID recognised, secret does not match                                                  | re-copy `SHOPIFY_CLIENT_SECRET`                                                         |
+
+Those mappings come from probing the live store with deliberately wrong values
+to see which error each produces — a wrong Client ID gives
+`application_cannot_be_found`, and the real one with a deliberately wrong
+secret gives the same `invalid_request` as the real secret, which is what shows
+the request is being refused before credential validation.
+
 ### The seed token never reaches the agent
 
-`SHOPIFY_SEED_TOKEN` carries write scopes. The agent is read-only and uses a
-different app's token. Two things enforce that rather than one person
-remembering:
+`SHOPIFY_CLIENT_SECRET` mints tokens with write scopes. The agent is read-only
+and uses a different app's token. Two things enforce that rather than one
+person remembering:
 
-- `assertNotSeedToken` refuses that value in the runtime Admin client, matched
-  **by value, not by variable name** — a check on the name alone would miss the
-  same secret arriving as `SHOPIFY_ACCESS_TOKEN`, which is exactly how the
-  mistake gets made.
+- `assertNotSeedToken` refuses **both** the client secret and any static seed
+  token in the runtime Admin client, matched **by value, not by variable
+  name** — a check on the name alone would miss the same secret arriving as
+  `SHOPIFY_ACCESS_TOKEN`, which is exactly how the mistake gets made. The
+  secret matters most now: it looks like a token and is not one.
 - `test/seed-token-isolation.test.ts` fails if any runtime file so much as
   names the variable.
 

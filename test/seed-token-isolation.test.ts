@@ -26,11 +26,23 @@ describe('the seed token cannot reach the runtime', () => {
     // The guard names it in order to compare against it, which is the one
     // legitimate use; everything else reading it would be the bug.
     if (path.endsWith('admin/guard.ts')) return;
-    expect(
-      content.includes('SHOPIFY_SEED_TOKEN'),
-      `${path} reads SHOPIFY_SEED_TOKEN. Seeding carries write scopes and the agent is ` +
-        `read-only by design — it must use the agent app's own token.`,
-    ).toBe(false);
+    for (const name of ['SHOPIFY_SEED_TOKEN', 'SHOPIFY_CLIENT_SECRET']) {
+      expect(
+        content.includes(name),
+        `${path} reads ${name}. Seeding carries write scopes and the agent is read-only ` +
+          `by design — it must use the agent app's own token.`,
+      ).toBe(false);
+    }
+  });
+
+  it('refuses the Dev Dashboard client secret too', () => {
+    // The Dev Dashboard hands out a Client Secret rather than a static token,
+    // so the secret is now the value most likely to be pasted into the wrong
+    // variable: it looks like a token and is not one.
+    const env = { SHOPIFY_CLIENT_SECRET: 'FAKE CREDENTIAL — client secret' };
+    expect(() => assertNotSeedToken('FAKE CREDENTIAL — client secret', env)).toThrow(
+      /seeding credential was passed to the runtime/,
+    );
   });
 
   it('refuses the seed token by VALUE, whatever variable carries it', () => {
@@ -39,7 +51,7 @@ describe('the seed token cannot reach the runtime', () => {
     // token pasted into the wrong variable during a deploy.
     const env = { SHOPIFY_SEED_TOKEN: 'FAKE CREDENTIAL — seed token' };
     expect(() => assertNotSeedToken('FAKE CREDENTIAL — seed token', env)).toThrow(
-      /SEED token was passed to the runtime/,
+      /seeding credential was passed to the runtime/,
     );
     expect(() => assertNotSeedToken('FAKE CREDENTIAL — agent token', env)).not.toThrow();
   });
@@ -54,6 +66,7 @@ describe('the seed token cannot reach the runtime', () => {
     // match an empty-ish token and break every request.
     expect(() => assertNotSeedToken('', {})).not.toThrow();
     expect(() => assertNotSeedToken('anything', { SHOPIFY_SEED_TOKEN: '' })).not.toThrow();
+    expect(() => assertNotSeedToken('anything', { SHOPIFY_CLIENT_SECRET: '' })).not.toThrow();
   });
 
   it('never puts the token in the error', () => {

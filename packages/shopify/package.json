@@ -13,6 +13,7 @@
   "scripts": {
     "seed": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts",
     "seed:check": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts --check",
-    "seed:dry-run": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts --dry-run"
+    "seed:dry-run": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts --dry-run",
+    "seed:diagnose": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts --diagnose"
   }
 }

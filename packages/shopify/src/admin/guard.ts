@@ -19,13 +19,20 @@ import { BitcError } from '@bitc/core';
  * `SHOPIFY_ACCESS_TOKEN`, which is precisely how this mistake gets made.
  */
 export const assertNotSeedToken = (token: string, env: NodeJS.ProcessEnv = process.env): void => {
-  const seed = (env.SHOPIFY_SEED_TOKEN ?? '').trim();
-  if (seed.length > 0 && token.trim() === seed) {
-    // The token itself never appears in the message.
+  // Both halves of the seeding credential. The Dev Dashboard hands out a
+  // Client Secret rather than a static token, so the secret is now the value
+  // most likely to be pasted into the wrong variable: it looks like a token
+  // and is not one.
+  const forbidden = [env.SHOPIFY_SEED_TOKEN, env.SHOPIFY_CLIENT_SECRET]
+    .map((value) => (value ?? '').trim())
+    .filter((value) => value.length > 0);
+
+  if (forbidden.includes(token.trim())) {
+    // The credential itself never appears in the message.
     throw new BitcError(
-      'seed_token_in_runtime',
-      'The Shopify SEED token was passed to the runtime client. That token carries write ' +
-        "scopes and the agent is read-only by design. Use the agent app's own access token.",
+      'seed_credential_in_runtime',
+      'A seeding credential was passed to the runtime client. Seeding carries write scopes ' +
+        "and the agent is read-only by design. Use the agent app's own access token.",
       { customerSafe: false },
     );
   }
