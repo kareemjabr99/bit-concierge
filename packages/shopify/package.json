@@ -9,5 +9,10 @@
   "dependencies": {
     "@bitc/core": "workspace:*",
     "zod": "4.5.4"
+  },
+  "scripts": {
+    "seed": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts",
+    "seed:check": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts --check",
+    "seed:dry-run": "node --env-file-if-exists=../../.env.local scripts/seed-dev-store.ts --dry-run"
   }
 }

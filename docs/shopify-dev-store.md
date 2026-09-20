@@ -10,6 +10,65 @@ than discovering gaps.
 
 ---
 
+## The store, and how to seed it
+
+Store: `bit-concierge-dev-blb8x6ix.myshopify.com` — dev type, Basic plan, SAR,
+metric, Riyadh time zone, order prefix `1886-`.
+
+Seeded by script rather than by hand:
+
+```bash
+pnpm --filter @bitc/shopify run seed:check     # verify access, writes nothing
+pnpm --filter @bitc/shopify run seed:dry-run   # show the plan, writes nothing
+pnpm --filter @bitc/shopify run seed           # create
+```
+
+`--check` runs first on purpose. It confirms the token, the currency, every
+mutation the script needs and every write scope, and reports what is missing —
+rather than failing halfway through and leaving the store half-seeded, which is
+worse than not starting.
+
+Everything created is tagged `bitc-seed`, and each order also carries a
+scenario tag. The script looks for those before creating anything, so
+re-running adds nothing.
+
+### Prices and size charts live in the script
+
+`packages/shopify/scripts/seed-dev-store.ts` holds them, and that is
+deliberate: the literal gate checks every number in a reply against what the
+tools returned, so a price that differs between the store and this project
+produces a suppression that looks like a bug and is not. Per
+`docs/fixtures.md` rule 2, this is configuration reaching a customer — sourced
+or absent — and the script is the source.
+
+| product              | SAR    | notes                                                    |
+| -------------------- | ------ | -------------------------------------------------------- |
+| Riyadh Oversized Tee | 189.00 | chest L = **63 cm**, XL front length **74 cm**           |
+| TFMC Logo Tee        | 215.00 | chest L = **65 cm**, XL front length **77 cm**           |
+| Classic Jacket SS24  | 749.00 | S = 0 but **still selling**; L = 0, genuine out-of-stock |
+| Sadu Hoodie          | 459.00 | M = **2**, low stock                                     |
+| TFMC Tote Bag        | 129.00 | **no size chart**, on purpose                            |
+| Japanese Pants       | 389.00 | second size chart                                        |
+| 1886 Mask            | 79.00  | **archived** — findable, not purchasable                 |
+
+Two tees with different measurements is the point: `sizing-tee-chest` exists
+because the agent must say measurements vary by style rather than pick one.
+
+### The seed token never reaches the agent
+
+`SHOPIFY_SEED_TOKEN` carries write scopes. The agent is read-only and uses a
+different app's token. Two things enforce that rather than one person
+remembering:
+
+- `assertNotSeedToken` refuses that value in the runtime Admin client, matched
+  **by value, not by variable name** — a check on the name alone would miss the
+  same secret arriving as `SHOPIFY_ACCESS_TOKEN`, which is exactly how the
+  mistake gets made.
+- `test/seed-token-isolation.test.ts` fails if any runtime file so much as
+  names the variable.
+
+Delete the seed app once seeding is done.
+
 ## Read this first: order numbers cannot be chosen
 
 Shopify assigns order numbers sequentially from 1001. The **prefix and suffix**
