@@ -267,8 +267,15 @@ contamination. It is the provider's contract, and we rely on it.
 
 ## A suite that only ever saw the mock
 
-The third instance of the same family, found while remapping the golden set
-onto the development store.
+**A test that passes vacuously is worse than one that fails.** A failing test
+is information. A test that goes green without asking its question is an
+assurance that costs nothing to produce and cannot be told apart from the real
+thing by reading the run. This section and the one below it are the two
+instances found in this build, and they belong together: one had a security
+control removed and nothing went red, the other had its question removed and
+nothing went red.
+
+Found while remapping the golden set onto the development store.
 
 The eval suite runs against `MockShopifyClient`, not the store. That is
 deliberate — it costs no API calls and no rate limit — and it means the mock
@@ -285,8 +292,9 @@ Nothing failed. Nothing could have — the suite only ever saw one side.
 **The dangerous half is not the answers, it is the refusals.** A case expecting
 a refusal passes when the order number is stale: the identity gate cannot find
 the order, the agent declines, and the run records a pass for a question it
-never asked. Every identity case in the set has that shape. A wrong answer
-announces itself; a right answer for the wrong reason does not.
+never asked. Every identity case in the set has that shape — **the whole
+identity suite could have been green while asking nothing at all.** A wrong
+answer announces itself; a right answer for the wrong reason does not.
 
 Closed from both ends, and mutation-tested at eight mutants — a drifting
 stock level, a continue-selling variant marked unavailable, both original email
@@ -303,18 +311,26 @@ build:
   in either direction, so a refusal case whose email silently starts verifying
   fails too.
 
-**One open question came out of the store rather than the code.** The Classic
-Jacket in S holds zero stock and is still purchasable, because the merchant
-setting is continue-selling; in L it holds zero and is not. `check_availability`
-reports the first as `in_stock`, which is what Shopify means by it and is not
-obviously what a customer means by it. Whether the agent should say "yes, you
-can order it" or name the backorder is a merchant's decision, not ours, so no
-golden case asserts either yet.
+**One question came out of the store rather than the code, and it has been
+settled.** The Classic Jacket in S holds zero stock and is still purchasable,
+because the merchant setting is continue-selling; in L it holds zero and is
+not. `check_availability` used to report the first as `in_stock` — what Shopify
+means by it, and not what a customer means by it.
+
+It is now its own state, `orderable_out_of_stock`, rather than something the
+agent has to infer from an availability flag and a quantity. The agent says the
+item can still be ordered, that it is not currently in stock, and that it
+cannot say when it would ship, then offers a human. **No timing, because 1886
+publishes no backorder policy** — a shipping estimate here would be invented,
+and inventing one is the single thing this product exists not to do. Merchants
+who do publish one ("ships in 2–3 weeks") get to say so in their own words:
+that is an attested fact and the phrasing becomes tenant configuration, carried
+as a Phase 5 item.
 
 ## The worst bug found in this build
 
-Worth stating plainly, because a client will reasonably ask what was found and
-when.
+The other vacuous pass, and the more serious one. Worth stating plainly,
+because a client will reasonably ask what was found and when.
 
 The storefront chat endpoint issues a conversation token; the browser stores it
 and sends it back on the next turn. The first version issued sixteen random
@@ -349,6 +365,26 @@ having: it is the class of bug that ships quietly, and it was caught by a
 discipline applied on purpose rather than by luck.
 
 ---
+
+## A pilot limitation with a name: orders older than 60 days
+
+Shopify's `read_orders` scope covers **only orders created in the last 60
+days**. Anything older returns nothing at all — not an error, not a partial
+result, nothing. Seeing further back requires `read_all_orders`, which needs
+Shopify's approval and a justification.
+
+In plain terms: **a 1886 customer asking about an order placed more than 60
+days ago gets a hand-over to a human.** Not a wrong answer — the agent never
+says whether an order exists, so the customer is asked to check the number and
+the email, and then escalated. Safe, and unhelpful, and it will happen on
+exactly the orders customers chase hardest: the old ones.
+
+This is not fixed by widening a scope quietly. `read_all_orders` is a request
+to Shopify with a stated reason, and it belongs in the design-partner
+agreement alongside the data-processing terms — the merchant is the one whose
+approval is being sought on their store. Until it is granted, the 60-day
+window is a product limit, stated up front, and not a bug to be discovered by
+a customer.
 
 ## What I would tell a client today
 
