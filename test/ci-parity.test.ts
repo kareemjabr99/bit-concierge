@@ -23,8 +23,22 @@ import { describe, expect, it } from 'vitest';
  */
 
 const WORKFLOW = readFileSync('.github/workflows/ci.yml', 'utf8');
-const PACKAGE = JSON.parse(readFileSync('package.json', 'utf8')) as {
-  scripts: Record<string, string>;
+/**
+ * The verification gate, as a script rather than a chain of npm scripts.
+ *
+ * It became a script because "chain it with &&" is a convention and a
+ * convention can be held wrong — it was, one commit after being written down,
+ * by piping verify through grep, where the pipeline's exit status is grep's.
+ * So parity is now checked against what the script actually runs.
+ */
+const VERIFY = readFileSync('scripts/verify.sh', 'utf8');
+
+/** What `pnpm <name>` resolves to inside the verify script. */
+const RUNS: Record<string, RegExp> = {
+  lint: /eslint/,
+  typecheck: /tsc" --noEmit(?! -p)/,
+  format: /prettier" --check/,
+  test: /vitest" run/,
 };
 
 /** Every `pnpm <something>` a workflow step runs, in order of appearance. */
@@ -57,26 +71,34 @@ describe('CI and pnpm verify run the same checks', () => {
     expect(steps).toContain('test');
   });
 
-  it.each(pnpmStepsIn(WORKFLOW))('CI step "pnpm %s" is covered by pnpm verify', (step) => {
+  it.each(pnpmStepsIn(WORKFLOW))('CI step "pnpm %s" is covered by verify.sh', (step) => {
     if (step in ENVIRONMENT_ONLY) return;
+    const pattern = RUNS[step];
+    expect(pattern, `no mapping for CI step "pnpm ${step}" — add one to RUNS`).toBeDefined();
     expect(
-      PACKAGE.scripts.verify,
-      `CI runs "pnpm ${step}" and pnpm verify does not.\n` +
+      pattern!.test(VERIFY),
+      `CI runs "pnpm ${step}" and scripts/verify.sh does not.\n` +
         `That is how two pushes went red on prettier --check while the documented ` +
-        `local command passed.\nEither add it to the verify script, or add it to ` +
+        `local command passed.\nEither add it to verify.sh, or add it to ` +
         `ENVIRONMENT_ONLY in this file with the reason it cannot run locally.`,
-    ).toContain(step);
+    ).toBe(true);
   });
 
   it('verify runs nothing CI skips', () => {
     // The other direction. A check only the developer runs is a check that
     // does not gate a merge, which makes it advisory dressed as enforcement.
-    const verifySteps = PACKAGE.scripts
-      .verify!.split('&&')
-      .map((s) => s.trim().replace('pnpm ', ''));
-    for (const step of verifySteps) {
-      expect(steps, `pnpm verify runs "${step}" and CI does not`).toContain(step);
+    for (const [name, pattern] of Object.entries(RUNS)) {
+      if (!pattern.test(VERIFY)) continue;
+      expect(steps, `verify.sh runs "${name}" and CI does not`).toContain(name);
     }
+  });
+
+  it('verify.sh fails the whole run when a step fails', () => {
+    // The property the script exists for. `set -e` plus an explicit check per
+    // step means no step's failure can be swallowed — and, unlike a chain of
+    // npm scripts, piping its OUTPUT cannot change its exit status.
+    expect(VERIFY).toMatch(/set -euo pipefail/);
+    expect(VERIFY).toContain('exit 1');
   });
 
   it('verify:clean ends by running verify, so it inherits the list', () => {

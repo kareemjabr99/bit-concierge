@@ -430,9 +430,13 @@ rather than a click.
 pnpm verify && git commit -m "..."
 ```
 
+`pnpm verify` is now `bash scripts/verify.sh` — **one command, one exit
+status**, rather than a chain of npm scripts joined by `&&`. It became a script
+because "chain it with `&&`" is a convention, and a convention is something you
+can hold wrong. It was held wrong one commit after being written down.
+
 A commit was once made over a failing test because `verify` and `git commit`
-ran in the same block and the output scrolled past. `&&` makes that impossible;
-reading carefully does not.
+ran in the same block and the output scrolled past.
 
 **And do not pipe it.** This looks equivalent and is not:
 
@@ -451,6 +455,17 @@ If output needs filtering, capture first and let the exit status stand alone:
 pnpm verify > /tmp/verify.log 2>&1 && git commit -m "..."
 ```
 
-or `set -o pipefail` before the pipeline. The general shape is the one this
-project keeps rediscovering: **a check whose result passes through something
-that can swallow it is not a check.**
+or `set -o pipefail` before the pipeline.
+
+**Making verify a script does not fix this**, and it would be comfortable to
+think it did. Measured on a deliberately broken repository:
+
+| invocation                                          | exit  |
+| --------------------------------------------------- | ----- |
+| `bash scripts/verify.sh > /dev/null 2>&1`           | **1** |
+| `bash scripts/verify.sh \| grep -E 'Tests \|error'` | **0** |
+
+A pipeline reports its last command's status whatever is on the left. The
+script removes the chain, so `&&` is now safe; the pipe is still yours to get
+wrong. The general shape is the one this project keeps rediscovering: **a check
+whose result passes through something that can swallow it is not a check.**

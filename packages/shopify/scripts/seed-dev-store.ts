@@ -421,6 +421,37 @@ const REQUIRED_MUTATIONS = [
   'refundCreate',
 ];
 
+/**
+ * Input fields this script actually sends.
+ *
+ * Checking mutation NAMES is not enough, and that is not hypothetical: the
+ * first run passed --check with all nine mutations present, then failed on
+ * `ignoreCompareQuantity`, a field that does not exist on
+ * InventorySetQuantitiesInput in 2026-07. The check verified the door and not
+ * the shape of the key.
+ *
+ * It failed AFTER creating a product, so the store was left holding one
+ * product with no inventory — which is the state --check exists to avoid.
+ */
+const REQUIRED_INPUT_FIELDS: Record<string, string[]> = {
+  InventorySetQuantitiesInput: ['name', 'reason', 'quantities'],
+  InventoryQuantityInput: ['inventoryItemId', 'locationId', 'quantity', 'changeFromQuantity'],
+  ProductInput: ['handle', 'title', 'descriptionHtml', 'productType', 'status', 'tags'],
+  ProductVariantsBulkInput: ['optionValues', 'price', 'inventoryItem', 'inventoryPolicy'],
+  CustomerInput: ['email', 'firstName', 'lastName', 'tags'],
+  OrderCreateOrderInput: [
+    'email',
+    'tags',
+    'currency',
+    'lineItems',
+    'shippingAddress',
+    'financialStatus',
+    'transactions',
+  ],
+  FulfillmentInput: ['lineItemsByFulfillmentOrder', 'trackingInfo', 'notifyCustomer'],
+  RefundInput: ['orderId', 'note', 'notify', 'refundLineItems'],
+};
+
 const check = async (): Promise<boolean> => {
   console.log(`\nchecking ${domain} on Admin API ${API_VERSION}\n`);
 
@@ -447,6 +478,27 @@ const check = async (): Promise<boolean> => {
     console.log(`    ${present ? 'ok  ' : 'MISSING'} ${name}`);
   }
 
+  // Input fields, not just mutation names. See REQUIRED_INPUT_FIELDS.
+  console.log(`\n  input fields this script sends:`);
+  for (const [typeName, fields] of Object.entries(REQUIRED_INPUT_FIELDS)) {
+    const type = await gql<{ __type: { inputFields: { name: string }[] } | null }>(
+      `{ __type(name: "${typeName}") { inputFields { name } } }`,
+    );
+    if (!type.__type) {
+      console.log(`    MISSING ${typeName} (type does not exist)`);
+      ok = false;
+      continue;
+    }
+    const present = new Set(type.__type.inputFields.map((f) => f.name));
+    const absent = fields.filter((f) => !present.has(f));
+    if (absent.length > 0) {
+      ok = false;
+      console.log(`    MISSING ${typeName}: ${absent.join(', ')}`);
+    } else {
+      console.log(`    ok   ${typeName} (${fields.length} field(s))`);
+    }
+  }
+
   // Scopes. A missing write scope fails halfway through otherwise, leaving the
   // store half-seeded, which is worse than not starting.
   try {
@@ -454,7 +506,19 @@ const check = async (): Promise<boolean> => {
       '{ currentAppInstallation { accessScopes { handle } } }',
     );
     const granted = new Set(scopes.currentAppInstallation.accessScopes.map((s) => s.handle));
-    const needed = ['write_products', 'write_customers', 'write_orders', 'write_inventory'];
+    // The four obvious ones, plus the two easy to miss because
+    // `write_fulfillments` sounds like it covers them and does not:
+    // fulfillmentOrders is gated separately and creating a fulfilment goes
+    // through it. Found by the seed failing on "Access denied for
+    // fulfillmentOrders field" AFTER creating an order.
+    const needed = [
+      'write_products',
+      'write_customers',
+      'write_orders',
+      'write_inventory',
+      'read_merchant_managed_fulfillment_orders',
+      'write_merchant_managed_fulfillment_orders',
+    ];
     console.log(`\n  scopes:`);
     for (const scope of needed) {
       const present = granted.has(scope);
@@ -479,21 +543,110 @@ const describeProduct = (p: SeedProduct): string => {
   return `${p.description}\n\nSize chart\n${p.sizeChart.header.join(' · ')}\n${rows}`;
 };
 
+/**
+ * Sets stock levels, for a product however it got here.
+ *
+ * Called on both the create and the already-exists path, because the
+ * quantities are the point of several scenarios — 2 of the Sadu Hoodie is
+ * "low stock", 0 of the Classic Jacket in L is "out of stock" — and a variant
+ * sitting at zero by accident is indistinguishable from one sitting at zero on
+ * purpose.
+ */
+const applyInventory = async (
+  p: SeedProduct,
+  variants: { sku: string; inventoryItem: { id: string } }[],
+): Promise<void> => {
+  const location = await gql<{ locations: { nodes: { id: string }[] } }>(
+    '{ locations(first: 1) { nodes { id } } }',
+  );
+  const locationId = location.locations.nodes[0]!.id;
+
+  // `changeFromQuantity` is compare-and-set: you state what you believe the
+  // current level is, and Shopify refuses if it has moved underneath you.
+  //
+  // It is REQUIRED, and introspection does not say so — it reports a nullable
+  // Int and the requirement is enforced at runtime. So --check cannot catch
+  // this class, and did not: it passed with every input field present and the
+  // seed still failed on the next line. Worth knowing the limit of that check
+  // rather than trusting it further than it goes.
+  const current = await gql<{
+    nodes: ({
+      id: string;
+      inventoryLevel: { quantities: { name: string; quantity: number }[] } | null;
+    } | null)[];
+  }>(
+    `query($ids: [ID!]!, $locationId: ID!) {
+       nodes(ids: $ids) {
+         ... on InventoryItem {
+           id
+           inventoryLevel(locationId: $locationId) { quantities(names: ["available"]) { name quantity } }
+         }
+       }
+     }`,
+    { ids: variants.map((v) => v.inventoryItem.id), locationId },
+  );
+  const levelFor = new Map(
+    current.nodes
+      .filter((n): n is NonNullable<typeof n> => n !== null)
+      .map((n) => [n.id, n.inventoryLevel?.quantities[0]?.quantity ?? 0]),
+  );
+
+  const quantities = variants
+    .filter((v) => p.variants.some((x) => x.sku === v.sku))
+    .map((v) => ({
+      inventoryItemId: v.inventoryItem.id,
+      locationId,
+      quantity: p.variants.find((x) => x.sku === v.sku)!.quantity,
+      changeFromQuantity: levelFor.get(v.inventoryItem.id) ?? 0,
+    }));
+  if (quantities.length === 0) return;
+
+  // 2026-07 requires @idempotent on this mutation: inventory is the one thing
+  // a retried request must not apply twice. The key is derived from the
+  // product and the quantities being set, so re-running this script with the
+  // same target is genuinely the same operation and Shopify can say so.
+  //
+  // Not discoverable from the input types — it is a directive, enforced at
+  // runtime, and --check found nothing wrong. Third thing the schema check
+  // could not see, after a field that does not exist and a nullable field that
+  // is required.
+  const idempotencyKey = `bitc-seed-${p.handle}-${quantities
+    .map((q) => `${q.inventoryItemId.split('/').pop()}:${q.quantity}`)
+    .join(',')}`;
+  const inventory = await gql<{ inventorySetQuantities: { userErrors: unknown[] } }>(
+    `mutation($input: InventorySetQuantitiesInput!, $key: String!) {
+       inventorySetQuantities(input: $input) @idempotent(key: $key) { userErrors { field message } }
+     }`,
+    { input: { name: 'available', reason: 'correction', quantities }, key: idempotencyKey },
+  );
+  assertNoUserErrors(`inventory ${p.handle}`, inventory.inventorySetQuantities);
+};
+
 const seedProduct = async (p: SeedProduct): Promise<Map<string, string>> => {
   const existing = await gql<{
-    productByHandle: { id: string; variants: { nodes: { id: string; sku: string }[] } } | null;
+    productByHandle: {
+      id: string;
+      variants: { nodes: { id: string; sku: string; inventoryItem: { id: string } }[] };
+    } | null;
   }>(
     `query($handle: String!) {
        productByHandle(handle: $handle) {
-         id variants(first: 20) { nodes { id sku } }
+         id variants(first: 20) { nodes { id sku inventoryItem { id } } }
        }
      }`,
     { handle: p.handle },
   );
 
+  // A product that exists is not a product that is correct. The first run of
+  // this script created this product and then failed before setting inventory,
+  // leaving every variant at zero — including the low-stock and out-of-stock
+  // scenarios, which would have looked seeded and been wrong. Returning early
+  // on "exists" made that state permanent across re-runs.
   if (existing.productByHandle) {
-    console.log(`  = ${p.handle} (exists)`);
-    return new Map(existing.productByHandle.variants.nodes.map((v) => [v.sku, v.id]));
+    const variants = existing.productByHandle.variants.nodes;
+    if (mode !== 'dry-run') await applyInventory(p, variants);
+    console.log(`  = ${p.handle} (exists, inventory reapplied)`);
+    return new Map(variants.map((v) => [v.sku, v.id]));
   }
   if (mode === 'dry-run') {
     console.log(`  + ${p.handle} — ${p.variants.length} variant(s), ${p.status}`);
@@ -545,23 +698,7 @@ const seedProduct = async (p: SeedProduct): Promise<Map<string, string>> => {
   );
   assertNoUserErrors(`variants ${p.handle}`, variants.productVariantsBulkCreate);
 
-  const location = await gql<{ locations: { nodes: { id: string }[] } }>(
-    '{ locations(first: 1) { nodes { id } } }',
-  );
-  const locationId = location.locations.nodes[0]!.id;
-
-  const quantities = variants.productVariantsBulkCreate.productVariants.map((v) => ({
-    inventoryItemId: v.inventoryItem.id,
-    locationId,
-    quantity: p.variants.find((x) => x.sku === v.sku)!.quantity,
-  }));
-  const inventory = await gql<{ inventorySetQuantities: { userErrors: unknown[] } }>(
-    `mutation($input: InventorySetQuantitiesInput!) {
-       inventorySetQuantities(input: $input) { userErrors { field message } }
-     }`,
-    { input: { name: 'available', reason: 'correction', ignoreCompareQuantity: true, quantities } },
-  );
-  assertNoUserErrors(`inventory ${p.handle}`, inventory.inventorySetQuantities);
+  await applyInventory(p, variants.productVariantsBulkCreate.productVariants);
 
   console.log(`  + ${p.handle} — ${p.variants.length} variant(s), ${p.status}`);
   return new Map(variants.productVariantsBulkCreate.productVariants.map((v) => [v.sku, v.id]));
@@ -617,6 +754,105 @@ interface SeededOrder {
   customerEmail: string | null;
 }
 
+/**
+ * Brings an order to the state its scenario describes.
+ *
+ * Split out because an order can exist in the WRONG state: order 1 was created
+ * and then its fulfilment failed on a missing scope, leaving a
+ * PAID/UNFULFILLED order already tagged as seeded. A re-run would have seen
+ * the tag and skipped it for ever — the same "exists is not correct" hole the
+ * products path had.
+ *
+ * Applies only what is actually missing, so calling it on a correct order is
+ * free.
+ */
+const reconcileOrder = async (
+  o: SeedOrder,
+  orderId: string,
+  state?: {
+    cancelledAt: string | null;
+    displayFulfillmentStatus: string;
+    displayFinancialStatus?: string;
+  },
+): Promise<string[]> => {
+  const applied: string[] = [];
+  const alreadyFulfilled = state?.displayFulfillmentStatus === 'FULFILLED';
+  const alreadyCancelled = Boolean(state?.cancelledAt);
+  const alreadyRefunded = state?.displayFinancialStatus === 'PARTIALLY_REFUNDED';
+
+  if (o.fulfil && !alreadyFulfilled && !alreadyCancelled) {
+    const fo = await gql<{ order: { fulfillmentOrders: { nodes: { id: string }[] } } }>(
+      `query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 5) { nodes { id } } } }`,
+      { id: orderId },
+    );
+    const fulfillmentOrderId = fo.order.fulfillmentOrders.nodes[0]?.id;
+    if (fulfillmentOrderId) {
+      const done = await gql<{ fulfillmentCreate: { userErrors: unknown[] } }>(
+        `mutation($f: FulfillmentInput!) {
+           fulfillmentCreate(fulfillment: $f) { fulfillment { id } userErrors { field message } }
+         }`,
+        {
+          f: {
+            lineItemsByFulfillmentOrder: [{ fulfillmentOrderId }],
+            trackingInfo: {
+              company: o.fulfil.company,
+              number: o.fulfil.trackingNumber,
+              url: o.fulfil.url,
+            },
+            notifyCustomer: false,
+          },
+        },
+      );
+      assertNoUserErrors(`fulfillmentCreate ${o.key}`, done.fulfillmentCreate);
+      applied.push('fulfilment');
+    }
+  }
+
+  if (o.refundSku && !alreadyRefunded && !alreadyCancelled) {
+    const detail = await gql<{
+      order: { lineItems: { nodes: { id: string; sku: string | null; quantity: number }[] } };
+    }>(
+      `query($id: ID!) { order(id: $id) { lineItems(first: 20) { nodes { id sku quantity } } } }`,
+      { id: orderId },
+    );
+    const line = detail.order.lineItems.nodes.find((l) => l.sku === o.refundSku);
+    if (line) {
+      const refunded = await gql<{ refundCreate: { userErrors: unknown[] } }>(
+        `mutation($input: RefundInput!) {
+           refundCreate(input: $input) { refund { id } userErrors { field message } }
+         }`,
+        {
+          input: {
+            orderId,
+            note: 'Seed fixture: partial refund of one line',
+            notify: false,
+            refundLineItems: [
+              { lineItemId: line.id, quantity: line.quantity, restockType: 'RETURN' },
+            ],
+          },
+        },
+      );
+      assertNoUserErrors(`refundCreate ${o.key}`, refunded.refundCreate);
+      applied.push('refund');
+    }
+  }
+
+  if (o.cancel && !alreadyCancelled) {
+    const cancelled = await gql<{ orderCancel: { userErrors: unknown[] } }>(
+      `mutation($id: ID!) {
+         orderCancel(orderId: $id, reason: OTHER, refund: true, restock: true, staffNote: "Seed fixture") {
+           userErrors { field message }
+         }
+       }`,
+      { id: orderId },
+    );
+    assertNoUserErrors(`orderCancel ${o.key}`, cancelled.orderCancel);
+    applied.push('cancellation');
+  }
+
+  return applied;
+};
+
 const seedOrder = async (
   o: SeedOrder,
   variantIds: Map<string, string>,
@@ -629,18 +865,34 @@ const seedOrder = async (
         id: string;
         name: string;
         email: string | null;
+        cancelledAt: string | null;
+        displayFulfillmentStatus: string;
+        displayFinancialStatus: string;
         customer: { email: string | null } | null;
       }[];
     };
   }>(
     `query($q: String!) {
-       orders(first: 1, query: $q) { nodes { id name email customer { email } } }
+       orders(first: 1, query: $q) {
+         nodes {
+           id name email cancelledAt displayFulfillmentStatus displayFinancialStatus
+           customer { email }
+         }
+       }
      }`,
     { q: `tag:${tag}` },
   );
+  // Same lesson as products: existing is not correct. Order 1 was created and
+  // then its fulfilment failed on a missing scope, leaving a PAID/UNFULFILLED
+  // order tagged as seeded — which a re-run would have skipped for ever.
   if (found.orders.nodes[0]) {
     const existing = found.orders.nodes[0];
-    console.log(`  = ${o.scenario} -> ${existing.name} (exists)`);
+    let note = 'exists';
+    if (mode !== 'dry-run') {
+      const applied = await reconcileOrder(o, existing.id, existing);
+      if (applied.length > 0) note = `exists, applied ${applied.join(' + ')}`;
+    }
+    console.log(`  = ${o.scenario} -> ${existing.name} (${note})`);
     return {
       scenario: o.scenario,
       key: o.key,
@@ -661,6 +913,17 @@ const seedOrder = async (
   if (lineItems.some((l) => !l.variantId)) {
     throw new Error(`${o.key}: a SKU in this order has no variant — seed products first`);
   }
+
+  // The transaction has to carry an amount, and it has to be the order's.
+  // Computed from the prices at the top of this file rather than read back
+  // from Shopify, so that a mismatch between the two is a loud failure here
+  // rather than a quiet inconsistency the literal gate trips over later.
+  const total = o.lines.reduce((sum, line) => {
+    const price = PRODUCTS.flatMap((p) => p.variants).find((v) => v.sku === line.sku)?.price;
+    if (!price) throw new Error(`${o.key}: no price for ${line.sku}`);
+    return sum + Number(price) * line.quantity;
+  }, 0);
+  const amountSet = { shopMoney: { amount: total.toFixed(2), currencyCode: 'SAR' } };
 
   // email and customerId are set INDEPENDENTLY, which is the whole point of
   // scenario 4: the order carries k@example.com while the account is omar@.
@@ -686,7 +949,7 @@ const seedOrder = async (
           countryCode: 'SA',
         },
         financialStatus: 'PAID',
-        transactions: [{ kind: 'SALE', status: 'SUCCESS', gateway: 'bogus' }],
+        transactions: [{ kind: 'SALE', status: 'SUCCESS', gateway: 'bogus', amountSet }],
       },
     },
   );
@@ -694,72 +957,7 @@ const seedOrder = async (
   const orderId = created.orderCreate.order.id;
   const name = created.orderCreate.order.name;
 
-  if (o.fulfil) {
-    const fo = await gql<{ order: { fulfillmentOrders: { nodes: { id: string }[] } } }>(
-      `query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 5) { nodes { id } } } }`,
-      { id: orderId },
-    );
-    const fulfillmentOrderId = fo.order.fulfillmentOrders.nodes[0]?.id;
-    if (fulfillmentOrderId) {
-      const done = await gql<{ fulfillmentCreate: { userErrors: unknown[] } }>(
-        `mutation($f: FulfillmentInput!) {
-           fulfillmentCreate(fulfillment: $f) { fulfillment { id } userErrors { field message } }
-         }`,
-        {
-          f: {
-            lineItemsByFulfillmentOrder: [{ fulfillmentOrderId }],
-            trackingInfo: {
-              company: o.fulfil.company,
-              number: o.fulfil.trackingNumber,
-              url: o.fulfil.url,
-            },
-            notifyCustomer: false,
-          },
-        },
-      );
-      assertNoUserErrors(`fulfillmentCreate ${o.key}`, done.fulfillmentCreate);
-    }
-  }
-
-  if (o.refundSku) {
-    const detail = await gql<{
-      order: { lineItems: { nodes: { id: string; sku: string | null; quantity: number }[] } };
-    }>(
-      `query($id: ID!) { order(id: $id) { lineItems(first: 20) { nodes { id sku quantity } } } }`,
-      { id: orderId },
-    );
-    const line = detail.order.lineItems.nodes.find((l) => l.sku === o.refundSku);
-    if (line) {
-      const refunded = await gql<{ refundCreate: { userErrors: unknown[] } }>(
-        `mutation($input: RefundInput!) {
-           refundCreate(input: $input) { refund { id } userErrors { field message } }
-         }`,
-        {
-          input: {
-            orderId,
-            note: 'Seed fixture: partial refund of one line',
-            notify: false,
-            refundLineItems: [
-              { lineItemId: line.id, quantity: line.quantity, restockType: 'RETURN' },
-            ],
-          },
-        },
-      );
-      assertNoUserErrors(`refundCreate ${o.key}`, refunded.refundCreate);
-    }
-  }
-
-  if (o.cancel) {
-    const cancelled = await gql<{ orderCancel: { userErrors: unknown[] } }>(
-      `mutation($id: ID!) {
-         orderCancel(orderId: $id, reason: OTHER, refund: true, restock: true, staffNote: "Seed fixture") {
-           userErrors { field message }
-         }
-       }`,
-      { id: orderId },
-    );
-    assertNoUserErrors(`orderCancel ${o.key}`, cancelled.orderCancel);
-  }
+  await reconcileOrder(o, orderId);
 
   console.log(`  + ${o.scenario} -> ${name}`);
   return {
