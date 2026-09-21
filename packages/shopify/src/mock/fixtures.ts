@@ -1,18 +1,30 @@
 import type { Order, Product } from '../types.ts';
 
 /**
- * INVENTED. Synthetic store data for Phase 1–3.
+ * INVENTED. Synthetic store data.
  *
  * Nothing here is 1886's: addresses are RFC 2606 reserved domains, names are
  * made up, the catalogue is a plausible elevated-streetwear range and no more.
  * This is what the free-tier model key is allowed to see, because a free-tier
- * key trains on its prompts. Phase 4 seeds the development store from the same
- * shapes with real data behind a paid key.
+ * key trains on its prompts.
+ *
+ * **Since Phase 4 it mirrors the seeded development store**, row for row —
+ * same order numbers, same emails, same SKUs, same quantities, same
+ * continue-selling flags. It has to: the golden set runs against this file and
+ * the acceptance run runs against the store, and a mock that is kinder than
+ * the store turns a green suite into a claim about nothing. When
+ * `seed-dev-store.ts` changes, this changes with it.
+ *
+ * Three things are deliberately NOT mirrored, and each is a divergence that
+ * cannot flatter the agent: product and order ids are synthetic gids, URLs
+ * stay on a reserved example domain so a fixture link can never be fetched or
+ * mistaken for a live one, and prices carry no tax or shipping line.
  *
  * The marker on the first line is load-bearing: test/provenance.test.ts
  * requires every file stating a window, a price or a rate to declare either
  * that its content is fiction or where it was sourced from. See
- * docs/fixtures.md rule 3.
+ * docs/fixtures.md rule 3. The development store holds the same fiction — it
+ * is a dev store with synthetic customers, not a merchant's.
  */
 
 const STORE = 'https://dev-store.example';
@@ -24,9 +36,9 @@ export const products: Product[] = [
     handle: 'riyadh-oversized-tee',
     title: 'Riyadh Oversized Tee',
     description:
-      'Heavyweight 320gsm cotton tee with a dropped shoulder and boxy cut. Garment-dyed in sand. Runs one size large — size down for a regular fit.',
+      'Heavyweight 320gsm cotton tee with a dropped shoulder and boxy cut. Garment-dyed in sand.\n\nSize chart\nSize · Chest (cm) · Front length (cm)\nS · 57 · 68\nM · 60 · 71\nL · 63 · 74\nXL · 66 · 74',
     productType: 'T-Shirts',
-    tags: ['tee', 'oversized', 'cotton', 'sand', 'new'],
+    tags: ['bitc-seed'],
     url: `${STORE}/products/riyadh-oversized-tee`,
     available: true,
     priceRange: { min: sar('189.00'), max: sar('189.00') },
@@ -37,7 +49,7 @@ export const products: Product[] = [
         sku: 'RT-SAND-S',
         price: sar('189.00'),
         available: true,
-        inventoryQuantity: 12,
+        inventoryQuantity: 24,
         selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
@@ -46,7 +58,7 @@ export const products: Product[] = [
         sku: 'RT-SAND-M',
         price: sar('189.00'),
         available: true,
-        inventoryQuantity: 7,
+        inventoryQuantity: 31,
         selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
@@ -55,7 +67,7 @@ export const products: Product[] = [
         sku: 'RT-SAND-L',
         price: sar('189.00'),
         available: true,
-        inventoryQuantity: 3,
+        inventoryQuantity: 18,
         selectedOptions: [{ name: 'Size', value: 'L' }],
       },
       {
@@ -63,79 +75,99 @@ export const products: Product[] = [
         title: 'XL',
         sku: 'RT-SAND-XL',
         price: sar('189.00'),
-        available: false,
-        inventoryQuantity: 0,
+        available: true,
+        inventoryQuantity: 12,
         selectedOptions: [{ name: 'Size', value: 'XL' }],
       },
     ],
   },
   {
     id: 'gid://shopify/Product/9002',
-    handle: 'najd-cargo-pant',
-    title: 'Najd Cargo Pant',
+    handle: 'tfmc-logo-tee',
+    title: 'TFMC Logo Tee',
     description:
-      'Relaxed straight-leg cargo in ripstop cotton with six pockets and an adjustable hem. Mid-rise. True to size.',
-    productType: 'Trousers',
-    tags: ['cargo', 'pant', 'ripstop', 'olive'],
-    url: `${STORE}/products/najd-cargo-pant`,
+      'Mid-weight cotton tee with a printed TFMC logo at the chest. Regular fit.\n\nSize chart\nSize · Chest (cm) · Front length (cm)\nS · 59 · 70\nM · 62 · 73\nL · 65 · 76\nXL · 68 · 77',
+    productType: 'T-Shirts',
+    tags: ['bitc-seed'],
+    url: `${STORE}/products/tfmc-logo-tee`,
     available: true,
-    priceRange: { min: sar('349.00'), max: sar('349.00') },
+    priceRange: { min: sar('215.00'), max: sar('215.00') },
     variants: [
       {
         id: 'gid://shopify/ProductVariant/90021',
-        title: '30',
-        sku: 'NC-OLV-30',
-        price: sar('349.00'),
+        title: 'S',
+        sku: 'TFMC-BLUE-S',
+        price: sar('215.00'),
         available: true,
-        inventoryQuantity: 5,
-        selectedOptions: [{ name: 'Waist', value: '30' }],
+        inventoryQuantity: 14,
+        selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
         id: 'gid://shopify/ProductVariant/90022',
-        title: '32',
-        sku: 'NC-OLV-32',
-        price: sar('349.00'),
+        title: 'M',
+        sku: 'TFMC-BLUE-M',
+        price: sar('215.00'),
         available: true,
         inventoryQuantity: 9,
-        selectedOptions: [{ name: 'Waist', value: '32' }],
+        selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
         id: 'gid://shopify/ProductVariant/90023',
-        title: '34',
-        sku: 'NC-OLV-34',
-        price: sar('349.00'),
+        title: 'L',
+        sku: 'TFMC-BLUE-L',
+        price: sar('215.00'),
         available: true,
-        inventoryQuantity: 4,
-        selectedOptions: [{ name: 'Waist', value: '34' }],
+        inventoryQuantity: 21,
+        selectedOptions: [{ name: 'Size', value: 'L' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/90024',
+        title: 'XL',
+        sku: 'TFMC-BLUE-XL',
+        price: sar('215.00'),
+        available: true,
+        inventoryQuantity: 7,
+        selectedOptions: [{ name: 'Size', value: 'XL' }],
       },
     ],
   },
   {
+    // S sells at zero stock (continue-selling) and L does not. The same
+    // quantity, two different answers to "do you have it" — which is a
+    // merchant setting, not a bug, and the reason stock is a tool call.
     id: 'gid://shopify/Product/9003',
-    handle: 'sadu-hoodie',
-    title: 'Sadu Hoodie',
-    description:
-      'Brushed-back fleece hoodie with Sadu-inspired jacquard panel across the chest. Oversized. Limited run.',
-    productType: 'Hoodies',
-    tags: ['hoodie', 'fleece', 'sadu', 'limited'],
-    url: `${STORE}/products/sadu-hoodie`,
-    available: false,
-    priceRange: { min: sar('429.00'), max: sar('429.00') },
+    handle: 'classic-jacket-ss24',
+    title: 'Classic Jacket SS24',
+    description: 'Boxy cotton-twill jacket with a concealed placket and welt pockets.',
+    productType: 'Outerwear',
+    tags: ['bitc-seed'],
+    url: `${STORE}/products/classic-jacket-ss24`,
+    available: true,
+    priceRange: { min: sar('749.00'), max: sar('749.00') },
     variants: [
       {
         id: 'gid://shopify/ProductVariant/90031',
-        title: 'M',
-        sku: 'SH-BLK-M',
-        price: sar('429.00'),
-        available: false,
+        title: 'S',
+        sku: 'CJ-KHAKI-S',
+        price: sar('749.00'),
+        available: true,
         inventoryQuantity: 0,
-        selectedOptions: [{ name: 'Size', value: 'M' }],
+        selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
         id: 'gid://shopify/ProductVariant/90032',
+        title: 'M',
+        sku: 'CJ-KHAKI-M',
+        price: sar('749.00'),
+        available: true,
+        inventoryQuantity: 6,
+        selectedOptions: [{ name: 'Size', value: 'M' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/90033',
         title: 'L',
-        sku: 'SH-BLK-L',
-        price: sar('429.00'),
+        sku: 'CJ-KHAKI-L',
+        price: sar('749.00'),
         available: false,
         inventoryQuantity: 0,
         selectedOptions: [{ name: 'Size', value: 'L' }],
@@ -143,25 +175,131 @@ export const products: Product[] = [
     ],
   },
   {
+    // M holds 2. The tool bands that as 'low' rather than stating it, so a
+    // reply quoting "2 left" is a fabricated literal.
     id: 'gid://shopify/Product/9004',
-    handle: 'desert-cap',
-    title: 'Desert Cap',
-    description:
-      'Six-panel unstructured cap in washed twill with a tonal embroidered mark. One size, adjustable strap.',
+    handle: 'sadu-hoodie',
+    title: 'Sadu Hoodie',
+    description: 'Heavyweight hoodie with a woven Sadu-pattern panel across the chest.',
+    productType: 'Hoodies',
+    tags: ['bitc-seed'],
+    url: `${STORE}/products/sadu-hoodie`,
+    available: true,
+    priceRange: { min: sar('459.00'), max: sar('459.00') },
+    variants: [
+      {
+        id: 'gid://shopify/ProductVariant/90041',
+        title: 'S',
+        sku: 'SH-BLACK-S',
+        price: sar('459.00'),
+        available: true,
+        inventoryQuantity: 11,
+        selectedOptions: [{ name: 'Size', value: 'S' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/90042',
+        title: 'M',
+        sku: 'SH-BLACK-M',
+        price: sar('459.00'),
+        available: true,
+        inventoryQuantity: 2,
+        selectedOptions: [{ name: 'Size', value: 'M' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/90043',
+        title: 'L',
+        sku: 'SH-BLACK-L',
+        price: sar('459.00'),
+        available: true,
+        inventoryQuantity: 8,
+        selectedOptions: [{ name: 'Size', value: 'L' }],
+      },
+    ],
+  },
+  {
+    id: 'gid://shopify/Product/9005',
+    handle: 'tfmc-tote-bag',
+    title: 'TFMC Tote Bag',
+    description: 'Heavy canvas tote with a screen-printed TFMC mark and reinforced handles.',
     productType: 'Accessories',
-    tags: ['cap', 'hat', 'twill', 'accessory'],
-    url: `${STORE}/products/desert-cap`,
+    tags: ['bitc-seed'],
+    url: `${STORE}/products/tfmc-tote-bag`,
     available: true,
     priceRange: { min: sar('129.00'), max: sar('129.00') },
     variants: [
       {
-        id: 'gid://shopify/ProductVariant/90041',
-        title: 'One size',
-        sku: 'DC-TAN-OS',
+        id: 'gid://shopify/ProductVariant/90051',
+        title: 'Default Title',
+        sku: 'TT-NAT-OS',
         price: sar('129.00'),
         available: true,
-        inventoryQuantity: 2,
-        selectedOptions: [{ name: 'Size', value: 'One size' }],
+        inventoryQuantity: 40,
+        selectedOptions: [{ name: 'Title', value: 'Default Title' }],
+      },
+    ],
+  },
+  {
+    id: 'gid://shopify/Product/9006',
+    handle: 'japanese-pants',
+    title: 'Japanese Pants',
+    description:
+      'Wide-leg trouser in Japanese cotton twill with a drawcord waist.\n\nSize chart\nSize · Waist (cm) · Inseam (cm)\nS · 74 · 72\nM · 79 · 74\nL · 84 · 76',
+    productType: 'Trousers',
+    tags: ['bitc-seed'],
+    url: `${STORE}/products/japanese-pants`,
+    available: true,
+    priceRange: { min: sar('389.00'), max: sar('389.00') },
+    variants: [
+      {
+        id: 'gid://shopify/ProductVariant/90061',
+        title: 'S',
+        sku: 'JP-ECRU-S',
+        price: sar('389.00'),
+        available: true,
+        inventoryQuantity: 13,
+        selectedOptions: [{ name: 'Size', value: 'S' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/90062',
+        title: 'M',
+        sku: 'JP-ECRU-M',
+        price: sar('389.00'),
+        available: true,
+        inventoryQuantity: 16,
+        selectedOptions: [{ name: 'Size', value: 'M' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/90063',
+        title: 'L',
+        sku: 'JP-ECRU-L',
+        price: sar('389.00'),
+        available: true,
+        inventoryQuantity: 5,
+        selectedOptions: [{ name: 'Size', value: 'L' }],
+      },
+    ],
+  },
+  {
+    // Archived: findable by name, not purchasable. A customer can still ask
+    // about something they own.
+    id: 'gid://shopify/Product/9007',
+    handle: '1886-mask-black',
+    title: '1886 Mask',
+    description: 'Machine-washable cotton mask with a moulded nose bridge.',
+    productType: 'Accessories',
+    tags: ['bitc-seed'],
+    url: `${STORE}/products/1886-mask-black`,
+    available: false,
+    priceRange: { min: sar('79.00'), max: sar('79.00') },
+    variants: [
+      {
+        id: 'gid://shopify/ProductVariant/90071',
+        title: 'Default Title',
+        sku: 'MK-BLACK-OS',
+        price: sar('79.00'),
+        available: false,
+        inventoryQuantity: 0,
+        selectedOptions: [{ name: 'Title', value: 'Default Title' }],
       },
     ],
   },
@@ -169,9 +307,9 @@ export const products: Product[] = [
 
 export const orders: Order[] = [
   {
-    // The happy path: verified email, shipped, trackable.
-    id: 'gid://shopify/Order/2041',
-    name: '#1886-2041',
+    // Scenario 1. Mirrors #1886-1001 in the development store.
+    id: 'gid://shopify/Order/1001',
+    name: '#1886-1001',
     email: 'ahmed@example.com',
     customerEmail: 'ahmed@example.com',
     createdAt: '2026-09-06T14:12:00Z',
@@ -193,98 +331,128 @@ export const orders: Order[] = [
     totalPrice: sar('189.00'),
     shippingCity: 'Riyadh',
     shippingCountryCode: 'SA',
-    statusUrl: `${STORE}/orders/status/2041`,
+    statusUrl: `${STORE}/orders/status/1001`,
   },
   {
-    // Paid, not yet shipped. No tracking exists — the agent must not invent one.
-    id: 'gid://shopify/Order/2042',
-    name: '#1886-2042',
+    // Scenario 2. Paid, no fulfilment at all — nothing to track.
+    id: 'gid://shopify/Order/1002',
+    name: '#1886-1002',
     email: 'sara@example.com',
     customerEmail: 'sara@example.com',
-    createdAt: '2026-09-09T19:05:00Z',
+    createdAt: '2026-09-11T08:40:00Z',
     financialStatus: 'paid',
     fulfillmentStatus: 'unfulfilled',
     cancelledAt: null,
     fulfillments: [],
     lineItems: [
-      { title: 'Najd Cargo Pant', variantTitle: '32', sku: 'NC-OLV-32', quantity: 1 },
-      { title: 'Desert Cap', variantTitle: 'One size', sku: 'DC-TAN-OS', quantity: 1 },
+      { title: 'Sadu Hoodie', variantTitle: 'L', sku: 'SH-BLACK-L', quantity: 1 },
+      { title: 'Japanese Pants', variantTitle: 'M', sku: 'JP-ECRU-M', quantity: 1 },
     ],
-    totalPrice: sar('478.00'),
+    totalPrice: sar('848.00'),
     shippingCity: 'Jeddah',
     shippingCountryCode: 'SA',
-    statusUrl: `${STORE}/orders/status/2042`,
+    statusUrl: `${STORE}/orders/status/1002`,
   },
   {
-    // Guest checkout: there is no customer record, only the order email.
-    id: 'gid://shopify/Order/2043',
-    name: '#1886-2043',
+    // Scenario 3. Delivered, not merely fulfilled — the distinction the store
+    // needed a fulfilment EVENT to express.
+    id: 'gid://shopify/Order/1003',
+    name: '#1886-1003',
     email: 'layla@example.com',
-    customerEmail: null,
-    createdAt: '2026-08-30T11:40:00Z',
+    customerEmail: 'layla@example.com',
+    createdAt: '2026-09-02T11:05:00Z',
     financialStatus: 'paid',
     fulfillmentStatus: 'fulfilled',
     cancelledAt: null,
     fulfillments: [
       {
         status: 'delivered',
-        trackingCompany: 'Aramex',
-        trackingNumber: 'ARX4400188620431',
-        trackingUrl: 'https://track.example/ARX4400188620431',
-        updatedAt: '2026-09-02T16:10:00Z',
+        trackingCompany: 'SMSA Express',
+        trackingNumber: 'SMSA1886204300',
+        trackingUrl: 'https://track.example/SMSA1886204300',
+        updatedAt: '2026-09-05T16:20:00Z',
       },
     ],
     lineItems: [
-      { title: 'Riyadh Oversized Tee', variantTitle: 'L', sku: 'RT-SAND-L', quantity: 2 },
+      { title: 'TFMC Tote Bag', variantTitle: 'Default Title', sku: 'TT-NAT-OS', quantity: 2 },
     ],
-    totalPrice: sar('378.00'),
+    totalPrice: sar('258.00'),
     shippingCity: 'Dammam',
     shippingCountryCode: 'SA',
-    statusUrl: `${STORE}/orders/status/2043`,
+    statusUrl: `${STORE}/orders/status/1003`,
   },
   {
-    // Order email and customer-record email differ. Either verifies.
-    id: 'gid://shopify/Order/2044',
-    name: '#1886-2044',
-    email: 'omar@example.com',
-    customerEmail: 'omar.k@example.com',
-    createdAt: '2026-09-01T08:20:00Z',
+    // Scenario 4. The order's contact address is NOT the account's.
+    //
+    // Both directions matter and the mock had them the wrong way round: the
+    // order carries k@example.com and the account is omar@example.com. The
+    // agent must verify against either and reveal neither to the other.
+    id: 'gid://shopify/Order/1004',
+    name: '#1886-1004',
+    email: 'k@example.com',
+    customerEmail: 'omar@example.com',
+    createdAt: '2026-09-09T19:55:00Z',
     financialStatus: 'refunded',
     fulfillmentStatus: 'unfulfilled',
-    cancelledAt: '2026-09-01T10:02:00Z',
+    cancelledAt: '2026-09-10T07:15:00Z',
     fulfillments: [],
-    lineItems: [{ title: 'Sadu Hoodie', variantTitle: 'L', sku: 'SH-BLK-L', quantity: 1 }],
-    totalPrice: sar('429.00'),
+    lineItems: [
+      { title: 'Classic Jacket SS24', variantTitle: 'M', sku: 'CJ-KHAKI-M', quantity: 1 },
+    ],
+    totalPrice: sar('749.00'),
     shippingCity: 'Riyadh',
     shippingCountryCode: 'SA',
-    statusUrl: `${STORE}/orders/status/2044`,
+    statusUrl: `${STORE}/orders/status/1004`,
   },
   {
-    // Cross-border, delivered, partially refunded.
-    id: 'gid://shopify/Order/2045',
-    name: '#1886-2045',
+    // Scenario 6. A guest checkout has NO account, which is not the same as
+    // an account whose address happens to match. The store needed the
+    // association removed after creation to produce this.
+    id: 'gid://shopify/Order/1006',
+    name: '#1886-1006',
+    email: 'guest@example.com',
+    customerEmail: null,
+    createdAt: '2026-09-14T13:30:00Z',
+    financialStatus: 'paid',
+    fulfillmentStatus: 'unfulfilled',
+    cancelledAt: null,
+    fulfillments: [],
+    lineItems: [
+      { title: 'Riyadh Oversized Tee', variantTitle: 'L', sku: 'RT-SAND-L', quantity: 1 },
+    ],
+    totalPrice: sar('189.00'),
+    shippingCity: 'Riyadh',
+    shippingCountryCode: 'SA',
+    statusUrl: `${STORE}/orders/status/1006`,
+  },
+  {
+    // Scenario 5. Partially refunded: one line of two returned. The number
+    // gap is real — #1886-1005 was deleted and recreated as 1007 after a
+    // refund that moved no money.
+    id: 'gid://shopify/Order/1007',
+    name: '#1886-1007',
     email: 'nora@example.com',
     customerEmail: 'nora@example.com',
-    createdAt: '2026-08-25T20:00:00Z',
+    createdAt: '2026-09-12T10:10:00Z',
     financialStatus: 'partially_refunded',
     fulfillmentStatus: 'fulfilled',
     cancelledAt: null,
     fulfillments: [
       {
-        status: 'delivered',
-        trackingCompany: 'Aramex',
-        trackingNumber: 'ARX4400188620452',
-        trackingUrl: 'https://track.example/ARX4400188620452',
-        updatedAt: '2026-08-31T13:45:00Z',
+        status: 'in_transit',
+        trackingCompany: 'SMSA Express',
+        trackingNumber: 'SMSA1886204500',
+        trackingUrl: 'https://track.example/SMSA1886204500',
+        updatedAt: '2026-09-13T12:00:00Z',
       },
     ],
     lineItems: [
-      { title: 'Najd Cargo Pant', variantTitle: '30', sku: 'NC-OLV-30', quantity: 1 },
-      { title: 'Riyadh Oversized Tee', variantTitle: 'S', sku: 'RT-SAND-S', quantity: 1 },
+      { title: 'TFMC Logo Tee', variantTitle: 'M', sku: 'TFMC-BLUE-M', quantity: 1 },
+      { title: 'TFMC Tote Bag', variantTitle: 'Default Title', sku: 'TT-NAT-OS', quantity: 1 },
     ],
-    totalPrice: sar('538.00'),
-    shippingCity: 'Dubai',
-    shippingCountryCode: 'AE',
-    statusUrl: `${STORE}/orders/status/2045`,
+    totalPrice: sar('344.00'),
+    shippingCity: 'Riyadh',
+    shippingCountryCode: 'SA',
+    statusUrl: `${STORE}/orders/status/1007`,
   },
 ];

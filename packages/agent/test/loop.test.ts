@@ -47,16 +47,16 @@ describe('agent turn', () => {
         tools: [
           {
             name: 'lookup_order',
-            input: { order_number: '1886-2041', email: 'ahmed@example.com' },
+            input: { order_number: '1886-1001', email: 'ahmed@example.com' },
           },
         ],
       },
       {
-        text: 'Order #1886-2041 is with SMSA and on its way. You can follow it here: https://track.example/SMSA1886204100',
+        text: 'Order #1886-1001 is with SMSA and on its way. You can follow it here: https://track.example/SMSA1886204100',
       },
     ]);
     const conv = uniqueId('c');
-    const r = await turn('where is my order 1886-2041, ahmed@example.com', model, conv);
+    const r = await turn('where is my order 1886-1001, ahmed@example.com', model, conv);
 
     expect(r.status).toBe('answered');
     expect(r.reply).toContain('https://track.example/SMSA1886204100');
@@ -89,7 +89,7 @@ describe('agent turn', () => {
         tools: [
           {
             name: 'lookup_order',
-            input: { order_number: '1886-2041', email: 'stranger@example.com' },
+            input: { order_number: '1886-1001', email: 'stranger@example.com' },
           },
         ],
       },
@@ -98,7 +98,7 @@ describe('agent turn', () => {
       },
     ]);
     const conv = uniqueId('c');
-    const r = await turn('order 1886-2041 stranger@example.com', model, conv);
+    const r = await turn('order 1886-1001 stranger@example.com', model, conv);
 
     expect(r.status).toBe('answered');
     expect(r.reply).not.toMatch(/SMSA|track\.example|189/);
@@ -111,7 +111,7 @@ describe('agent turn', () => {
       [conv],
     );
     expect(attempt?.outcome).toBe('mismatch');
-    expect(attempt?.order_number_hash).not.toContain('2041');
+    expect(attempt?.order_number_hash).not.toContain('1001');
   });
 
   it('policy question: retrieval, a cited answer, markers stripped for the customer', async () => {
@@ -354,7 +354,7 @@ describe('agent turn', () => {
         tools: [
           {
             name: 'lookup_order',
-            input: { order_number: '1886-2041', email: 'ahmed@example.com' },
+            input: { order_number: '1886-1001', email: 'ahmed@example.com' },
           },
         ],
       },
@@ -368,7 +368,7 @@ describe('agent turn', () => {
       },
     } as typeof deps.shopify;
     const r = await runTurn(
-      { tenantId, channel: 'web', externalConversationId: uniqueId('c'), text: 'order 1886-2041' },
+      { tenantId, channel: 'web', externalConversationId: uniqueId('c'), text: 'order 1886-1001' },
       deps,
     );
     expect(r.status).toBe('escalated');
