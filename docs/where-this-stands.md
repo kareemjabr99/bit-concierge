@@ -265,6 +265,52 @@ embedding carries nothing identifying, so a provider returning the right count
 in the wrong order would be undetectable here and would produce exactly that
 contamination. It is the provider's contract, and we rely on it.
 
+## A suite that only ever saw the mock
+
+The third instance of the same family, found while remapping the golden set
+onto the development store.
+
+The eval suite runs against `MockShopifyClient`, not the store. That is
+deliberate — it costs no API calls and no rate limit — and it means the mock
+has to be the store, or a green suite is a claim about nothing. It was not. The
+mock had made a customer's order into a guest checkout and **reversed the two
+emails on the different-email scenario**, so the sixteen cases that turn on
+identity were being scored against a store that behaves differently from the
+one an acceptance run would use. The catalogue was further out still: two
+products that never existed in the store, and five SKUs the mock's own orders
+referenced but its own product list did not contain.
+
+Nothing failed. Nothing could have — the suite only ever saw one side.
+
+**The dangerous half is not the answers, it is the refusals.** A case expecting
+a refusal passes when the order number is stale: the identity gate cannot find
+the order, the agent declines, and the run records a pass for a question it
+never asked. Every identity case in the set has that shape. A wrong answer
+announces itself; a right answer for the wrong reason does not.
+
+Closed from both ends, and mutation-tested at eight mutants — a drifting
+stock level, a continue-selling variant marked unavailable, both original email
+bugs, a price changed in the store but not the mock, a stale order number, and
+an email that verifies when the case expects a refusal. All eight fail the
+build:
+
+- `packages/shopify/test/mock-mirrors-store.test.ts` derives the fixtures from
+  the seed data — prices, quantities, continue-selling flags, order totals,
+  line items, emails. A price that moves in the store and not the mock is a red
+  build, not a suppression that looks like a bug.
+- `packages/evals/test/suite.test.ts` refuses a case that names an order the
+  fixtures do not have, or pairs an order with an email that cannot verify —
+  in either direction, so a refusal case whose email silently starts verifying
+  fails too.
+
+**One open question came out of the store rather than the code.** The Classic
+Jacket in S holds zero stock and is still purchasable, because the merchant
+setting is continue-selling; in L it holds zero and is not. `check_availability`
+reports the first as `in_stock`, which is what Shopify means by it and is not
+obviously what a customer means by it. Whether the agent should say "yes, you
+can order it" or name the backorder is a merchant's decision, not ours, so no
+golden case asserts either yet.
+
 ## The worst bug found in this build
 
 Worth stating plainly, because a client will reasonably ask what was found and
