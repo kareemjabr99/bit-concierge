@@ -122,13 +122,25 @@ Shopify assigns order numbers sequentially from 1001. The **prefix and suffix**
 are configurable (Settings → General → Order ID format); the number is not, and
 `name` is read-only through the Admin API.
 
-The golden set currently hard-codes `#1886-2041` through `#1886-2045` across
-**16 cases**, because the mock fixtures invented them.
+The golden set used to hard-code `#1886-2041` through `#1886-2045` across
+**16 cases**, because the mock fixtures invented them. The store assigned its
+own, and the cases were remapped to these:
 
-**Please set the order ID prefix to `1886-` and create the orders in the order
-listed below.** They will come out as `#1886-1001`, `#1886-1002`, … and I will
-update the 16 cases to match once the store exists. What matters is the
-sequence, so that the mapping is mechanical rather than guesswork.
+| scenario                      | assigned     | email on the order | customer account     |
+| ----------------------------- | ------------ | ------------------ | -------------------- |
+| 1. In transit                 | `#1886-1001` | ahmed@example.com  | ahmed@example.com    |
+| 2. Paid, unshipped            | `#1886-1002` | sara@example.com   | sara@example.com     |
+| 3. Delivered                  | `#1886-1003` | layla@example.com  | layla@example.com    |
+| 4. Cancelled, different email | `#1886-1004` | k@example.com      | **omar@example.com** |
+| 5. Partially refunded         | `#1886-1007` | nora@example.com   | nora@example.com     |
+| 6. Guest checkout             | `#1886-1006` | guest@example.com  | **(none)**           |
+
+**The mapping is not positional, and this is the part that would have been got
+wrong by hand.** `#1886-1005` was created by a refund attempt that moved no
+money, deleted, and recreated as `#1886-1007` — so the partial-refund scenario
+carries a HIGHER number than the guest one. The numbers are recorded in
+`ASSIGNED_ORDER_NUMBERS` in `packages/shopify/scripts/seed-data.ts`, and the
+seed script's readback prints a warning if a store ever assigns different ones.
 
 Do not try to force the old numbers. A store configured to make a fixture true
 is a store that is lying to the test suite.
@@ -288,11 +300,30 @@ once stored (`tenant_shopify_credentials`, AES-256-GCM, ADR 0007).
 
 ## After the store exists
 
-1. I map the assigned order numbers to the 16 cases and update them — a fixture
-   correction, recorded, not an expectation change.
+1. **Done.** The assigned order numbers are mapped to the 16 cases — a fixture
+   correction, recorded, not an expectation change. Four more cases moved with
+   them: the different-email case now uses the email that is actually on the
+   order, and the three stock cases were pointed at the inventory states the
+   store actually holds (the Desert Cap they named does not exist; the Sadu
+   Hoodie they called sold out holds 2).
 2. The mock client stays. It is what the eval suite runs against, and it costs
    no API calls and no rate limit. Phase 4 adds a real client behind the same
    interface; both are exercised.
+
+   **The mock now mirrors the store row for row, and a test enforces it.**
+   `packages/shopify/test/mock-mirrors-store.test.ts` derives the fixtures from
+   `seed-data.ts` — prices, quantities, continue-selling flags, order totals,
+   emails. They had already diverged once, silently: the mock had made a
+   customer's order into a guest one and reversed the two emails on scenario 4,
+   so the sixteen identity cases would have passed against a mock that behaves
+   differently from the store. Nothing failed, and nothing could have.
+   `packages/evals/test/suite.test.ts` closes the other half: a case naming an
+   order the fixtures do not have, or pairing an order with an email that
+   cannot verify, is now a red build. A stale order number makes a case
+   expecting a refusal pass for the wrong reason — the gate cannot find the
+   order, declines, and the suite records a pass for a question it never
+   asked.
+
 3. `docs/fixtures.md` rule 2 applies to everything seeded here: it is
    configuration reaching a customer, so it is sourced from this document or it
    is absent.

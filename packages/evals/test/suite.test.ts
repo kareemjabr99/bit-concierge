@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { mockOrders, normalizeOrderName } from '@bitc/shopify';
 import {
   listBaselines,
   diffRuns,
@@ -675,6 +676,91 @@ describe('model diff', () => {
     for (const file of recorded) {
       expect(file.chatModel).toMatch(/^[a-z]+:/);
       expect(Object.keys(file.cases).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * The golden set names orders that exist, and pairs them with emails that
+ * actually verify.
+ *
+ * Both halves fail silently otherwise, and the second one fails in the
+ * direction nobody checks. A case expecting a REFUSAL passes when the order
+ * number is stale: the identity gate cannot find the order, returns
+ * `not_verified`, the agent declines, and the suite records a pass for a
+ * question it never asked. Sixteen cases were remapped when the development
+ * store assigned real numbers, and nothing in the run would have reported a
+ * missed one.
+ *
+ * Products are checked differently, on purpose: a case naming a product the
+ * store does not stock fails a run loudly with `unknown_product` from
+ * `check_availability`, so it cannot pass for the wrong reason. An order
+ * number can.
+ */
+describe('golden-set cases name orders that exist', () => {
+  /** Order numbers that must NOT resolve, each with the reason it is here. */
+  const DELIBERATELY_ABSENT: Record<string, string> = {
+    '#1886-9999': 'identity-nonexistent-order: a lookup for an order nobody placed',
+  };
+
+  const ORDER_NUMBER = /1886-\d{4}/g;
+  const EMAIL = /[\w.+-]+@[\w.-]+\.\w{2,}/g;
+
+  const known = new Set(mockOrders.map((o) => normalizeOrderName(o.name)));
+
+  it('is looking at cases that mention orders at all', () => {
+    const mentions = allCases.filter((c) => ORDER_NUMBER.test(c.input));
+    ORDER_NUMBER.lastIndex = 0;
+    expect(mentions.length).toBeGreaterThan(5);
+  });
+
+  it.each(allCases.map((c) => [c.id, c] as const))('%s', (_id, c) => {
+    // Expectations are searched as well as inputs: a `mustNotContain` holding
+    // an order number that cannot exist is a check that can never fire.
+    const haystack = [c.input, ...c.history, ...c.expect.mustContain, ...c.expect.mustNotContain];
+    for (const raw of haystack.join(' ').match(ORDER_NUMBER) ?? []) {
+      const name = normalizeOrderName(raw);
+      if (name in DELIBERATELY_ABSENT) {
+        expect(known.has(name), `${name} is listed as absent but the fixtures have it`).toBe(false);
+        continue;
+      }
+      expect(
+        known.has(name),
+        `${c.id} names ${name}, which is not in the mock fixtures.\n` +
+          `Either the store assigned different numbers — see ASSIGNED_ORDER_NUMBERS in ` +
+          `packages/shopify/scripts/seed-data.ts — or add it to DELIBERATELY_ABSENT with the ` +
+          `reason it must not resolve.`,
+      ).toBe(true);
+    }
+
+    // An order and an email in the same question is a verification attempt,
+    // and the case's expected behaviour says which way it must go.
+    const numbers = c.input.match(ORDER_NUMBER) ?? [];
+    const emails = c.input.match(EMAIL) ?? [];
+    if (numbers.length !== 1 || emails.length !== 1) return;
+    if (c.expect.behaviour !== 'answer' && c.expect.behaviour !== 'refuse') return;
+
+    const order = mockOrders.find(
+      (o) => normalizeOrderName(o.name) === normalizeOrderName(numbers[0]!),
+    );
+    const email = emails[0]!.toLowerCase();
+    const verifies =
+      order !== undefined &&
+      [order.email, order.customerEmail].some((e) => (e ?? '').toLowerCase() === email);
+
+    if (c.expect.behaviour === 'answer') {
+      expect(
+        verifies,
+        `${c.id} expects an answer, but ${email} does not match ${numbers[0]} in the fixtures ` +
+          `(order ${order?.email ?? 'missing'}, account ${order?.customerEmail ?? 'none'}). ` +
+          `The gate would refuse and the case would fail for a reason it is not testing.`,
+      ).toBe(true);
+    } else {
+      expect(
+        verifies,
+        `${c.id} expects a refusal, but ${email} DOES verify against ${numbers[0]}. ` +
+          `The case would pass or fail for a reason it is not testing.`,
+      ).toBe(false);
     }
   });
 });
