@@ -144,8 +144,16 @@ export const adminToken = async (
   shop: string,
   clientId: string,
   clientSecret: string,
+  options: { fresh?: boolean } = {},
 ): Promise<string> => {
-  const cached = readCache(shop, clientId);
+  // A cached token carries the scopes it was minted with, for a full 24 hours.
+  // Adding a scope to the app and releasing it does NOT change a token already
+  // in hand — so after a scope change the cache is actively misleading: every
+  // call fails with "Access denied" for a permission the app now has.
+  //
+  // `--check` always mints fresh for that reason. It exists to tell you what
+  // is true right now, and a cached answer is not that.
+  const cached = options.fresh ? null : readCache(shop, clientId);
   if (cached) return cached;
 
   const response = await fetch(`https://${shop}/admin/oauth/access_token`, {

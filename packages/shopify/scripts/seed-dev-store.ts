@@ -61,7 +61,10 @@ if (!staticToken && (!clientId || !clientSecret)) {
 /** Resolved once, then reused. Tokens last 24h and are cached on disk. */
 let token = staticToken;
 const ensureToken = async (): Promise<string> => {
-  if (!token) token = await adminToken(domain, clientId, clientSecret);
+  // --check mints fresh: a cached token carries the scopes it was minted with,
+  // so after a scope change the cache would report the old permissions as
+  // current. A check that can be stale is not a check.
+  if (!token) token = await adminToken(domain, clientId, clientSecret, { fresh: mode === 'check' });
   return token;
 };
 
@@ -419,6 +422,10 @@ const REQUIRED_MUTATIONS = [
   'fulfillmentCreate',
   'orderCancel',
   'refundCreate',
+  'orderUpdate',
+  'orderCustomerSet',
+  'orderCustomerRemove',
+  'fulfillmentEventCreate',
 ];
 
 /**
@@ -773,12 +780,104 @@ const reconcileOrder = async (
     cancelledAt: string | null;
     displayFulfillmentStatus: string;
     displayFinancialStatus?: string;
+    email: string | null;
+    customerEmail: string | null;
+    refundCount?: number;
   },
 ): Promise<string[]> => {
   const applied: string[] = [];
   const alreadyFulfilled = state?.displayFulfillmentStatus === 'FULFILLED';
   const alreadyCancelled = Boolean(state?.cancelledAt);
-  const alreadyRefunded = state?.displayFinancialStatus === 'PARTIALLY_REFUNDED';
+  // Guarded on the refunds themselves. displayFinancialStatus stayed PAID
+  // through a zero-value refund, so it is not a signal that a refund happened.
+  const alreadyRefunded = (state?.refundCount ?? 0) > 0;
+
+  // The account on the order, which is not the same thing as the email on it.
+  //
+  // Scenario 4 is the one that needs this and the one that was silently wrong:
+  // created without an association, Shopify matched a customer from the order
+  // email, so the "different email" case had the same address in both places
+  // and tested nothing. Repairable in place — the association is separate from
+  // the contact email, which is the very property the scenario exists for.
+  if (state && o.customerEmail && state.customerEmail !== o.customerEmail) {
+    const wanted = await gql<{ customers: { nodes: { id: string }[] } }>(
+      `query($q: String!) { customers(first: 1, query: $q) { nodes { id } } }`,
+      { q: `email:${o.customerEmail}` },
+    );
+    const customerId = wanted.customers.nodes[0]?.id;
+    if (customerId) {
+      const set = await gql<{ orderCustomerSet: { userErrors: unknown[] } }>(
+        `mutation($orderId: ID!, $customerId: ID!) {
+           orderCustomerSet(orderId: $orderId, customerId: $customerId) {
+             userErrors { field message }
+           }
+         }`,
+        { orderId, customerId },
+      );
+      assertNoUserErrors(`orderCustomerSet ${o.key}`, set.orderCustomerSet);
+      applied.push(`account -> ${o.customerEmail}`);
+    }
+  }
+
+  // A guest checkout has NO customer record, and orderCreate will not produce
+  // one: given an email and no association, Shopify matches or creates a
+  // customer and links it. Scenario 6 looked seeded and was not — it had an
+  // account with the same address as the order, which is scenario 1 with a
+  // different name on it. The association is removed afterwards.
+  if (state && o.customerEmail === null && state.customerEmail !== null) {
+    const removed = await gql<{ orderCustomerRemove: { userErrors: unknown[] } }>(
+      `mutation($orderId: ID!) {
+         orderCustomerRemove(orderId: $orderId) { userErrors { field message } }
+       }`,
+      { orderId },
+    );
+    assertNoUserErrors(`orderCustomerRemove ${o.key}`, removed.orderCustomerRemove);
+    applied.push('account removed (guest)');
+  }
+
+  // And the contact email, if it drifted from what the scenario wants.
+  if (state && state.email !== o.orderEmail) {
+    const updated = await gql<{ orderUpdate: { userErrors: unknown[] } }>(
+      `mutation($input: OrderInput!) {
+         orderUpdate(input: $input) { order { id } userErrors { field message } }
+       }`,
+      { input: { id: orderId, email: o.orderEmail } },
+    );
+    assertNoUserErrors(`orderUpdate ${o.key}`, updated.orderUpdate);
+    applied.push(`order email -> ${o.orderEmail}`);
+  }
+
+  // Delivery is a separate step from fulfilment, and reachable on its own.
+  // Scenario 3 already existed as FULFILLED, so the whole fulfil block was
+  // skipped and the delivered event with it — leaving "delivered" identical to
+  // "in transit", which is the one thing that scenario is for.
+  if (o.fulfil?.delivered && alreadyFulfilled && !alreadyCancelled) {
+    const existing = await gql<{
+      order: { fulfillments: { id: string; displayStatus: string | null }[] };
+    }>(`query($id: ID!) { order(id: $id) { fulfillments(first: 5) { id displayStatus } } }`, {
+      id: orderId,
+    });
+    const pending = existing.order.fulfillments.find((f) => f.displayStatus !== 'DELIVERED');
+    if (pending) {
+      const event = await gql<{ fulfillmentEventCreate: { userErrors: unknown[] } }>(
+        `mutation($input: FulfillmentEventInput!) {
+           fulfillmentEventCreate(fulfillmentEvent: $input) {
+             fulfillmentEvent { id status }
+             userErrors { field message }
+           }
+         }`,
+        {
+          input: {
+            fulfillmentId: pending.id,
+            status: 'DELIVERED',
+            message: 'Seed fixture: delivered',
+          },
+        },
+      );
+      assertNoUserErrors(`fulfillmentEventCreate ${o.key}`, event.fulfillmentEventCreate);
+      applied.push('delivered');
+    }
+  }
 
   if (o.fulfil && !alreadyFulfilled && !alreadyCancelled) {
     const fo = await gql<{ order: { fulfillmentOrders: { nodes: { id: string }[] } } }>(
@@ -787,7 +886,9 @@ const reconcileOrder = async (
     );
     const fulfillmentOrderId = fo.order.fulfillmentOrders.nodes[0]?.id;
     if (fulfillmentOrderId) {
-      const done = await gql<{ fulfillmentCreate: { userErrors: unknown[] } }>(
+      const done = await gql<{
+        fulfillmentCreate: { fulfillment: { id: string } | null; userErrors: unknown[] };
+      }>(
         `mutation($f: FulfillmentInput!) {
            fulfillmentCreate(fulfillment: $f) { fulfillment { id } userErrors { field message } }
          }`,
@@ -805,30 +906,101 @@ const reconcileOrder = async (
       );
       assertNoUserErrors(`fulfillmentCreate ${o.key}`, done.fulfillmentCreate);
       applied.push('fulfilment');
+
+      // `delivered` was in the scenario data from the start and nothing read
+      // it, so scenario 3 was "fulfilled and in transit" — the same shape as
+      // scenario 1. A fulfilment reaches DELIVERED through an event, not a
+      // field.
+      if (o.fulfil.delivered && done.fulfillmentCreate.fulfillment?.id) {
+        const event = await gql<{ fulfillmentEventCreate: { userErrors: unknown[] } }>(
+          `mutation($input: FulfillmentEventInput!) {
+             fulfillmentEventCreate(fulfillmentEvent: $input) {
+               fulfillmentEvent { id status }
+               userErrors { field message }
+             }
+           }`,
+          {
+            input: {
+              fulfillmentId: done.fulfillmentCreate.fulfillment.id,
+              status: 'DELIVERED',
+              message: 'Seed fixture: delivered',
+            },
+          },
+        );
+        assertNoUserErrors(`fulfillmentEventCreate ${o.key}`, event.fulfillmentEventCreate);
+        applied.push('delivered');
+      }
     }
   }
 
   if (o.refundSku && !alreadyRefunded && !alreadyCancelled) {
     const detail = await gql<{
-      order: { lineItems: { nodes: { id: string; sku: string | null; quantity: number }[] } };
+      order: {
+        lineItems: { nodes: { id: string; sku: string | null; quantity: number }[] };
+        transactions: { id: string; kind: string; gateway: string }[];
+      };
     }>(
-      `query($id: ID!) { order(id: $id) { lineItems(first: 20) { nodes { id sku quantity } } } }`,
+      `query($id: ID!) {
+         order(id: $id) {
+           lineItems(first: 20) { nodes { id sku quantity } }
+           transactions { id kind gateway }
+         }
+       }`,
       { id: orderId },
     );
     const line = detail.order.lineItems.nodes.find((l) => l.sku === o.refundSku);
     if (line) {
+      // A refund without a TRANSACTION moves no money. The first version
+      // created a refund of 0.00 against the right line and left the order
+      // PAID — a return record, not a partial refund, and
+      // displayFinancialStatus never changed, which is also why the
+      // "already refunded" guard below could not see it.
+      const price = PRODUCTS.flatMap((p) => p.variants).find((v) => v.sku === o.refundSku)?.price;
+      if (!price) throw new Error(`${o.key}: no price for ${o.refundSku}`);
+      const amount = (Number(price) * line.quantity).toFixed(2);
+      const parent = detail.order.transactions.find((t) => t.kind === 'SALE');
+      // @idempotent again, for the same reason as inventory: a retried refund
+      // must not refund twice. orderCancel does NOT require it — verified by
+      // scenario 4 completing without one — so it is not added there
+      // speculatively.
       const refunded = await gql<{ refundCreate: { userErrors: unknown[] } }>(
-        `mutation($input: RefundInput!) {
-           refundCreate(input: $input) { refund { id } userErrors { field message } }
+        `mutation($input: RefundInput!, $key: String!) {
+           refundCreate(input: $input) @idempotent(key: $key) {
+             refund { id }
+             userErrors { field message }
+           }
          }`,
         {
+          // The key includes the AMOUNT. A key that identifies only the
+          // scenario means a corrected refund is "the same request" as the
+          // wrong one it replaces, and Shopify refuses it — which is the
+          // feature working: a fixed payload under an old key is exactly what
+          // idempotency is meant to catch.
+          key: `bitc-seed-refund-${o.key}-${amount}`,
           input: {
             orderId,
             note: 'Seed fixture: partial refund of one line',
             notify: false,
+            // NO_RESTOCK on purpose. RETURN needs a locationId and, worse,
+            // would put the item back into stock — and the stock levels are
+            // themselves fixtures. A refund quietly changing the low-stock
+            // scenario would be one fixture corrupting another.
             refundLineItems: [
-              { lineItemId: line.id, quantity: line.quantity, restockType: 'RETURN' },
+              { lineItemId: line.id, quantity: line.quantity, restockType: 'NO_RESTOCK' },
             ],
+            ...(parent
+              ? {
+                  transactions: [
+                    {
+                      orderId,
+                      parentId: parent.id,
+                      amount,
+                      kind: 'REFUND',
+                      gateway: parent.gateway,
+                    },
+                  ],
+                }
+              : {}),
           },
         },
       );
@@ -869,6 +1041,7 @@ const seedOrder = async (
         displayFulfillmentStatus: string;
         displayFinancialStatus: string;
         customer: { email: string | null } | null;
+        refunds: { id: string }[];
       }[];
     };
   }>(
@@ -877,6 +1050,7 @@ const seedOrder = async (
          nodes {
            id name email cancelledAt displayFulfillmentStatus displayFinancialStatus
            customer { email }
+           refunds { id }
          }
        }
      }`,
@@ -889,7 +1063,11 @@ const seedOrder = async (
     const existing = found.orders.nodes[0];
     let note = 'exists';
     if (mode !== 'dry-run') {
-      const applied = await reconcileOrder(o, existing.id, existing);
+      const applied = await reconcileOrder(o, existing.id, {
+        ...existing,
+        customerEmail: existing.customer?.email ?? null,
+        refundCount: existing.refunds.length,
+      });
       if (applied.length > 0) note = `exists, applied ${applied.join(' + ')}`;
     }
     console.log(`  = ${o.scenario} -> ${existing.name} (${note})`);
@@ -936,10 +1114,24 @@ const seedOrder = async (
      }`,
     {
       order: {
-        email: o.orderEmail,
+        // Created with the ACCOUNT's address. Passing a different one here
+        // makes Shopify reconcile the two — it matches or creates a customer
+        // from the order email and associates THAT, overriding the association
+        // above. The differing address is applied afterwards by orderUpdate,
+        // which changes only the order's contact email.
+        email: o.customerEmail ?? o.orderEmail,
         tags: [SEED_TAG, tag],
         currency: 'SAR',
-        ...(o.customerEmail ? { customerId: customerIds.get(o.customerEmail) } : {}),
+        // `customer`, not `customerId` — the latter is not a field on this
+        // input. It was silently dropped rather than rejected, because
+        // JSON.stringify omits undefined, so every order was created with no
+        // customer and Shopify matched one from the email instead. That is
+        // what destroyed scenario 4: the account became k@example.com, the
+        // same address as the order, and the entire point of the case is that
+        // they differ.
+        ...(o.customerEmail && customerIds.get(o.customerEmail)
+          ? { customer: { toAssociate: { id: customerIds.get(o.customerEmail)! } } }
+          : {}),
         lineItems,
         shippingAddress: {
           firstName: 'Seed',
@@ -956,6 +1148,17 @@ const seedOrder = async (
   assertNoUserErrors(`orderCreate ${o.key}`, created.orderCreate);
   const orderId = created.orderCreate.order.id;
   const name = created.orderCreate.order.name;
+
+  // Scenario 4: the order's contact email differs from the account's.
+  if (o.customerEmail && o.customerEmail !== o.orderEmail) {
+    const updated = await gql<{ orderUpdate: { userErrors: unknown[] } }>(
+      `mutation($input: OrderInput!) {
+         orderUpdate(input: $input) { order { id email } userErrors { field message } }
+       }`,
+      { input: { id: orderId, email: o.orderEmail } },
+    );
+    assertNoUserErrors(`orderUpdate ${o.key}`, updated.orderUpdate);
+  }
 
   await reconcileOrder(o, orderId);
 
@@ -1023,16 +1226,54 @@ const main = async (): Promise<void> => {
   // The remap table. Shopify assigns order numbers and `name` is read-only, so
   // the 16 golden-set cases that hard-code #1886-2041..2045 are remapped from
   // this rather than from guesswork.
+  // Re-read rather than report what was seen before reconciling. The first
+  // version printed pre-repair state and said scenario 4's account was
+  // k@example.com moments after changing it to omar@ — a mapping that is wrong
+  // is worse than no mapping, because the remap is done from it.
+  const verified = await gql<{
+    orders: {
+      nodes: {
+        name: string;
+        email: string | null;
+        cancelledAt: string | null;
+        displayFinancialStatus: string;
+        displayFulfillmentStatus: string;
+        customer: { email: string | null } | null;
+        fulfillments: { displayStatus: string | null }[];
+      }[];
+    };
+  }>(
+    `query($q: String!) {
+       orders(first: 20, query: $q) {
+         nodes {
+           name email cancelledAt displayFinancialStatus displayFulfillmentStatus
+           customer { email }
+           fulfillments(first: 3) { displayStatus }
+         }
+       }
+     }`,
+    { q: `tag:${SEED_TAG}` },
+  );
+  const live = new Map(verified.orders.nodes.map((n) => [n.name, n]));
+
   console.log(`\n${'='.repeat(72)}`);
-  console.log('ASSIGNED ORDER NUMBERS — for the golden-set remap');
+  console.log('ASSIGNED ORDER NUMBERS — read back from the store');
   console.log('='.repeat(72));
   for (const s of seeded) {
+    const actual = live.get(s.name);
+    const account = actual?.customer?.email ?? null;
+    const state = actual
+      ? `${actual.displayFinancialStatus}/${actual.displayFulfillmentStatus}` +
+        (actual.cancelledAt ? ' CANCELLED' : '') +
+        (actual.fulfillments[0]?.displayStatus ? ` (${actual.fulfillments[0].displayStatus})` : '')
+      : '(not found)';
     console.log(`\n  ${s.scenario}`);
-    console.log(`    order number    ${s.name}`);
-    console.log(`    email on order  ${s.orderEmail}`);
+    console.log(`    order number     ${s.name}`);
+    console.log(`    state            ${state}`);
+    console.log(`    email on order   ${actual?.email ?? s.orderEmail}`);
     console.log(
-      `    customer account ${s.customerEmail ?? '(none — guest checkout)'}` +
-        (s.customerEmail && s.customerEmail !== s.orderEmail ? '   <- DIFFERS, on purpose' : ''),
+      `    customer account ${account ?? '(none — guest checkout)'}` +
+        (account && account !== actual?.email ? '   <- DIFFERS, on purpose' : ''),
     );
   }
   console.log(`\n${calls} API call(s). Re-running this script changes nothing.\n`);
