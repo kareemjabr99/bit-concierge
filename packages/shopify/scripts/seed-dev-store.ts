@@ -143,6 +143,7 @@ const REQUIRED_MUTATIONS = [
   'orderCustomerSet',
   'orderCustomerRemove',
   'fulfillmentEventCreate',
+  'productUpdate',
 ];
 
 /**
@@ -160,7 +161,8 @@ const REQUIRED_MUTATIONS = [
 const REQUIRED_INPUT_FIELDS: Record<string, string[]> = {
   InventorySetQuantitiesInput: ['name', 'reason', 'quantities'],
   InventoryQuantityInput: ['inventoryItemId', 'locationId', 'quantity', 'changeFromQuantity'],
-  ProductInput: ['handle', 'title', 'descriptionHtml', 'productType', 'status', 'tags'],
+  // `id` is what makes productUpdate an update rather than a second product.
+  ProductInput: ['id', 'handle', 'title', 'descriptionHtml', 'productType', 'status', 'tags'],
   ProductVariantsBulkInput: ['optionValues', 'price', 'inventoryItem', 'inventoryPolicy'],
   CustomerInput: ['email', 'firstName', 'lastName', 'tags'],
   OrderCreateOrderInput: [
@@ -340,16 +342,29 @@ const applyInventory = async (
   assertNoUserErrors(`inventory ${p.handle}`, inventory.inventorySetQuantities);
 };
 
+/**
+ * The description as HTML, for a store that will also render it as text.
+ *
+ * The newline after each `<br>` is load-bearing and was missing. Shopify's
+ * `description` field is `descriptionHtml` with the tags removed and nothing
+ * put in their place, so `sand.<br><br>Size chart` came back as
+ * `sand.Size chart` — every API reader saw the size chart run into the copy
+ * while the storefront looked fine. Found by comparing the store against the
+ * fixtures rather than by looking at it.
+ */
+const descriptionHtmlFor = (p: SeedProduct): string => describeProduct(p).replace(/\n/g, '<br>\n');
+
 const seedProduct = async (p: SeedProduct): Promise<Map<string, string>> => {
   const existing = await gql<{
     productByHandle: {
       id: string;
+      descriptionHtml: string;
       variants: { nodes: { id: string; sku: string; inventoryItem: { id: string } }[] };
     } | null;
   }>(
     `query($handle: String!) {
        productByHandle(handle: $handle) {
-         id variants(first: 20) { nodes { id sku inventoryItem { id } } }
+         id descriptionHtml variants(first: 20) { nodes { id sku inventoryItem { id } } }
        }
      }`,
     { handle: p.handle },
@@ -362,8 +377,27 @@ const seedProduct = async (p: SeedProduct): Promise<Map<string, string>> => {
   // on "exists" made that state permanent across re-runs.
   if (existing.productByHandle) {
     const variants = existing.productByHandle.variants.nodes;
-    if (mode !== 'dry-run') await applyInventory(p, variants);
-    console.log(`  = ${p.handle} (exists, inventory reapplied)`);
+    const wanted = descriptionHtmlFor(p);
+    const staleCopy = existing.productByHandle.descriptionHtml !== wanted;
+
+    if (mode !== 'dry-run') {
+      await applyInventory(p, variants);
+      // Same lesson as the inventory above and the orders below: existing is
+      // not correct. A product whose copy was written wrong stays wrong
+      // forever if a re-run skips it for having the right handle.
+      if (staleCopy) {
+        const updated = await gql<{ productUpdate: { userErrors: unknown[] } }>(
+          `mutation($input: ProductInput!) {
+             productUpdate(input: $input) { userErrors { field message } }
+           }`,
+          { input: { id: existing.productByHandle.id, descriptionHtml: wanted } },
+        );
+        assertNoUserErrors(`productUpdate ${p.handle}`, updated.productUpdate);
+      }
+    }
+    console.log(
+      `  = ${p.handle} (exists, inventory reapplied${staleCopy ? ', description rewritten' : ''})`,
+    );
     return new Map(variants.map((v) => [v.sku, v.id]));
   }
   if (mode === 'dry-run') {
@@ -379,7 +413,7 @@ const seedProduct = async (p: SeedProduct): Promise<Map<string, string>> => {
       input: {
         handle: p.handle,
         title: p.title,
-        descriptionHtml: describeProduct(p).replace(/\n/g, '<br>'),
+        descriptionHtml: descriptionHtmlFor(p),
         productType: p.productType,
         status: p.status,
         tags: [SEED_TAG],
