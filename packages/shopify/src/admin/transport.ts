@@ -1,5 +1,5 @@
 import { BitcError } from '@bitc/core';
-import { assertNotSeedToken } from './guard.ts';
+import { assertAgentAccessToken } from './guard.ts';
 
 /**
  * HTTP for the Admin GraphQL API: retries, throttling, and knowing when to stop.
@@ -63,7 +63,7 @@ export class AdminTransport {
 
   constructor(options: AdminTransportOptions) {
     // Before anything else: the agent is read-only, and the seed token is not.
-    assertNotSeedToken(options.accessToken);
+    assertAgentAccessToken(options.accessToken);
     this.shop = options.shop;
     this.accessToken = options.accessToken;
     this.apiVersion = options.apiVersion;

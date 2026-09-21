@@ -106,7 +106,7 @@ the request is being refused before credential validation.
 and uses a different app's token. Two things enforce that rather than one
 person remembering:
 
-- `assertNotSeedToken` refuses **both** the client secret and any static seed
+- `assertAgentAccessToken` refuses **both** the client secret and any static seed
   token in the runtime Admin client, matched **by value, not by variable
   name** — a check on the name alone would miss the same secret arriving as
   `SHOPIFY_ACCESS_TOKEN`, which is exactly how the mistake gets made. The

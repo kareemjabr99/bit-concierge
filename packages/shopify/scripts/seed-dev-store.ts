@@ -14,7 +14,7 @@
  * failing halfway through writing.
  *
  * **This script uses SHOPIFY_SEED_TOKEN, which carries write scopes.** The
- * agent never sees it: `assertNotSeedToken` refuses that value in the runtime
+ * agent never sees it: `assertAgentAccessToken` refuses that value in the runtime
  * client by value rather than by variable name, and
  * test/seed-token-isolation.test.ts fails if any runtime file so much as names
  * it. Delete the seed app when seeding is done.
