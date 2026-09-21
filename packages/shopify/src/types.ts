@@ -14,13 +14,34 @@ export interface Money {
 
 export interface OrderLineItem {
   title: string;
+  /** Null when the product has no real variants — Shopify's "Default Title". */
   variantTitle: string | null;
   sku: string | null;
+  /** What was ordered. */
   quantity: number;
+  /**
+   * What is still on the order. Lower than `quantity` when a line has been
+   * refunded or removed, zero when all of it has.
+   *
+   * Both are carried because "what did I order" and "what am I getting" are
+   * different questions and a partial refund makes them different answers.
+   * Reporting only one of them is how an assistant tells a customer they are
+   * receiving something that was refunded a week ago.
+   */
+  currentQuantity: number;
 }
 
+/**
+ * Where a parcel is, as far as the store knows.
+ *
+ * `shipped` is the one that is easy to leave out and is the commonest state of
+ * all: the merchant has fulfilled the order and handed it over, and the
+ * carrier has reported nothing yet. It is not `pending` — it has gone — and it
+ * is not `in_transit`, because nobody has scanned it. Every order the
+ * development store holds with tracking sits in exactly this state.
+ */
 export type FulfillmentStatus =
-  'pending' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failure';
+  'pending' | 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failure';
 
 export interface Fulfillment {
   status: FulfillmentStatus;
@@ -44,7 +65,17 @@ export interface Order {
   cancelledAt: string | null;
   fulfillments: Fulfillment[];
   lineItems: OrderLineItem[];
+  /** What the order came to when it was placed. */
   totalPrice: Money;
+  /**
+   * What it comes to now, after refunds and cancellations.
+   *
+   * Equal to `totalPrice` on an untouched order and different on every order a
+   * customer is most likely to ask about. "Why is my total different" is a
+   * question with two numbers in the answer, and an assistant holding one of
+   * them will guess the other.
+   */
+  currentTotalPrice: Money;
   shippingCity: string | null;
   shippingCountryCode: string | null;
   /** Shopify's customer-facing order status page. */
@@ -85,7 +116,15 @@ export interface Product {
   description: string;
   productType: string;
   tags: string[];
-  url: string;
+  /**
+   * The storefront page, or null when there is not one.
+   *
+   * Nullable because Shopify says null for anything not published to the
+   * Online Store channel, which includes every product on the development
+   * store. The agent is told never to write a URL a tool did not return, so a
+   * null here means no link rather than a guessed one.
+   */
+  url: string | null;
   available: boolean;
   priceRange: { min: Money; max: Money };
   variants: ProductVariant[];

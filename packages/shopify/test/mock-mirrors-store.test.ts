@@ -37,33 +37,59 @@ const variantPrice = (sku: string): number => {
 
 const productOf = (sku: string) => PRODUCTS.find((p) => p.variants.some((v) => v.sku === sku))!;
 
-/** What a seeded order looks like once the store has applied the scenario. */
-const expectedOrder = (o: SeedOrder) => ({
-  name: ASSIGNED_ORDER_NUMBERS[o.key],
-  email: o.orderEmail,
-  customerEmail: o.customerEmail,
-  financialStatus: o.cancel ? 'refunded' : o.refundSku ? 'partially_refunded' : 'paid',
-  fulfillmentStatus: o.fulfil ? 'fulfilled' : 'unfulfilled',
-  cancelled: o.cancel,
-  city: o.city,
-  fulfillments: o.fulfil
-    ? [
-        {
-          status: o.fulfil.delivered ? 'delivered' : 'in_transit',
-          trackingCompany: o.fulfil.company,
-          trackingNumber: o.fulfil.trackingNumber,
-          trackingUrl: o.fulfil.url,
-        },
-      ]
-    : [],
-  lineItems: o.lines.map((l) => ({
-    title: productOf(l.sku).title,
-    variantTitle: productOf(l.sku).variants.find((v) => v.sku === l.sku)!.option,
-    sku: l.sku,
-    quantity: l.quantity,
-  })),
-  total: o.lines.reduce((sum, l) => sum + variantPrice(l.sku) * l.quantity, 0).toFixed(2),
-});
+/**
+ * What a seeded order looks like once the store has applied the scenario.
+ *
+ * Several of these were written from what the seed script asked for and
+ * corrected to what the store actually returned, which is the difference this
+ * file exists to hold:
+ *
+ * - A fulfilment with tracking and no carrier scan reports `FULFILLED`, not
+ *   `IN_TRANSIT`. Shopify says in-transit when something tells it so; creating
+ *   a shipment does not.
+ * - `variantTitle` is null for Shopify's "Default Title", not the string.
+ * - A refunded line keeps its quantity and drops its current quantity to zero,
+ *   and the order keeps its total and drops its current total.
+ */
+const expectedOrder = (o: SeedOrder) => {
+  const total = o.lines.reduce((sum, l) => sum + variantPrice(l.sku) * l.quantity, 0);
+  const refunded = o.lines
+    .filter((l) => l.sku === o.refundSku)
+    .reduce((sum, l) => sum + variantPrice(l.sku) * l.quantity, 0);
+
+  return {
+    name: ASSIGNED_ORDER_NUMBERS[o.key],
+    email: o.orderEmail,
+    customerEmail: o.customerEmail,
+    financialStatus: o.cancel ? 'refunded' : o.refundSku ? 'partially_refunded' : 'paid',
+    fulfillmentStatus: o.fulfil ? 'fulfilled' : 'unfulfilled',
+    cancelled: o.cancel,
+    city: o.city,
+    fulfillments: o.fulfil
+      ? [
+          {
+            status: o.fulfil.delivered ? 'delivered' : 'shipped',
+            trackingCompany: o.fulfil.company,
+            trackingNumber: o.fulfil.trackingNumber,
+            trackingUrl: o.fulfil.url,
+          },
+        ]
+      : [],
+    lineItems: o.lines.map((l) => {
+      const option = productOf(l.sku).variants.find((v) => v.sku === l.sku)!.option;
+      const gone = o.cancel || l.sku === o.refundSku;
+      return {
+        title: productOf(l.sku).title,
+        variantTitle: option === 'Default Title' ? null : option,
+        sku: l.sku,
+        quantity: l.quantity,
+        currentQuantity: gone ? 0 : l.quantity,
+      };
+    }),
+    total: total.toFixed(2),
+    currentTotal: (o.cancel ? 0 : total - refunded).toFixed(2),
+  };
+};
 
 describe('the mock catalogue mirrors the seeded store', () => {
   it('holds every seeded product and no others', () => {
@@ -132,6 +158,9 @@ describe('the mock orders mirror the seeded store', () => {
     expect(mock.lineItems).toEqual(want.lineItems);
     expect(mock.totalPrice.amount).toBe(want.total);
     expect(mock.totalPrice.currencyCode).toBe('SAR');
+    // What is left after refunds and cancellations. Equal to the total on an
+    // untouched order and different on both orders a customer would ask about.
+    expect(mock.currentTotalPrice.amount).toBe(want.currentTotal);
     expect(
       mock.fulfillments.map((f) => ({
         status: f.status,
