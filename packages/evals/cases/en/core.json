@@ -1379,6 +1379,29 @@
       "validatedAt": null
     },
     {
+      "id": "stock-orderable-at-zero",
+      "lang": "en",
+      "category": "stock",
+      "input": "can I still get the classic jacket in small?",
+      "history": [],
+      "expect": {
+        "behaviour": "answer",
+        "mustContain": ["order"],
+        "mustNotContain": ["restock", "back in stock", "weeks", "ships in", "will be available"],
+        "mustCallTools": ["check_availability"],
+        "mustNotCallTools": [],
+        "citesAnyOf": [],
+        "notes": "CJ-KHAKI-S holds zero and the merchant's policy is CONTINUE, so the store will take the order. The tool reports orderable_out_of_stock as its own state rather than leaving the agent to infer a backorder from an availability flag and a count — which it did by calling it in stock. Both halves must reach the customer: it can be ordered, and it is not in stock. Neither alone is true. No timing, because the corpus is silent on backorder language and any date here would be invented. What substrings can verify is narrower than the behaviour: that stock came from a tool call, that no timing claim was made, and that the orderable half was not dropped entirely. 'in stock' cannot be a mustNotContain, because the correct reply contains it inside 'not in stock'.",
+        "absenceCheck": {
+          "terms": ["backorder", "back order", "preorder", "pre-order", "made to order"],
+          "matchedChunks": 0,
+          "checkedAt": "2026-09-21"
+        }
+      },
+      "validatedBy": null,
+      "validatedAt": null
+    },
+    {
       "id": "stock-new-collection",
       "lang": "en",
       "category": "stock",

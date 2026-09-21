@@ -84,6 +84,7 @@ describe('the mock catalogue mirrors the seeded store', () => {
       expect(mv.price.amount).toBe(sv.price);
       expect(mv.price.currencyCode).toBe('SAR');
       expect(mv.inventoryQuantity).toBe(sv.quantity);
+      expect(mv.inventoryPolicy).toBe(sv.policy.toLowerCase());
       // The one that is easy to get wrong by hand, and the reason stock is a
       // tool call: zero on hand still sells when the policy says CONTINUE.
       const sellable =

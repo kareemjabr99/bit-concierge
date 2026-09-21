@@ -50,6 +50,7 @@ export const products: Product[] = [
         price: sar('189.00'),
         available: true,
         inventoryQuantity: 24,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
@@ -59,6 +60,7 @@ export const products: Product[] = [
         price: sar('189.00'),
         available: true,
         inventoryQuantity: 31,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
@@ -68,6 +70,7 @@ export const products: Product[] = [
         price: sar('189.00'),
         available: true,
         inventoryQuantity: 18,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'L' }],
       },
       {
@@ -77,6 +80,7 @@ export const products: Product[] = [
         price: sar('189.00'),
         available: true,
         inventoryQuantity: 12,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'XL' }],
       },
     ],
@@ -100,6 +104,7 @@ export const products: Product[] = [
         price: sar('215.00'),
         available: true,
         inventoryQuantity: 14,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
@@ -109,6 +114,7 @@ export const products: Product[] = [
         price: sar('215.00'),
         available: true,
         inventoryQuantity: 9,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
@@ -118,6 +124,7 @@ export const products: Product[] = [
         price: sar('215.00'),
         available: true,
         inventoryQuantity: 21,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'L' }],
       },
       {
@@ -127,6 +134,7 @@ export const products: Product[] = [
         price: sar('215.00'),
         available: true,
         inventoryQuantity: 7,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'XL' }],
       },
     ],
@@ -152,6 +160,7 @@ export const products: Product[] = [
         price: sar('749.00'),
         available: true,
         inventoryQuantity: 0,
+        inventoryPolicy: 'continue',
         selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
@@ -161,6 +170,7 @@ export const products: Product[] = [
         price: sar('749.00'),
         available: true,
         inventoryQuantity: 6,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
@@ -170,6 +180,7 @@ export const products: Product[] = [
         price: sar('749.00'),
         available: false,
         inventoryQuantity: 0,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'L' }],
       },
     ],
@@ -194,6 +205,7 @@ export const products: Product[] = [
         price: sar('459.00'),
         available: true,
         inventoryQuantity: 11,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
@@ -203,6 +215,7 @@ export const products: Product[] = [
         price: sar('459.00'),
         available: true,
         inventoryQuantity: 2,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
@@ -212,6 +225,7 @@ export const products: Product[] = [
         price: sar('459.00'),
         available: true,
         inventoryQuantity: 8,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'L' }],
       },
     ],
@@ -234,6 +248,7 @@ export const products: Product[] = [
         price: sar('129.00'),
         available: true,
         inventoryQuantity: 40,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Title', value: 'Default Title' }],
       },
     ],
@@ -257,6 +272,7 @@ export const products: Product[] = [
         price: sar('389.00'),
         available: true,
         inventoryQuantity: 13,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'S' }],
       },
       {
@@ -266,6 +282,7 @@ export const products: Product[] = [
         price: sar('389.00'),
         available: true,
         inventoryQuantity: 16,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'M' }],
       },
       {
@@ -275,6 +292,7 @@ export const products: Product[] = [
         price: sar('389.00'),
         available: true,
         inventoryQuantity: 5,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Size', value: 'L' }],
       },
     ],
@@ -299,6 +317,7 @@ export const products: Product[] = [
         price: sar('79.00'),
         available: false,
         inventoryQuantity: 0,
+        inventoryPolicy: 'deny',
         selectedOptions: [{ name: 'Title', value: 'Default Title' }],
       },
     ],

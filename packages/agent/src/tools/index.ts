@@ -1,5 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import { stockLevel } from '@bitc/shopify';
 import { recorded, toolError, type ToolResult, type TurnContext } from '../context.ts';
 import { escalate } from '../escalation.ts';
 import { verifyOrderIdentity } from './identity-gate.ts';
@@ -185,14 +186,11 @@ export const makeTools = (ctx: TurnContext) => ({
           variants: variants.map((v) => ({
             title: v.title,
             available: v.available,
-            stock_level:
-              v.inventoryQuantity === null
-                ? 'unknown'
-                : v.inventoryQuantity <= 3 && v.inventoryQuantity > 0
-                  ? 'low'
-                  : v.available
-                    ? 'in_stock'
-                    : 'out_of_stock',
+            // One value, decided in the domain. The agent used to be handed an
+            // availability flag and a quantity and left to work out that
+            // "available, zero on hand" means backorder — which it did by
+            // calling it in stock.
+            stock_level: stockLevel(v),
           })),
         };
       }),
