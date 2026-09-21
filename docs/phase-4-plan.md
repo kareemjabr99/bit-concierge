@@ -77,12 +77,45 @@ principled basis for choosing.
 - The bar unchanged: zero fabricated literals and zero uncited claims reaching
   a customer.
 
-## Blocked on
+## Where it stands
 
-The development store, per `docs/shopify-dev-store.md`. Order numbers are
-assigned by Shopify and cannot be chosen, so 16 golden-set cases need remapping
-once the store exists — a fixture correction, recorded, not an expectation
-change.
+| Definition-of-done item                                                    | State                                        |
+| -------------------------------------------------------------------------- | -------------------------------------------- |
+| Real order fetched and answered, literal gate passing on Admin API figures | client done, not yet wired into a turn       |
+| Mismatched-email and guest-checkout cases against real data                | read and compared; not yet through the agent |
+| A throttled request escalating, under test                                 | done                                         |
+| The mock client still passing the full suite                               | done — 687 tests                             |
+| The bar unchanged                                                          | unchanged                                    |
+
+The store was seeded, the 16 cases were remapped, and four more moved with
+them. `ShopifyAdminClient` reads it. What is left is the wiring: which client a
+turn gets, and where a tenant's credentials come from.
+
+### Mutation results, for the gate report
+
+Standing policy is that correctness-critical components are mutation-tested
+before their gate closes and the results are recorded. Twenty-two mutants
+across this phase's components; twenty-one killed, one survived and was
+answered by deleting the code rather than by writing a test for it.
+
+| Component                             | Mutants | Killed | Note                                                                                                                                                    |
+| ------------------------------------- | ------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mock/store mirror + golden-set guards | 8       | 8      | stock drift, continue-selling flag, both email bugs, a store-side price change, a stale order number, an email that verifies when a refusal is expected |
+| Credential guard                      | 3       | 2      | the survivor was an early return `matches` already covered — dead code, removed                                                                         |
+| Stock level                           | 4       | 4      | the old in_stock behaviour, policy ignored, availability veto removed, threshold off by one                                                             |
+| Read client and mapper                | 6       | 6      | exact-match filter dropped, two matches accepted, customer text unquoted, drafts surfaced, money truncated, FULFILLED read as in transit                |
+
+### The decision the wiring needs
+
+`shopify_installs` stores an encrypted **access token**, which is the shape of
+the classic OAuth install flow. The Dev Dashboard app does not have one: it has
+a Client ID and a Client Secret, and the token is minted from them and lives 24
+hours. So the durable secret to encrypt per tenant is the client secret, and
+the access token should not be persisted at all — it is already held in memory
+and discarded.
+
+That is a schema change rather than a wiring detail, so it is a decision to
+take rather than a default to pick.
 
 ## Carried to Phase 5, alongside the four unstable cases
 
