@@ -127,7 +127,19 @@ export class AdminTransport {
         // GraphQL reports throttling as a 200 with an error code. That is the
         // trap: a naive client sees 200 and reports success with no data.
         const throttled = body.errors.some((e) => e.extensions?.code === 'THROTTLED');
-        if (throttled && attempt < this.maxAttempts) {
+        if (throttled && attempt === this.maxAttempts) {
+          // Out of attempts against a bucket that never refilled. Named apart
+          // from a GraphQL error because the two call for opposite responses:
+          // this one is a busy store and will pass, a malformed query is a bug
+          // and will not. One message for both sends whoever reads the log
+          // hunting the wrong thing.
+          throw new BitcError(
+            'shopify_throttled',
+            `Shopify throttled ${this.maxAttempts} attempts in a row`,
+            { customerSafe: false },
+          );
+        }
+        if (throttled) {
           lastError = 'THROTTLED';
           // Wait for the bucket to refill to half, which is long enough to be
           // worth retrying and short enough not to strand a customer.

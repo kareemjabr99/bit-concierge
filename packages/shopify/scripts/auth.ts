@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { requestAccessToken } from '../src/admin/auth.ts';
+
 /**
  * Getting an Admin API token for a Dev Dashboard app.
  *
@@ -80,11 +82,6 @@ const OAUTH_ERRORS: Record<string, { explanation: string; nextStep: string }> = 
   },
 };
 
-const parseOAuthError = (html: string): string => {
-  const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
-  return /Oauth error (\w+)/.exec(title)?.[1] ?? 'unknown';
-};
-
 const cachePath = (shop: string, clientId: string): string =>
   join(CACHE_DIR, `${shop}.${clientId.slice(0, 8)}.json`);
 
@@ -113,23 +110,13 @@ export const diagnose = async (
   clientId: string,
   clientSecret: string,
 ): Promise<OAuthDiagnosis> => {
-  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
+  const result = await requestAccessToken(shop, clientId, clientSecret);
+  if (result.ok) return { ok: true };
 
-  if (response.ok) return { ok: true };
-
-  const error = parseOAuthError(await response.text());
-  const known = OAUTH_ERRORS[error];
+  const known = OAUTH_ERRORS[result.error];
   return {
     ok: false,
-    error,
+    error: result.error,
     ...(known ? { explanation: known.explanation, nextStep: known.nextStep } : {}),
   };
 };
@@ -156,36 +143,21 @@ export const adminToken = async (
   const cached = options.fresh ? null : readCache(shop, clientId);
   if (cached) return cached;
 
-  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = parseOAuthError(await response.text());
-    const known = OAUTH_ERRORS[error];
+  const result = await requestAccessToken(shop, clientId, clientSecret);
+  if (!result.ok) {
+    const known = OAUTH_ERRORS[result.error];
     throw new Error(
-      `Shopify refused the client credentials grant: ${error}\n\n` +
+      `Shopify refused the client credentials grant: ${result.error}\n\n` +
         (known
           ? `  ${known.explanation}\n\n  ${known.nextStep}\n`
           : `  No mapping for this error.\n`),
     );
   }
 
-  const body = (await response.json()) as {
-    access_token: string;
-    scope: string;
-    expires_in: number;
-  };
   writeCache(shop, clientId, {
-    accessToken: body.access_token,
-    scope: body.scope,
-    expiresAt: Date.now() + body.expires_in * 1000,
+    accessToken: result.grant.accessToken,
+    scope: result.grant.scope,
+    expiresAt: Date.now() + result.grant.expiresInSeconds * 1000,
   });
-  return body.access_token;
+  return result.grant.accessToken;
 };
