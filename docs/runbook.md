@@ -469,3 +469,48 @@ A pipeline reports its last command's status whatever is on the left. The
 script removes the chain, so `&&` is now safe; the pipe is still yours to get
 wrong. The general shape is the one this project keeps rediscovering: **a check
 whose result passes through something that can swallow it is not a check.**
+
+## Seeding the development store
+
+```bash
+pnpm --filter @bitc/shopify run seed:check
+pnpm --filter @bitc/shopify run seed:dry-run
+pnpm --filter @bitc/shopify run seed
+```
+
+**Standing rule: `compare:store` runs after every seed.** It is not a step to
+remember — `seed` runs it, and exits non-zero if the store disagrees with the
+fixtures the eval suite runs on. What the store was asked for is not what it
+does: a fulfilment reported FULFILLED rather than IN_TRANSIT, a null variant
+title, a second set of totals after a refund, and descriptions with their line
+breaks stripped were all found by reading the store back, and none of them by
+anything derived from the seed script's own data.
+
+If any step fails, stop. Every seeding failure so far has left the store half
+right, and a workaround on a half-right store is how a fixture becomes a lie.
+
+The seed app (`bitc-seed`) carries write scopes and stays **uninstalled**
+between seeds. Reinstalling it for a seed is expected; `--diagnose` reports
+`app_not_installed` when the install has not reached this store.
+
+## Background waits
+
+**Standing rule: every background wait has a timeout.**
+
+A wait for an eval run to finish was once written as `while true` whose only
+exit was the line reporting 103 of 103 cases. The run never printed it, and the
+loop ran for about 155 hours. It only read a local file, so it cost nothing —
+but it was also the unexplained background process that made a quota reading
+look suspect, and ruling it out took a person's attention that a timeout would
+have saved.
+
+A wait is bounded by the longest the thing could reasonably take, and when the
+bound is reached it says so and stops:
+
+```bash
+for i in $(seq 1 40); do
+  docker info >/dev/null 2>&1 && break
+  sleep 3
+done
+docker info >/dev/null 2>&1 || { echo "still down after 120s — stopping"; exit 1; }
+```

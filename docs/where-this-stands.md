@@ -144,8 +144,6 @@ and it is also why deflection — not the bar — is the commercial argument.
 
 ## Unmeasurable at current precision
 
-## Unmeasurable at current precision
-
 **~~Whether the system meets a 95% bar.~~ Retired 2026-09-16.** The measurement
 happened and settled it: 12 of 103 cases are nondeterministic, so a system with
 every remaining defect fixed clears 95% on 38.7% of runs. A threshold a perfect
@@ -366,6 +364,41 @@ discipline applied on purpose rather than by luck.
 
 ---
 
+## Customer text reaching a query language
+
+The second injection surface found in this build, and it belongs beside the
+token bug because it has the same shape: correct-looking code, a channel the
+product exists to accept, and nothing that would have gone red.
+
+The read client passes a customer's question to Shopify's product search.
+Shopify's search is a **query language** — `status:DRAFT`, `tag:private`,
+`inventory_total:>0` are fields, not words. Passed through unquoted, a customer
+typing `status:draft` is not searching for a phrase; they are running a filter
+against the merchant's catalogue, and the one that matters surfaces
+**products the merchant has not published** — unfinished work, unannounced
+lines, prices not yet set. No credential is needed and nothing looks unusual in
+a log: it is a customer asking a question.
+
+Fixed before the client touched anything real. Every value that reaches a
+Shopify query is quoted as a literal, backslashes escaped before quotes so the
+escaping cannot escape itself; drafts are dropped after fetching as well, so the
+quoting is not the only thing standing between a customer and unpublished work;
+and at most twelve words of a question reach the query. Mutation-tested — remove
+the quoting and five tests fail, surface drafts and one does.
+
+**This is the second injection surface, after `agents.md`, and both arrive
+through legitimate channels.** `agents.md` was the merchant's own published
+content, fetched by the same crawl that fetches the returns policy and
+addressed to the agent as though it were configuration (ADR 0005). This is the
+customer's own question, typed into the widget the merchant installed so that
+customers would type questions into it. Neither needs an attacker to find a
+back door. Both come in through the front one — the one the product exists to
+open — which is why "is this input trusted?" is the wrong question for this
+system. Every channel is legitimate. What differs is whether its content is
+treated as data or as structure, and the answer has to be data, every time,
+including when the content is well-formed, good-faith, and from the people we
+work for.
+
 ## A pilot limitation with a name: orders older than 60 days
 
 Shopify's `read_orders` scope covers **only orders created in the last 60
@@ -385,6 +418,23 @@ agreement alongside the data-processing terms — the merchant is the one whose
 approval is being sought on their store. Until it is granted, the 60-day
 window is a product limit, stated up front, and not a bug to be discovered by
 a customer.
+
+### 1886's capture mode is unverified
+
+Payment states now have decided answers. An **authorized** order — a card hold
+nobody has captured — is treated as confirmed: status questions are answered
+from fulfilment and say nothing about payment, and a payment question goes to a
+person. A **partially paid** order always goes to a person.
+
+Which of those 1886's customers actually meet depends on a setting nobody here
+has seen: whether the store captures payment automatically at checkout or
+manually. **If 1886 captures manually, every unshipped order is authorized**,
+and every "has my card been charged?" about one of them is a hand-over. That is
+a volume question for the escalation estimate rather than a correctness one —
+the answer is safe either way — but the estimate should not be quoted until the
+setting is known.
+
+**Unverified. To be confirmed in 1886's admin before the pilot.**
 
 ## What I would tell a client today
 

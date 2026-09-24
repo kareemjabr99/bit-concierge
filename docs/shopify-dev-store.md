@@ -294,7 +294,7 @@ it answers questions, it does not change orders. If a scope beyond these turns
 out to be needed I will ask rather than widen the request quietly.
 
 The access token goes in `.env.local` and nowhere else. It is encrypted at rest
-once stored (`tenant_shopify_credentials`, AES-256-GCM, ADR 0007).
+once stored (`shopify_installs`, AES-256-GCM, `packages/core/src/crypto.ts`).
 
 ---
 

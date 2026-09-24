@@ -27,9 +27,11 @@ interface, and keep both working.
    `getOrderByName`, `getProductByHandle`, `searchProducts`,
    `checkAvailability`. The mock is not thrown away — it is what the eval suite
    runs against, costing no API calls and no rate limit.
-2. **Credentials, encrypted.** `tenant_shopify_credentials` with AES-256-GCM at
-   rest, ADR 0007. Read-only scopes only; the agent answers questions and never
-   changes an order.
+2. **Credentials, encrypted.** `shopify_installs`, sealed with AES-256-GCM by
+   `packages/core/src/crypto.ts`. Read-only scopes only; the agent answers
+   questions and never changes an order. (This line used to name a
+   `tenant_shopify_credentials` table and ADR 0007; neither exists — 0007 is
+   retention.)
 3. **The identity gate against real shapes.** Guest checkout means no customer
    record. A different email on the order than on the account is normal. Both
    are in the seed spec because both are how the gate gets tested rather than
@@ -94,8 +96,8 @@ turn gets, and where a tenant's credentials come from.
 ### Mutation results, for the gate report
 
 Standing policy is that correctness-critical components are mutation-tested
-before their gate closes and the results are recorded. Twenty-two mutants
-across this phase's components; twenty-one killed, one survived and was
+before their gate closes and the results are recorded. Twenty-five mutants
+across this phase's components; twenty-four killed, one survived and was
 answered by deleting the code rather than by writing a test for it.
 
 | Component                             | Mutants | Killed | Note                                                                                                                                                    |
@@ -104,18 +106,39 @@ answered by deleting the code rather than by writing a test for it.
 | Credential guard                      | 3       | 2      | the survivor was an early return `matches` already covered — dead code, removed                                                                         |
 | Stock level                           | 4       | 4      | the old in_stock behaviour, policy ignored, availability veto removed, threshold off by one                                                             |
 | Read client and mapper                | 6       | 6      | exact-match filter dropped, two matches accepted, customer text unquoted, drafts surfaced, money truncated, FULFILLED read as in transit                |
+| Payment states in lookup_order        | 3       | 3      | partially paid no longer handed over, payment field exposed on an authorized order, the second total dropped                                            |
 
-### The decision the wiring needs
+### The decision the wiring needs — what Shopify's docs say
 
-`shopify_installs` stores an encrypted **access token**, which is the shape of
-the classic OAuth install flow. The Dev Dashboard app does not have one: it has
-a Client ID and a Client Secret, and the token is minted from them and lives 24
-hours. So the durable secret to encrypt per tenant is the client secret, and
-the access token should not be persisted at all — it is already held in memory
-and discarded.
+Checked 2026-09-24, before changing anything. Nothing has been changed.
 
-That is a schema change rather than a wiring detail, so it is a decision to
-take rather than a default to pick.
+- **Client credentials cannot reach a merchant's store.** "The client
+  credentials grant only works when the app and the store belong to the same
+  Shopify organization," and "can't reach a store outside your organization,
+  including a client's store." It works here only because the development store
+  and the app share Bit68's development organization.
+  ([source](https://shopify.dev/docs/apps/build/dev-dashboard/get-api-access-tokens))
+- **A merchant's store is reached by custom distribution and the authorization
+  code grant**, for an app that runs outside the Shopify admin, as this one
+  does. That produces a **per-store offline access token** — the shape
+  `shopify_installs` already stores.
+- **Non-expiring offline tokens remain available to custom apps.** Public apps
+  must use expiring ones — a one-hour access token plus a rotating 90-day
+  refresh token — for the Admin API from 1 January 2027, and "this doesn't
+  apply to custom apps." `shopify_installs` has no refresh-token column, which
+  is correct for custom distribution and would need a migration if Bit68 ever
+  distributed publicly.
+  ([source](https://shopify.dev/docs/apps/build/authentication-authorization/access-token-types/offline-access-tokens))
+- **Custom distribution is one store, or one Plus organization, per app, and
+  the choice cannot be changed afterwards.** Each further merchant is a further
+  app registration, and there is no Billing API.
+  ([source](https://shopify.dev/docs/apps/launch/distribution/select-distribution-method))
+
+Which makes the earlier framing here wrong. Moving the schema towards a stored
+client secret would have reshaped production around the one environment where
+client credentials work at all. Per the owner's conditional decision on
+2026-09-24, the schema stays; client credentials become a development and
+same-organization credential source read from the environment. Not built yet.
 
 ## Carried to Phase 5, alongside the four unstable cases
 
