@@ -31,6 +31,7 @@ import {
   ORDERS,
   PRODUCTS,
   type SeedOrder,
+  type SeedPayment,
   type SeedProduct,
 } from './seed-data.ts';
 
@@ -178,6 +179,19 @@ const REQUIRED_INPUT_FIELDS: Record<string, string[]> = {
   RefundInput: ['orderId', 'note', 'notify', 'refundLineItems'],
 };
 
+/**
+ * Enum values this script sends. The third layer of the same lesson: the
+ * mutation exists, the input field exists, and the value put in it still has
+ * to be one Shopify accepts. AUTHORIZED and PARTIALLY_PAID are new to this
+ * script and exactly the kind of value to find missing before a write rather
+ * than after one.
+ */
+const REQUIRED_ENUM_VALUES: Record<string, string[]> = {
+  OrderCreateFinancialStatus: ['PAID', 'AUTHORIZED', 'PARTIALLY_PAID'],
+  OrderTransactionKind: ['SALE', 'AUTHORIZATION', 'REFUND'],
+  FulfillmentEventStatus: ['IN_TRANSIT', 'DELIVERED'],
+};
+
 const check = async (): Promise<boolean> => {
   console.log(`\nchecking ${domain} on Admin API ${API_VERSION}\n`);
 
@@ -222,6 +236,21 @@ const check = async (): Promise<boolean> => {
       console.log(`    MISSING ${typeName}: ${absent.join(', ')}`);
     } else {
       console.log(`    ok   ${typeName} (${fields.length} field(s))`);
+    }
+  }
+
+  console.log(`\n  enum values this script sends:`);
+  for (const [typeName, values] of Object.entries(REQUIRED_ENUM_VALUES)) {
+    const type = await gql<{ __type: { enumValues: { name: string }[] } | null }>(
+      `{ __type(name: "${typeName}") { enumValues { name } } }`,
+    );
+    const present = new Set((type.__type?.enumValues ?? []).map((v) => v.name));
+    const absent = values.filter((v) => !present.has(v));
+    if (absent.length > 0) {
+      ok = false;
+      console.log(`    MISSING ${typeName}: ${absent.join(', ')}`);
+    } else {
+      console.log(`    ok   ${typeName} (${values.join(', ')})`);
     }
   }
 
@@ -506,6 +535,54 @@ interface SeededOrder {
   customerEmail: string | null;
 }
 
+/** A carrier status, as the fulfilment event Shopify reads it from. */
+const recordCarrierStatus = async (
+  o: SeedOrder,
+  fulfillmentId: string,
+  status: 'IN_TRANSIT' | 'DELIVERED',
+): Promise<void> => {
+  const event = await gql<{ fulfillmentEventCreate: { userErrors: unknown[] } }>(
+    `mutation($input: FulfillmentEventInput!) {
+       fulfillmentEventCreate(fulfillmentEvent: $input) {
+         fulfillmentEvent { id status }
+         userErrors { field message }
+       }
+     }`,
+    { input: { fulfillmentId, status, message: `Seed fixture: ${status.toLowerCase()}` } },
+  );
+  assertNoUserErrors(`fulfillmentEventCreate ${o.key}`, event.fulfillmentEventCreate);
+};
+
+/**
+ * The transaction `orderCreate` records, which is what sets the payment state.
+ *
+ * An AUTHORIZATION is a hold on a card that nobody has captured — it shows the
+ * customer a pending charge. A SALE for less than the total is a partial
+ * payment and leaves money owed. Both are states the agent now has a decided
+ * answer for, and neither existed anywhere until this function did.
+ */
+const transactionFor = (payment: SeedPayment, totalAmount: string) => {
+  const money = (amount: string) => ({ shopMoney: { amount, currencyCode: 'SAR' } });
+  switch (payment.status) {
+    case 'AUTHORIZED':
+      return {
+        kind: 'AUTHORIZATION',
+        status: 'SUCCESS',
+        gateway: 'bogus',
+        amountSet: money(totalAmount),
+      };
+    case 'PARTIALLY_PAID':
+      return {
+        kind: 'SALE',
+        status: 'SUCCESS',
+        gateway: 'bogus',
+        amountSet: money(payment.amount),
+      };
+    default:
+      return { kind: 'SALE', status: 'SUCCESS', gateway: 'bogus', amountSet: money(totalAmount) };
+  }
+};
+
 /**
  * Brings an order to the state its scenario describes.
  *
@@ -592,35 +669,22 @@ const reconcileOrder = async (
     applied.push(`order email -> ${o.orderEmail}`);
   }
 
-  // Delivery is a separate step from fulfilment, and reachable on its own.
-  // Scenario 3 already existed as FULFILLED, so the whole fulfil block was
-  // skipped and the delivered event with it — leaving "delivered" identical to
-  // "in transit", which is the one thing that scenario is for.
-  if (o.fulfil?.delivered && alreadyFulfilled && !alreadyCancelled) {
+  // What the carrier has reported is a separate step from fulfilment, and
+  // reachable on its own. Scenario 3 already existed as FULFILLED, so the whole
+  // fulfil block was skipped and the delivered event with it — leaving
+  // "delivered" identical to "shipped", which is the one thing that scenario is
+  // for. Scenario 1 is the same shape for IN_TRANSIT.
+  const wantedStatus = o.fulfil?.carrierStatus ?? null;
+  if (wantedStatus && alreadyFulfilled && !alreadyCancelled) {
     const existing = await gql<{
       order: { fulfillments: { id: string; displayStatus: string | null }[] };
     }>(`query($id: ID!) { order(id: $id) { fulfillments(first: 5) { id displayStatus } } }`, {
       id: orderId,
     });
-    const pending = existing.order.fulfillments.find((f) => f.displayStatus !== 'DELIVERED');
-    if (pending) {
-      const event = await gql<{ fulfillmentEventCreate: { userErrors: unknown[] } }>(
-        `mutation($input: FulfillmentEventInput!) {
-           fulfillmentEventCreate(fulfillmentEvent: $input) {
-             fulfillmentEvent { id status }
-             userErrors { field message }
-           }
-         }`,
-        {
-          input: {
-            fulfillmentId: pending.id,
-            status: 'DELIVERED',
-            message: 'Seed fixture: delivered',
-          },
-        },
-      );
-      assertNoUserErrors(`fulfillmentEventCreate ${o.key}`, event.fulfillmentEventCreate);
-      applied.push('delivered');
+    const behind = existing.order.fulfillments.find((f) => f.displayStatus !== wantedStatus);
+    if (behind) {
+      await recordCarrierStatus(o, behind.id, wantedStatus);
+      applied.push(wantedStatus.toLowerCase());
     }
   }
 
@@ -652,28 +716,12 @@ const reconcileOrder = async (
       assertNoUserErrors(`fulfillmentCreate ${o.key}`, done.fulfillmentCreate);
       applied.push('fulfilment');
 
-      // `delivered` was in the scenario data from the start and nothing read
-      // it, so scenario 3 was "fulfilled and in transit" — the same shape as
-      // scenario 1. A fulfilment reaches DELIVERED through an event, not a
-      // field.
-      if (o.fulfil.delivered && done.fulfillmentCreate.fulfillment?.id) {
-        const event = await gql<{ fulfillmentEventCreate: { userErrors: unknown[] } }>(
-          `mutation($input: FulfillmentEventInput!) {
-             fulfillmentEventCreate(fulfillmentEvent: $input) {
-               fulfillmentEvent { id status }
-               userErrors { field message }
-             }
-           }`,
-          {
-            input: {
-              fulfillmentId: done.fulfillmentCreate.fulfillment.id,
-              status: 'DELIVERED',
-              message: 'Seed fixture: delivered',
-            },
-          },
-        );
-        assertNoUserErrors(`fulfillmentEventCreate ${o.key}`, event.fulfillmentEventCreate);
-        applied.push('delivered');
+      // A fulfilment reaches IN_TRANSIT or DELIVERED through an event, not a
+      // field. Without one, Shopify says FULFILLED and means "shipped, and no
+      // carrier has said anything".
+      if (o.fulfil.carrierStatus && done.fulfillmentCreate.fulfillment?.id) {
+        await recordCarrierStatus(o, done.fulfillmentCreate.fulfillment.id, o.fulfil.carrierStatus);
+        applied.push(o.fulfil.carrierStatus.toLowerCase());
       }
     }
   }
@@ -885,8 +933,8 @@ const seedOrder = async (
           city: o.city,
           countryCode: 'SA',
         },
-        financialStatus: 'PAID',
-        transactions: [{ kind: 'SALE', status: 'SUCCESS', gateway: 'bogus', amountSet }],
+        financialStatus: o.payment.status,
+        transactions: [transactionFor(o.payment, amountSet.shopMoney.amount)],
       },
     },
   );

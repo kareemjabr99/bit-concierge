@@ -68,6 +68,15 @@ const OAUTH_ERRORS: Record<string, { explanation: string; nextStep: string }> = 
       'Install bitc-seed on the dev store. In the Dev Dashboard, open the app and use its ' +
       'install link or "Test on development store" and pick this store. Then re-run --check.',
   },
+  app_not_installed: {
+    explanation:
+      'Shopify recognises the Client ID and says the app is not installed on this store. ' +
+      'Observed after the app had been uninstalled and reinstalled: the reinstall had not ' +
+      'reached this store. Before that, a never-installed app answered invalid_request instead.',
+    nextStep:
+      'In the Dev Dashboard, open the app, confirm the latest version is released, and install ' +
+      'it on this store specifically. Then re-run --diagnose.',
+  },
   shop_not_permitted: {
     explanation:
       'The app and the store are in different Dev Dashboard organizations, or the store was ' +

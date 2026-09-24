@@ -205,10 +205,33 @@ export interface SeedOrder {
   orderEmail: string;
   city: string;
   lines: { sku: string; quantity: number }[];
-  fulfil: null | { trackingNumber: string; company: string; url: string; delivered: boolean };
+  fulfil: null | {
+    trackingNumber: string;
+    company: string;
+    url: string;
+    /**
+     * What the carrier has reported, as a fulfilment event. Null means
+     * nothing: Shopify then says FULFILLED, which the domain calls `shipped`.
+     *
+     * An event rather than a flag, because a flag called `delivered` sat in
+     * this data for a whole phase meaning "not delivered, therefore in
+     * transit" — and the store, which is the thing that counts, never agreed.
+     * Creating a shipment does not make Shopify believe a carrier has it.
+     */
+    carrierStatus: 'IN_TRANSIT' | 'DELIVERED' | null;
+  };
   cancel: boolean;
   refundSku: string | null;
+  /**
+   * How the order was paid, as `orderCreate` records it. PAID is a captured
+   * sale. AUTHORIZED is a card hold not yet captured. PARTIALLY_PAID is a
+   * sale for less than the total, which leaves money owed.
+   */
+  payment: SeedPayment;
 }
+
+export type SeedPayment =
+  { status: 'PAID' } | { status: 'AUTHORIZED' } | { status: 'PARTIALLY_PAID'; amount: string };
 
 export const ORDERS: SeedOrder[] = [
   {
@@ -222,10 +245,11 @@ export const ORDERS: SeedOrder[] = [
       trackingNumber: 'SMSA1886204100',
       company: 'SMSA Express',
       url: 'https://track.example/SMSA1886204100',
-      delivered: false,
+      carrierStatus: null,
     },
     cancel: false,
     refundSku: null,
+    payment: { status: 'PAID' },
   },
   {
     key: 'order-2-unshipped',
@@ -240,6 +264,7 @@ export const ORDERS: SeedOrder[] = [
     fulfil: null,
     cancel: false,
     refundSku: null,
+    payment: { status: 'PAID' },
   },
   {
     key: 'order-3-delivered',
@@ -252,10 +277,11 @@ export const ORDERS: SeedOrder[] = [
       trackingNumber: 'SMSA1886204300',
       company: 'SMSA Express',
       url: 'https://track.example/SMSA1886204300',
-      delivered: true,
+      carrierStatus: 'DELIVERED',
     },
     cancel: false,
     refundSku: null,
+    payment: { status: 'PAID' },
   },
   {
     key: 'order-4-different-email',
@@ -270,6 +296,7 @@ export const ORDERS: SeedOrder[] = [
     fulfil: null,
     cancel: true,
     refundSku: null,
+    payment: { status: 'PAID' },
   },
   {
     key: 'order-5-partial-refund',
@@ -285,10 +312,11 @@ export const ORDERS: SeedOrder[] = [
       trackingNumber: 'SMSA1886204500',
       company: 'SMSA Express',
       url: 'https://track.example/SMSA1886204500',
-      delivered: false,
+      carrierStatus: null,
     },
     cancel: false,
     refundSku: 'TT-NAT-OS',
+    payment: { status: 'PAID' },
   },
   {
     key: 'order-6-guest',
@@ -303,6 +331,7 @@ export const ORDERS: SeedOrder[] = [
     fulfil: null,
     cancel: false,
     refundSku: null,
+    payment: { status: 'PAID' },
   },
 ];
 

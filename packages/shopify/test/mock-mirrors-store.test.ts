@@ -61,14 +61,27 @@ const expectedOrder = (o: SeedOrder) => {
     name: ASSIGNED_ORDER_NUMBERS[o.key],
     email: o.orderEmail,
     customerEmail: o.customerEmail,
-    financialStatus: o.cancel ? 'refunded' : o.refundSku ? 'partially_refunded' : 'paid',
+    financialStatus: o.cancel
+      ? 'refunded'
+      : o.refundSku
+        ? 'partially_refunded'
+        : o.payment.status === 'AUTHORIZED'
+          ? 'authorized'
+          : o.payment.status === 'PARTIALLY_PAID'
+            ? 'partially_paid'
+            : 'paid',
     fulfillmentStatus: o.fulfil ? 'fulfilled' : 'unfulfilled',
     cancelled: o.cancel,
     city: o.city,
     fulfillments: o.fulfil
       ? [
           {
-            status: o.fulfil.delivered ? 'delivered' : 'shipped',
+            status:
+              o.fulfil.carrierStatus === 'DELIVERED'
+                ? 'delivered'
+                : o.fulfil.carrierStatus === 'IN_TRANSIT'
+                  ? 'in_transit'
+                  : 'shipped',
             trackingCompany: o.fulfil.company,
             trackingNumber: o.fulfil.trackingNumber,
             trackingUrl: o.fulfil.url,
