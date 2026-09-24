@@ -108,14 +108,20 @@ const FULFILMENT_STATUS: Record<string, FulfillmentStatus> = {
 /**
  * Order financial status.
  *
- * **Deliberately absent:** `AUTHORIZED`, `PARTIALLY_PAID`, `EXPIRED`. All
- * three are questions about money that has or has not moved, and this project
- * does not guess about money. They are also states the development store
- * cannot produce, so anything written for them would be written from a
- * reading of the documentation rather than from a real order.
+ * `AUTHORIZED` and `PARTIALLY_PAID` are mapped because a decision now exists
+ * for each, not because the mapping became obvious. Both are common in real
+ * stores — a merchant capturing manually leaves every order authorized until
+ * it ships — and what the agent does with them is decided in lookup_order,
+ * not here: this layer only names the state.
+ *
+ * **Deliberately absent:** `EXPIRED`. An authorization that lapsed is money
+ * that did not move on an order that may still ship, and nobody has decided
+ * what a customer should be told about that.
  */
 const FINANCIAL_STATUS: Record<string, Order['financialStatus']> = {
   PENDING: 'pending',
+  AUTHORIZED: 'authorized',
+  PARTIALLY_PAID: 'partially_paid',
   PAID: 'paid',
   REFUNDED: 'refunded',
   PARTIALLY_REFUNDED: 'partially_refunded',

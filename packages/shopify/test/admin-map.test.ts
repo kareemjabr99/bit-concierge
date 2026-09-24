@@ -117,15 +117,23 @@ describe('states this build has no answer for', () => {
     expect(() => toOrder(withFulfilmentStatus(status))).toThrow(/no customer-facing answer/);
   });
 
-  it.each(['AUTHORIZED', 'PARTIALLY_PAID', 'EXPIRED'])(
-    'hands over rather than describing payment state %s',
-    (status) => {
-      // Money. This project does not guess about money.
-      expect(() => toOrder({ ...SHIPPED_ORDER, displayFinancialStatus: status })).toThrow(
-        /no customer-facing answer/,
-      );
-    },
-  );
+  it('hands over rather than describing an expired authorization', () => {
+    // Money that did not move, on an order that may still ship. Undecided.
+    expect(() => toOrder({ ...SHIPPED_ORDER, displayFinancialStatus: 'EXPIRED' })).toThrow(
+      /no customer-facing answer/,
+    );
+  });
+
+  it('names the two payment states that have a decided answer', () => {
+    // Named here, handled in lookup_order. The mapper's job is to say which
+    // state it is, not what to tell a customer about it.
+    expect(
+      toOrder({ ...SHIPPED_ORDER, displayFinancialStatus: 'AUTHORIZED' }).financialStatus,
+    ).toBe('authorized');
+    expect(
+      toOrder({ ...SHIPPED_ORDER, displayFinancialStatus: 'PARTIALLY_PAID' }).financialStatus,
+    ).toBe('partially_paid');
+  });
 
   it.each(['ON_HOLD', 'SCHEDULED', 'REQUEST_DECLINED', 'RESTOCKED'])(
     'hands over rather than describing order state %s',

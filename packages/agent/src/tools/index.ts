@@ -85,22 +85,53 @@ export const makeTools = (ctx: TurnContext) => ({
               );
         }
         const o = outcome.order;
+
+        // Money owed. Whatever the customer asked, this is the merchant's
+        // conversation: handed over here, deterministically, before the model
+        // sees a single figure it could use to explain a balance. The
+        // escalation makes the turn end in system copy, so nothing the model
+        // writes after this reaches the customer.
+        if (o.financialStatus === 'partially_paid') {
+          await escalate(ctx, {
+            reason: 'payment_outstanding',
+            summary: `Verified customer asking about ${o.name}, which is partially paid.`,
+          });
+          return toolError(
+            'handed_over',
+            'This order has a payment question only the store team can answer. It has been handed to them.',
+          );
+        }
+
+        const money = (m: { amount: string; currencyCode: string }) =>
+          `${m.amount} ${m.currencyCode}`;
         return {
           ok: true as const,
           id: 't:order',
           order: {
             number: o.name,
             placed_at: o.createdAt,
-            payment_status: o.financialStatus,
+            // Absent, not described, for a card hold nobody has captured. It
+            // shows the customer a pending charge, so "paid" is false and
+            // "pending" is a money claim; the order itself is confirmed, and
+            // status questions are answered from fulfilment alone. With no
+            // field, there is nothing to repeat — and the prompt says a
+            // payment question without one goes to the team.
+            ...(o.financialStatus === 'authorized' ? {} : { payment_status: o.financialStatus }),
             fulfillment_status: o.fulfillmentStatus,
             cancelled_at: o.cancelledAt,
-            total: `${o.totalPrice.amount} ${o.totalPrice.currencyCode}`,
+            total: money(o.totalPrice),
+            // What it comes to now. Equal to the total until something is
+            // refunded; "why is my total different" has both numbers in its
+            // answer, and the second one was in the domain for a whole round
+            // before this tool passed it on.
+            current_total: money(o.currentTotalPrice),
             ship_to: [o.shippingCity, o.shippingCountryCode].filter(Boolean).join(', '),
             status_page_url: o.statusUrl,
             items: o.lineItems.map((li) => ({
               title: li.title,
               variant: li.variantTitle,
               quantity: li.quantity,
+              still_on_order: li.currentQuantity,
             })),
             shipments: o.fulfillments.map((f) => ({
               status: f.status,

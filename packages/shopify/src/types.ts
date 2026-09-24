@@ -60,7 +60,20 @@ export interface Order {
   /** Email on the linked customer record. Can differ from the order email. */
   customerEmail: string | null;
   createdAt: string;
-  financialStatus: 'paid' | 'pending' | 'refunded' | 'partially_refunded' | 'voided';
+  /**
+   * `authorized` is a card hold nobody has captured: the order is confirmed,
+   * and the customer sees a pending charge. `partially_paid` means money is
+   * owed. Both are decided states with a decided answer — see lookup_order —
+   * and neither is a thing the assistant describes.
+   */
+  financialStatus:
+    | 'paid'
+    | 'pending'
+    | 'authorized'
+    | 'partially_paid'
+    | 'refunded'
+    | 'partially_refunded'
+    | 'voided';
   fulfillmentStatus: 'unfulfilled' | 'partial' | 'fulfilled';
   cancelledAt: string | null;
   fulfillments: Fulfillment[];
