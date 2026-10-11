@@ -112,17 +112,17 @@ What is **not built**, so nobody assumes it is:
 
 ### Numbers, and what they are worth
 
-| Measure                                   | Value                                    | Worth quoting?                                      |
-| ----------------------------------------- | ---------------------------------------- | --------------------------------------------------- |
-| Fabricated literals reaching a customer   | 0                                        | **Yes** — a property, enforced by the gate          |
-| Uncited policy claims reaching a customer | 0                                        | **Yes** — same                                      |
-| Accuracy                                  | ~79% on 103 cases, ±3.3 points           | No — drafted suite, not client-validated            |
-| Deflection                                | 77.5%                                    | No — same; this is the number that would sell it    |
-| Escalation precision                      | 73.8%                                    | No — same                                           |
-| Latency                                   | 3.2s median, 8.1s p95, 33s worst         | Yes, and it is a known weakness                     |
-| Model cost                                | $4.70 per 1,000 three-turn conversations | Yes, at Google's published paid rate                |
-| Platform floor                            | ~$53/month shared, before any tenant     | Yes — price with a floor, not only per conversation |
-| Tests                                     | 691 passing, 39 files                    | —                                                   |
+| Measure                                   | Value                                                    | Worth quoting?                                      |
+| ----------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| Fabricated literals reaching a customer   | 0                                                        | **Yes** — a property, enforced by the gate          |
+| Uncited policy claims reaching a customer | 0                                                        | **Yes** — same                                      |
+| Accuracy                                  | ~79% on 103 cases, ±3.3 points                           | No — drafted suite, not client-validated            |
+| Deflection                                | 77.5%                                                    | No — same; this is the number that would sell it    |
+| Escalation precision                      | 73.8%                                                    | No — same                                           |
+| Latency                                   | 3.2s median, 8.1s p95, 33s worst                         | Yes, and it is a known weakness                     |
+| Model cost                                | $4.70 per 1,000 three-turn conversations                 | Yes, at Google's published paid rate                |
+| Platform floor                            | ~$53/month shared, before any tenant                     | Yes — price with a floor, not only per conversation |
+| Tests                                     | 691 passing, 39 files — as of the last commit, re-verify | —                                                   |
 
 **Every eval number above predates Phase 4's changes.** Since the last run the
 system prompt gained a stock section and a payment rule, `lookup_order`'s output
@@ -159,8 +159,8 @@ export; the history's README says exactly what survives.
   git remote set-url origin https://github.com/<new-owner>/bit-concierge.git
   ```
 
-- Everything is pushed; `main` on GitHub is the whole project. CI is green at
-  the handover commit.
+- Everything is pushed; `main` on GitHub is the whole project. Do not take CI's
+  state from this file; check it with `gh run list --limit 1`.
 - **This machine has two GitHub accounts.** `karimgabr-PM` has read access
   only; `kareemjabr99` owns the repository. Git takes its GitHub login from
   `gh` (`gh auth setup-git` was run), so pushes follow whichever account
@@ -176,20 +176,24 @@ Secrets live **only** in `.env.local`, which is gitignored. They never go in a
 file that is not `.env.local`, never in chat, never in a commit message. Move
 them through a password manager or another channel built for it.
 
+On the current machine `.env.local` already exists in the repo root with its
+values filled in. A backup lives outside the repository at `~/.secrets/`. Do not
+ask for the values again; on a new machine, copy the file from that backup.
+
 `.env.example` holds every **name** and no value. The ones in use today:
 
-| Variable                                            | What it is                                      | Notes                                                         |
-| --------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| `DATABASE_URL`, `DATABASE_URL_MIGRATOR`             | App role (RLS enforced) and migration role      | Local values are in the README                                |
-| `ENCRYPTION_KEY`, `_VERSION`, `_PREVIOUS`           | AES-256-GCM key ring for credentials at rest    | No production data is sealed with it yet                      |
-| `BLIND_INDEX_SALT`                                  | Salts blind indexes of order numbers and IPs    | Required in production                                        |
-| `GOOGLE_GENERATIVE_AI_API_KEY`                      | Gemini, **free tier**                           | Free-tier prompts train Google's models — synthetic data only |
-| `SHOPIFY_STORE_DOMAIN`                              | The development store                           | `bit-concierge-dev-blb8x6ix.myshopify.com`                    |
-| `SHOPIFY_RUNTIME_CLIENT_ID`, `_SECRET`              | The read-only runtime app (`bit-concierge`)     | Seven read scopes; installed on the dev store                 |
-| `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`        | The **seeding** app (`bitc-seed`), write scopes | Never read by the runtime — a test enforces it                |
-| `SHOPIFY_API_KEY`, `_SECRET`, `_APP_URL`, `_SCOPES` | Reserved for the embedded admin app             | Phase 6; confirm which app they belong to before using        |
-| `RESEND_API_KEY`, `ESCALATION_FROM_EMAIL`           | Escalation email                                | Not wired yet                                                 |
-| `META_*`, `INSTAGRAM_*`, `WHATSAPP_*`               | Channels                                        | Phase 6                                                       |
+| Variable                                            | What it is                                      | Notes                                                                                                                          |
+| --------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`, `DATABASE_URL_MIGRATOR`             | App role (RLS enforced) and migration role      | Local values are in the README                                                                                                 |
+| `ENCRYPTION_KEY`, `_VERSION`, `_PREVIOUS`           | AES-256-GCM key ring for credentials at rest    | No production data is sealed with it yet                                                                                       |
+| `BLIND_INDEX_SALT`                                  | Salts blind indexes of order numbers and IPs    | Required in production                                                                                                         |
+| `GOOGLE_GENERATIVE_AI_API_KEY`                      | Gemini, **free tier**                           | From Google AI Studio. Free-tier prompts train Google's models — synthetic data only                                           |
+| `SHOPIFY_STORE_DOMAIN`                              | The development store                           | `bit-concierge-dev-blb8x6ix.myshopify.com`                                                                                     |
+| `SHOPIFY_RUNTIME_CLIENT_ID`, `_SECRET`              | The read-only runtime app (`bit-concierge`)     | From `bit-concierge` → App settings in the Dev Dashboard. Seven read scopes, listed in section 2.3; installed on the dev store |
+| `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`        | The **seeding** app (`bitc-seed`), write scopes | From `bitc-seed` → App settings in the Dev Dashboard. Never read by the runtime — a test enforces it                           |
+| `SHOPIFY_API_KEY`, `_SECRET`, `_APP_URL`, `_SCOPES` | Reserved for the embedded admin app             | Reserved for the future production OAuth app, which does not exist yet. Phase 6                                                |
+| `RESEND_API_KEY`, `ESCALATION_FROM_EMAIL`           | Escalation email                                | Not wired yet                                                                                                                  |
+| `META_*`, `INSTAGRAM_*`, `WHATSAPP_*`               | Channels                                        | Phase 6                                                                                                                        |
 
 **Rotate when ownership changes.** If this moves to people who should not hold
 the current credentials: regenerate the Google key and both Shopify client
@@ -203,18 +207,18 @@ fails loudly rather than giving the agent write access.
 
 ### 2.3 External accounts
 
-| Resource                 | Where                                                    | State                                                      |
-| ------------------------ | -------------------------------------------------------- | ---------------------------------------------------------- |
-| GitHub repository        | `kareemjabr99/bit-concierge`                             | Private; transfer to Bit68 pending                         |
-| Shopify development org  | Dev Dashboard, Bit68's development organization          | Holds the dev store and both apps                          |
-| Development store        | `bit-concierge-dev-blb8x6ix.myshopify.com`               | Dev type, Basic plan, SAR, Riyadh, order prefix `1886-`    |
-| App `bit-concierge`      | Read-only runtime app                                    | Installed; seven read scopes                               |
-| App `bitc-seed`          | Seeding app, write scopes                                | **Uninstalled** between seeds, kept for re-seeding         |
-| App `bit-concierge-seed` | An earlier seeding app                                   | Unused — delete it                                         |
-| Google AI Studio         | Gemini key, free tier                                    | Development only; production needs a paid key under a DPA  |
-| Fly.io                   | `bit-concierge-web`, `bit-concierge-worker` in `fra`     | **Not created.** Config only                               |
-| Production Postgres      | Neon, Frankfurt ([ADR 0002](docs/adr/0002-datastore.md)) | Chosen; nothing in the repo shows it provisioned — confirm |
-| Resend, Meta             | Escalation email; IG and WhatsApp                        | Not set up                                                 |
+| Resource                 | Where                                                    | State                                                                                                                                                                                                                                                               |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub repository        | `kareemjabr99/bit-concierge`                             | Private; transfer to Bit68 pending                                                                                                                                                                                                                                  |
+| Shopify development org  | Dev Dashboard, personal Partner org `bit-concierge-dev`  | Owned by Karim Gabr; holds the dev store and both apps. Not a Bit68 org                                                                                                                                                                                             |
+| Development store        | `bit-concierge-dev-blb8x6ix.myshopify.com`               | Dev type, Basic plan, SAR, Riyadh, order prefix `1886-`                                                                                                                                                                                                             |
+| App `bit-concierge`      | Read-only runtime app                                    | Installed. Scopes: `read_orders`, `read_products`, `read_inventory`, `read_customers`, `read_fulfillments`, `read_merchant_managed_fulfillment_orders`, `read_locations`                                                                                            |
+| App `bitc-seed`          | Seeding app, write scopes (temporary)                    | **Uninstalled** between seeds, kept for re-seeding. Scopes: `write_products`, `write_orders`, `write_customers`, `write_inventory`, `write_fulfillments`, `read_locations`, `read_merchant_managed_fulfillment_orders`, `write_merchant_managed_fulfillment_orders` |
+| App `bit-concierge-seed` | An earlier seeding app                                   | Unused — delete it                                                                                                                                                                                                                                                  |
+| Google AI Studio         | Gemini key, free tier                                    | Development only; production needs a paid key under a DPA                                                                                                                                                                                                           |
+| Fly.io                   | `bit-concierge-web`, `bit-concierge-worker` in `fra`     | **Not created.** Config only                                                                                                                                                                                                                                        |
+| Production Postgres      | Neon, Frankfurt ([ADR 0002](docs/adr/0002-datastore.md)) | Chosen; **not provisioned.** Nothing is deployed                                                                                                                                                                                                                    |
+| Resend, Meta             | Escalation email; IG and WhatsApp                        | Not set up                                                                                                                                                                                                                                                          |
 
 The production Shopify app for a real merchant is **a separate registration
 under Bit68's organization**, made before any pilot. It is not the dev-org app.
@@ -222,13 +226,13 @@ See [section 7](#7-decisions-still-open).
 
 ### 2.4 State that does not live in git
 
-| What                        | Where on the current machine                               | Keep?                                                                                    |
-| --------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `.env.local`                | repo root                                                  | **Yes** — via a password manager (section 2.2)                                           |
-| Local Postgres              | Docker volume `bitc-pgdata`, container `bitc-pg`           | Optional. Holds the dev tenant, the indexed corpus, eval run summaries and conversations |
-| Embedding and rerank caches | `.embed-cache/`, `.rerank-cache/`                          | Optional; they save free-tier quota on eval runs                                         |
-| Shopify token cache         | `.shopify-token-cache/`                                    | **No** — expired 24-hour tokens. Delete                                                  |
-| Agent working notes         | `~/.claude/projects/-Users-jabrzmac-bit-concierge/memory/` | No — everything in them is now in `CLAUDE.md`, the runbook or section 11                 |
+| What                        | Where on the current machine                               | Keep?                                                                                                                |
+| --------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `.env.local`                | repo root                                                  | **Yes** — via a password manager (section 2.2)                                                                       |
+| Local Postgres              | Docker volume `bitc-pgdata`, container `bitc-pg`           | Optional. Holds the dev tenant, the indexed corpus, eval run summaries and conversations                             |
+| Embedding and rerank caches | `.embed-cache/`, `.rerank-cache/`                          | Optional; created on first eval or ingest run, so absent on a fresh checkout. They save free-tier quota on eval runs |
+| Shopify token cache         | `.shopify-token-cache/`                                    | **No** — expired 24-hour tokens. Delete                                                                              |
+| Agent working notes         | `~/.claude/projects/-Users-jabrzmac-bit-concierge/memory/` | No — everything in them is now in `CLAUDE.md`, the runbook or section 11                                             |
 
 Everything in the database can be regenerated — `pnpm db:seed` for the tenant,
 `pnpm --filter @bitc/rag ingest` for the corpus. The one thing that could not,
@@ -242,6 +246,12 @@ day's planning, not a minute's.
 ---
 
 ## 3. Standing it up somewhere new
+
+### On the current machine: nvm first
+
+This repo uses nvm with `.nvmrc`. Run `nvm use` in the repo before anything
+else, and do not use corepack's pnpm shims on this machine. The old shims are
+what caused the `pnpm.cjs` failure described below.
 
 ### Prerequisites
 
@@ -334,7 +344,7 @@ packages/models   chat / embedding / reranker providers behind one registry
 packages/agent    the tool loop, six tools, both grounding gates, the system prompt
 packages/rag      ingestion, chunking, hybrid retrieval
 packages/shopify  read-only store interface: the mock, the real client, the seed scripts
-packages/evals    golden set (104 cases), runner, adjudications, cost scripts
+packages/evals    golden set (104 cases as of the last commit, re-verify), runner, adjudications, cost scripts
 packages/channels message envelope for IG/WhatsApp — a stub
 
 test/             repo-wide guards: secrets, CI parity, provenance, seed-token isolation
@@ -410,17 +420,17 @@ broken at least once, or nearly. They travel with the code.
 
 ## 6. Operating it
 
-| Task                       | Command                                                              | Read first                                                      |
-| -------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Talk to the agent          | `pnpm --filter @bitc/cli chat -- --debug`                            | [README](README.md#talking-to-it)                               |
-| Run the golden set         | `pnpm evals run -- --suite en-core --out run.md --out-json run.json` | [runbook](docs/runbook.md#running-an-eval-suite)                |
-| Check recorded absences    | `pnpm --filter @bitc/evals run verify-absence`                       | before any gate                                                 |
-| Ingest a storefront        | `pnpm --filter @bitc/rag ingest`                                     | spends embedding quota                                          |
-| Seed the dev store         | `seed:check` → `seed:dry-run` → `seed` (in `@bitc/shopify`)          | [runbook](docs/runbook.md#seeding-the-development-store)        |
-| Compare store against mock | `pnpm --filter @bitc/shopify run compare:store`                      | exits non-zero on any unexplained difference                    |
-| Close a phase              | `pnpm verify:clean`, then `pnpm gate`                                | [runbook](docs/runbook.md#closing-a-phase)                      |
-| Swap the chat model        | registry, run, diff, review suppressions                             | [runbook](docs/runbook.md#swapping-the-chat-model)              |
-| Re-index to a new embedder | backfill, then flip config                                           | [runbook](docs/runbook.md#re-indexing-to-a-new-embedding-model) |
+| Task                       | Command                                                                                                                          | Read first                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Talk to the agent          | `pnpm --filter @bitc/cli chat -- --debug`                                                                                        | [README](README.md#talking-to-it)                               |
+| Run the golden set         | `pnpm evals run -- --suite en-core --out packages/evals/history/<date>-run.md --out-json packages/evals/history/<date>-run.json` | [runbook](docs/runbook.md#running-an-eval-suite)                |
+| Check recorded absences    | `pnpm --filter @bitc/evals run verify-absence`                                                                                   | before any gate                                                 |
+| Ingest a storefront        | `pnpm --filter @bitc/rag ingest`                                                                                                 | spends embedding quota                                          |
+| Seed the dev store         | `seed:check` → `seed:dry-run` → `seed` (in `@bitc/shopify`)                                                                      | [runbook](docs/runbook.md#seeding-the-development-store)        |
+| Compare store against mock | `pnpm --filter @bitc/shopify run compare:store`                                                                                  | exits non-zero on any unexplained difference                    |
+| Close a phase              | `pnpm verify:clean`, then `pnpm gate`                                                                                            | [runbook](docs/runbook.md#closing-a-phase)                      |
+| Swap the chat model        | registry, run, diff, review suppressions                                                                                         | [runbook](docs/runbook.md#swapping-the-chat-model)              |
+| Re-index to a new embedder | backfill, then flip config                                                                                                       | [runbook](docs/runbook.md#re-indexing-to-a-new-embedding-model) |
 
 **Reading an eval report:** check `incompleteCases` before any other number. A
 run that runs out of quota or times out does not fail loudly; it scores the
@@ -565,6 +575,16 @@ Each of these cost real time once. They recur in new forms.
   signed yet.
 - **Project owner:** the Bit68 owner who commissioned and reviewed this build;
   every decision recorded as "the owner's" in the docs is theirs.
+
+### Owner and contacts
+
+- **Owner:** Karim Gabr, Technical PM, Bit68 —
+  [karim.gabr@bit68.com](mailto:karim.gabr@bit68.com).
+- **Shopify:** the development store and both apps live in a personal Partner
+  org, `bit-concierge-dev`, owned by Karim Gabr. The Bit68 Partner org admin is
+  **to confirm**; it is not known.
+- **Timeline:** there is no deadline yet for the 1886 agreement or for the
+  distribution decision.
 
 ---
 
