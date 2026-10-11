@@ -5,6 +5,10 @@ another team, or Bit68's GitHub organization. It says what the project is,
 **exactly where it stands**, what has to move with it, how to stand it up again,
 and what to do next.
 
+[CLAUDE.md](CLAUDE.md) is the short version that Claude Code loads at the start
+of every session: what this is, the rules, and where to look. This file is the
+long version.
+
 If you read only one section, read [Where it stands](#1-where-it-stands). If you
 are about to change code, read [The rules that do not bend](#5-the-rules-that-do-not-bend)
 first. Everything here links to the document it summarises; where the two
@@ -72,8 +76,14 @@ From the definition of done in [docs/phase-4-plan.md](docs/phase-4-plan.md#defin
 What exists and works:
 
 - **The development store is seeded** — 7 products, 5 customers, 6 order
-  scenarios (in transit, unshipped, delivered, different email on the order,
-  partial refund, guest checkout), verified by reading them back.
+  scenarios (shipped, unshipped, delivered, different email on the order,
+  partial refund, guest checkout), verified by reading them back. Scenario 1
+  was meant to be _in transit_; the store reports it as shipped with no carrier
+  scan, because creating a shipment does not make Shopify believe a carrier has
+  it. Adding the carrier event is part of step 3 below.
+- **The payment-state decisions are tested against constructed orders only.**
+  No authorized or partially paid order exists in the store yet; step 3 adds
+  them.
 - **`ShopifyAdminClient`** — the real read client, Admin GraphQL 2026-07, same
   interface as the mock, written from recorded responses, mutation-tested.
 - **`compare:store`** — reads the live store and diffs it field by field
@@ -120,15 +130,17 @@ changed, the golden set was remapped to new order numbers, and a 104th case was
 added. Nothing has been re-measured. **The next eval run re-baselines
 everything** — see [step 4 of what to do next](#8-what-to-do-next-in-order).
 
-**No baseline is recorded on disk** (`packages/evals/baselines/` is empty). Eval
-run history lives in the `eval_runs` table of the local development database,
-not in git — see [what does not live in git](#24-state-that-does-not-live-in-git).
+**No baseline is recorded on disk** (`packages/evals/baselines/` is empty). The
+**run history is exported** to [packages/evals/history/](packages/evals/history/README.md):
+all 11 run summaries, six printed reports, and the run 4/5/6 comparisons with
+the twelve flips and their replies — the evidence behind
+`where-this-stands.md`. Per-case outputs for each run were lost before the
+export; the history's README says exactly what survives.
 
 ### Blocked right now
 
 | Blocker                                                                                           | Who                            | Unblock                                                                     |
 | ------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| **3 commits not pushed.** The active GitHub CLI account is `karimgabr-PM`, which has READ only.   | Repo owner                     | `gh auth switch --user kareemjabr99`, then `git push origin main`           |
 | **Seed app not installed.** Shopify returns `app_not_installed` for `bitc-seed` on the dev store. | Shopify org admin              | Install `bitc-seed` on the dev store specifically; `seed:diagnose` confirms |
 | **`compare:store` exits 1** — three product descriptions lost their line breaks in the store.     | Fixed in code; needs a re-seed | Re-seed (needs the line above)                                              |
 
@@ -147,9 +159,12 @@ not in git — see [what does not live in git](#24-state-that-does-not-live-in-g
   git remote set-url origin https://github.com/<new-owner>/bit-concierge.git
   ```
 
-- **Push the three local commits first** (`1adc6c2`, `734a68e`, `f1fc3a9`, plus
-  the commit adding this file). A transfer of the remote without them leaves the
-  payment-state work, the seed refactor and the agreement inputs behind.
+- Everything is pushed; `main` on GitHub is the whole project. CI is green at
+  the handover commit.
+- **This machine has two GitHub accounts.** `karimgabr-PM` has read access
+  only; `kareemjabr99` owns the repository. Git takes its GitHub login from
+  `gh` (`gh auth setup-git` was run), so pushes follow whichever account
+  `gh auth switch` last selected.
 - **CI needs no secrets.** It runs against a throwaway Postgres service, so it
   works in a new organization as-is. `pnpm gate` reads CI status through the
   `gh` CLI, so the new owner's `gh` must be authenticated to the new location.
@@ -207,21 +222,19 @@ See [section 7](#7-decisions-still-open).
 
 ### 2.4 State that does not live in git
 
-| What                        | Where on the current machine                               | Keep?                                                                                  |
-| --------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `.env.local`                | repo root                                                  | **Yes** — via a password manager (section 2.2)                                         |
-| Local Postgres              | Docker volume `bitc-pgdata`, container `bitc-pg`           | Optional. Holds the dev tenant, the indexed corpus, eval run history and conversations |
-| Embedding and rerank caches | `.embed-cache/`, `.rerank-cache/`                          | Optional; they save free-tier quota on eval runs                                       |
-| Shopify token cache         | `.shopify-token-cache/`                                    | **No** — expired 24-hour tokens. Delete                                                |
-| Agent working notes         | `~/.claude/projects/-Users-jabrzmac-bit-concierge/memory/` | No — both rules in it are also in `docs/runbook.md`                                    |
+| What                        | Where on the current machine                               | Keep?                                                                                    |
+| --------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `.env.local`                | repo root                                                  | **Yes** — via a password manager (section 2.2)                                           |
+| Local Postgres              | Docker volume `bitc-pgdata`, container `bitc-pg`           | Optional. Holds the dev tenant, the indexed corpus, eval run summaries and conversations |
+| Embedding and rerank caches | `.embed-cache/`, `.rerank-cache/`                          | Optional; they save free-tier quota on eval runs                                         |
+| Shopify token cache         | `.shopify-token-cache/`                                    | **No** — expired 24-hour tokens. Delete                                                  |
+| Agent working notes         | `~/.claude/projects/-Users-jabrzmac-bit-concierge/memory/` | No — everything in them is now in `CLAUDE.md`, the runbook or section 11                 |
 
 Everything in the database can be regenerated — `pnpm db:seed` for the tenant,
-`pnpm --filter @bitc/rag ingest` for the corpus — except **eval run history**.
-If that history matters, export it before the move:
-
-```bash
-docker exec bitc-pg pg_dump -U postgres -d bitconcierge -t eval_runs > eval_runs.sql
-```
+`pnpm --filter @bitc/rag ingest` for the corpus. The one thing that could not,
+the eval run history, is **already exported to the repository**
+([packages/evals/history/](packages/evals/history/README.md)). Nothing in the
+database needs to move.
 
 Re-ingesting the corpus spends embedding quota; on the free tier that is a
 day's planning, not a minute's.
@@ -238,10 +251,24 @@ day's planning, not a minute's.
 - **`gh` CLI**, authenticated to wherever the repo now lives, for `pnpm gate`
 - `psql`, once, to create the local login role
 
-On the machine this was built on, corepack's cached pnpm 12.3.4 lost its binary
-and would not re-download, so the build ran on a standalone Node with tools
-called from `node_modules/.bin`. On a clean machine `corepack enable` is enough;
-if it is not, fix corepack rather than working around it.
+On a clean machine `corepack enable` is enough: corepack 0.36 runs pnpm
+12.3.4, and CI does exactly this.
+
+**If `pnpm` fails with `Cannot find module …/pnpm/12.3.4/bin/pnpm.cjs`**, the
+`pnpm` on your PATH is a shim from an old corepack. That is what happened on the
+machine this was built on: `/opt/homebrew/bin/pnpm` pointed at corepack 0.18.0
+left behind by a Node 18 install under `/usr/local`, and 0.18 predates pnpm
+12's layout (`bin/pnpm.mjs` and a native binary, no `pnpm.cjs`). Clearing the
+cache does not help. Re-pointing the shims at a current corepack does:
+
+```bash
+corepack --version        # must be 0.36 or later
+corepack enable pnpm
+pnpm --version            # 12.3.4
+```
+
+Also check `node --version` says 24. That machine's default `node` was 26; the
+project pins 24 (`.nvmrc`, `engines`), and CI runs 24.
 
 ### Steps
 
@@ -377,7 +404,7 @@ broken at least once, or nearly. They travel with the code.
   green when a control is removed was testing nothing.
 - **One eval run per day, and nothing else touches the model key that day.** The
   free tier fits one 103-case run with about 28% headroom.
-- **`compare:store` runs after every seed.** `pnpm seed` runs it for you.
+- **`compare:store` runs after every seed.** The `@bitc/shopify` `seed` script runs it for you.
 
 ---
 
@@ -425,8 +452,7 @@ development, same-organization source read from the environment. **Not built.**
 
 ## 8. What to do next, in order
 
-1. **Push and confirm.** Switch the `gh` account, push the four local commits,
-   run `pnpm gate`.
+1. ~~Push and confirm.~~ Done 2026-10-11; CI green.
 2. **Transfer the repository** to Bit68's organization if that is the move;
    update the remote; keep push protection on.
 3. **Re-seed the development store.** Install `bitc-seed` on the dev store, then:
@@ -435,25 +461,59 @@ development, same-organization source read from the environment. **Not built.**
    - add scenario 7, an **authorized** order, and scenario 8, a **partially
      paid** one — the seed mechanism for both is built and checked by
      `seed:check`; the data is not added yet, because their order numbers are
-     assigned by the store;
+     assigned by the store. The data proposed for them, never written down
+     until now:
+
+     | Scenario          | Customer (new)       | City   | Line             | Payment                                          |
+     | ----------------- | -------------------- | ------ | ---------------- | ------------------------------------------------ |
+     | 7. Authorized     | `yousef@example.com` | Riyadh | `TFMC-BLUE-L` ×1 | `{ status: 'AUTHORIZED' }`                       |
+     | 8. Partially paid | `reem@example.com`   | Jeddah | `JP-ECRU-S` ×1   | `{ status: 'PARTIALLY_PAID', amount: '100.00' }` |
+
+     Both unfulfilled on purpose: fulfilling an authorized order may make
+     Shopify capture it, depending on store settings, which would quietly turn
+     scenario 7 into scenario 1. Expect `#1886-1008` and `#1886-1009`, and
+     **record what the store actually assigns** — the last batch had a gap;
+
    - `seed:check`, `seed:dry-run`, `seed` — which runs `compare:store`;
    - record the assigned numbers in `ASSIGNED_ORDER_NUMBERS`, mirror the new
      orders in `packages/shopify/src/mock/fixtures.ts`, refresh the recorded
      shapes in `packages/shopify/test/shapes.ts`;
    - write four golden cases: in transit, an authorized order's status, an
-     authorized order's payment question (escalate), and a partially paid order
-     (escalate);
+     authorized order's payment question (escalate, `escalationGround: 'money'`),
+     and a partially paid order (escalate, `'money'`). `mustNotContain` is a
+     substring check — `"delivered"` matches "not delivered yet" and `"in stock"`
+     matches "not in stock", so pick phrases a correct reply cannot contain.
+     `suite.test.ts` fails if an order number is not in the fixtures or an
+     email cannot verify, so mirror the orders first;
    - when `compare:store` exits 0, **uninstall `bitc-seed` again.**
 4. **Run the eval suite once** to re-baseline after Phase 4's prompt, tool and
-   case changes, and record a baseline — none exists on disk.
+   case changes, and record a baseline — none exists on disk. Write
+   `--out`/`--out-json` into `packages/evals/history/` and commit them: the
+   per-case files from every earlier run were lost because they were written to
+   a temporary directory.
 5. **Wire the real client into a turn**, from environment credentials, for the
    dev store. Then meet the first two Phase 4 definition-of-done items end to end:
    a real order answered with the literal gate passing on Admin API figures, and
-   the different-email and guest cases through the agent.
+   the different-email and guest cases through the agent. Where to start:
+   - three places construct `MockShopifyClient` today —
+     `apps/cli/src/chat.ts`, `apps/web/src/server.ts`, `packages/evals/src/cli.ts`;
+   - `packages/shopify/scripts/compare-store.ts` already builds the real client
+     from `SHOPIFY_STORE_DOMAIN` and `SHOPIFY_RUNTIME_CLIENT_ID`/`_SECRET`:
+     `AccessTokenCache` → `AdminTransport` (API version `2026-07`) →
+     `ShopifyAdminClient`. That construction, behind one factory that falls back
+     to the mock when the variables are absent, is most of the work;
+   - credentials are arguments in `packages/shopify/src`, never `process.env`
+     reads — the factory belongs at the app edge;
+   - the eval suite stays on the mock. It is free and deterministic; the real
+     client is checked by `compare:store` and by the definition-of-done turns.
 6. **Webhooks for incremental ingest** (`apps/worker` is where they go).
 7. **Escalation email delivery.**
 8. **Close Phase 4:** `verify:clean`, `gate`, and a gate report carrying the
    mutation table from the phase plan. Then stop for review.
+
+**While step 3 waits on the seed app,** steps 5, 6 and 7 do not depend on it
+and can go first. Step 4 can too, but a baseline taken before step 3 will not
+include the four new cases.
 
 Carried to **Phase 5**: Arabic; a golden set validated and signed by 1886; the
 four unstable cases; latency (p95 8–9s, two cases over a 45-second budget);
@@ -505,6 +565,68 @@ Each of these cost real time once. They recur in new forms.
   signed yet.
 - **Project owner:** the Bit68 owner who commissioned and reviewed this build;
   every decision recorded as "the owner's" in the docs is theirs.
+
+---
+
+## 11. What only the builder knew
+
+Written in before the move, because the agent that built this kept working notes
+outside the repository and they do not travel. Everything below was true on
+2026-10-11.
+
+### How the owner works
+
+- **Every phase ends at a checkpoint, and work stops there** until the owner
+  approves it in writing. Approvals arrive as a message that starts "Phase N
+  approved" and usually carries decisions; record those decisions in the docs,
+  dated, in the owner's words where they gave words.
+- **Report what failed first, and plainly.** A failing test, a skipped step, a
+  number that went the wrong way. The owner reads closely and has caught
+  overstatement every time it happened.
+- **Never claim an improvement that was not measured.** A metric that improved
+  because the measurement changed is not an improvement in the system; the owner
+  called one such claim "technically true and substantively false", and the
+  refusal to make it was "the single most important line in the report".
+- **Keep a property apart from a count.** "A fabricated literal reaching a
+  customer is a property. A count of gate interventions is not." The owner
+  repeats this; so should every report.
+- **When you were wrong, correct it with a measurement, briefly**, and carry on.
+- **Decisions that are the owner's are put to the owner**: payment states,
+  scopes, schema shape, what a customer is told in a state nobody has designed
+  copy for. The answer is recorded where the code that implements it can point.
+
+### Decisions, with dates
+
+| Date       | Decision                                                                                            | Recorded in                                                                                                |
+| ---------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 2026-09-16 | The 95% accuracy bar is retired for a property: zero fabricated literals, zero uncited claims       | [ADR 0011](docs/adr/0011-the-bar.md)                                                                       |
+| Phase 3    | Replies do not stream; not to be revisited under UX pressure                                        | [ADR 0010](docs/adr/0010-no-streaming.md)                                                                  |
+| Phase 3    | The four unstable cases are carried to Phase 5, not fixed in Phase 4                                | [phase-4-plan.md](docs/phase-4-plan.md)                                                                    |
+| Phase 3    | Merchant-authored copy is not gated; responsibility goes in the agreement                           | [ADR 0005](docs/adr/0005-grounding.md)                                                                     |
+| 2026-09-21 | Zero stock that still sells: "can be ordered, not in stock, can't say when it ships", then a person | [where-this-stands.md](docs/where-this-stands.md#a-suite-that-only-ever-saw-the-mock)                      |
+| 2026-09-21 | Do not request `read_all_orders`; it goes in the design-partner agreement                           | [where-this-stands.md](docs/where-this-stands.md#a-pilot-limitation-with-a-name-orders-older-than-60-days) |
+| 2026-09-24 | Authorized → treat as confirmed, payment questions handed over; partially paid → always handed over | [where-this-stands.md](docs/where-this-stands.md#1886s-capture-mode-is-unverified)                         |
+| 2026-09-24 | Keep `shopify_installs`; client credentials are a dev and same-org source read from env             | [phase-4-plan.md](docs/phase-4-plan.md#the-decision-the-wiring-needs--what-shopifys-docs-say)              |
+
+### Facts not written anywhere else
+
+- **The seed script reads products with `productByHandle`, which is
+  deprecated.** It works at 2026-07, and it is invisible to default
+  introspection, which is why `seed:check` never flagged it. When Shopify
+  removes it, seeding breaks loudly. The read client already uses
+  `products(query: "handle:…")`; move the seed to the same.
+- **Shopify's OAuth errors, as observed against this store:** an app that was
+  never installed answers `invalid_request` without checking the secret at all;
+  an app that was installed and then removed answers `app_not_installed`; a
+  wrong secret on an installed app answers `invalid_client`. Only the last
+  proves the ID and secret belong to different apps.
+- **Scripted text edits fail silently after Prettier has reflowed a file.** A
+  find-and-replace whose search text no longer matches does nothing and reports
+  nothing. Assert the match before writing, every time.
+- **Temporary directories do not survive a reboot.** The per-case eval files
+  were lost that way. Anything that is evidence goes in the repository.
+- **Docker Desktop does not start on its own after a reboot** on the build
+  machine; the tests need the `bitc-pg` container on port 55432.
 
 When something here is wrong, fix this file in the same commit as the change
 that made it wrong.

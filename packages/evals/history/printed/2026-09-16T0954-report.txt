@@ -1,0 +1,50 @@
+# Printed 2026-09-16T09:54:55.889Z — recovered verbatim from the session transcript
+
+## Eval — en-core · provisional
+
+`google:gemini-3.5-flash-lite` · `google:gemini-embedding-001@1536` · reranker `llm:google:gemini-3.5-flash-lite` · 46410b8
+
+> **Provisional suite.** These cases were drafted from the storefront, not signed by the merchant. They prove the machinery works; they do not prove the answers match what this store's customers actually ask.
+
+### The bar — a SAFETY guarantee. A property, not a percentage.
+
+Zero is the whole bar, and it has no error bars: the gate inspects every reply and withholds any that fails, so above zero means the guarantee is **broken, not degraded**.
+
+| | |
+| --- | --- |
+| Fabricated literals reaching a customer | **0** |
+| Uncited policy claims reaching a customer | **0** |
+
+**This says nothing about whether the answers are useful.** 
+
+### What the guarantee costs, and how often the net was used
+
+Reported, never thresholded. Gate interventions count claims that were CAUGHT and withheld — quoting them as a defect rate would be quoting how often the safety net was used as though it were how often someone fell.
+
+| | |
+| --- | --- |
+| Replies withheld that should have been sent | 4 (3.9%) |
+| Gate interventions — fabricated literals caught | 0 |
+| Gate interventions — uncited claims caught | 8 |
+
+### Measured — NOT a bar, and not a quality claim
+
+These are figures against expectations the merchant has not signed, and they carry a ±3.3 point interval from run-to-run nondeterminism. **Deflection is the number that would show the agent is worth paying for, and it does not hold yet** — it needs a validated question set, which is Phase 5. See docs/variance-measurement.md.
+
+| | |
+| --- | --- |
+| Cases | 103 (83 passed, 20 failed) |
+| Cases accepting more than one behaviour | 8 — each one adjudicated with evidence |
+| Accuracy, as originally scored | **71.8%** |
+| Accuracy, after adjudication | 80.6% · 10 case(s) reclassified |
+| Deflection | 71.8% |
+| Escalation precision | 68.2% |
+| Retrieval hit rate | 85.2% |
+| p95 latency | 9254 ms |
+| Cost per conversation | $0.00156 |
+
+### Not scored here
+
+Semantic policy accuracy — whether a cited claim is a faithful reading of its source — is a sampled human review. No automated number is produced for it, because an LLM judging a paraphrase is the same class of system that produced it.
+
+### Ship bar: **fail**

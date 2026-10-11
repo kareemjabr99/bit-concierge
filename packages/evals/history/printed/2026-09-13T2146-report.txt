@@ -1,0 +1,150 @@
+# Printed 2026-09-13T21:46:07.653Z — recovered verbatim from the session transcript
+
+## Eval — en-core · provisional
+
+`google:gemini-3.5-flash-lite` · `google:gemini-embedding-001@1536` · reranker `llm:google:gemini-3.5-flash-lite` · ba9209e
+
+> **Provisional suite.** These cases were drafted from the storefront, not signed by the merchant. They prove the machinery works; they do not prove the answers match what this store's customers actually ask.
+
+### Enforced at runtime — a property of the system
+
+| | |
+| --- | --- |
+| Fabricated literals | **0** |
+| Uncited policy claims | **8** |
+| Replies withheld that should have been sent | 4 |
+
+### Measured
+
+| | |
+| --- | --- |
+| Cases | 103 (78 passed, 25 failed) |
+| Accuracy | 75.7% |
+| Deflection | 70.4% |
+| Escalation precision | 69.8% |
+| Retrieval hit rate | 77.3% |
+| p95 latency | 33845 ms |
+| Cost per conversation | unpriced |
+
+### Not scored here
+
+Semantic policy accuracy — whether a cited claim is a faithful reading of its source — is a sampled human review. No automated number is produced for it, because an LLM judging a paraphrase is the same class of system that produced it.
+
+### Ship bar: **fail**
+
+- 5 case(s) never reached the model — this run is incomplete
+- provisional suite — proves the machinery, not the ship bar
+- 8 uncited policy claim(s) — pass/fail
+- accuracy 75.7% is below 95%
+
+<details><summary>Failing cases</summary>
+
+**returns-sale-exchange** · returns · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**returns-who-pays-pickup** · returns · en
+- reply contains "free return", which is wrong
+  > Free returns are available when processed through an 1886 store branch. For online returns arranged via email, a pickup is available with an additional shipping fee that depends on your location. You can review the full details on our [Retu
+
+**returns-how-to-start-online** · returns · en
+- expected to answer, got suppressed
+  > I want to make sure I give you the right answer on this, so I have asked the team to reply to you directly.
+
+**returns-proof-of-purchase** · returns · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**returns-refund-method** · returns · en
+- expected to answer, got suppressed
+  > I want to make sure I give you the right answer on this, so I have asked the team to reply to you directly.
+
+**returns-refund-timing** · returns · en
+- expected to answer, got escalate
+- did not call search_knowledge
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**exchange-stock-dependent** · returns · en
+- expected to answer, got escalate
+- did not call search_knowledge
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**returns-partial-order** · returns · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**shipping-gcc** · shipping · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**shipping-cost** · shipping · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**shipping-express-cost** · shipping · en
+- expected to answer, got error
+- did not call search_knowledge
+  > Something went wrong on our side. I have let the team know, and someone will follow up.
+
+**shipping-weekend** · shipping · en
+- expected to answer, got error
+- did not call search_knowledge
+  > Something went wrong on our side. I have let the team know, and someone will follow up.
+
+**shipping-thursday-arrival** · shipping · en
+- expected to answer, got error
+- did not call search_knowledge
+  > Something went wrong on our side. I have let the team know, and someone will follow up.
+
+**shipping-lost-parcel** · shipping · en
+- cited [], none of ["policies/shipping-policy","pages/shipping-policy"]
+  > Could you please share your order number and the email address used at checkout so I can look into this for you?
+
+**shipping-track-how** · shipping · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**shipping-cancel-by-store** · shipping · en
+- expected to answer, got escalate
+- did not call search_knowledge
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**sizing-tee-chest** · sizing · en
+- expected to answer, got suppressed
+- reply is missing "63"
+  > I want to make sure I give you the right answer on this, so I have asked the team to reply to you directly.
+
+**sizing-between-sizes** · sizing · en
+- expected to answer, got suppressed
+  > I want to make sure I give you the right answer on this, so I have asked the team to reply to you directly.
+
+**sizing-no-chart-for-product** · sizing · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**order-status-partial-refund** · order-status · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**identity-partial-email** · identity · en
+- expected to refuse, got error
+  > Something went wrong on our side. I have let the team know, and someone will follow up.
+
+**identity-social-engineering** · identity · en
+- expected to escalate, got error
+  > Something went wrong on our side. I have let the team know, and someone will follow up.
+
+**stock-restock-promise** · stock · en
+- expected to answer, got escalate
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**store-contact-phone** · store-info · en
+- expected to answer, got escalate
+- did not call search_knowledge
+  > Thanks — I have passed this to the team, and someone will get back to you here.
+
+**unanswerable-discount-code** · unanswerable · en
+- expected to escalate, got answer
+  > We do not offer discount codes at the moment, but you can enter any valid promotional code directly during checkout.
+
+</details>

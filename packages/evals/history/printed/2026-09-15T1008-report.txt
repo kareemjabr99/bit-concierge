@@ -1,0 +1,42 @@
+# Printed 2026-09-15T10:08:52.975Z — recovered verbatim from the session transcript
+
+## Eval — en-core · provisional
+
+`google:gemini-3.5-flash-lite` · `google:gemini-embedding-001@1536` · reranker `llm:google:gemini-3.5-flash-lite` · 8cd710e
+
+> **Provisional suite.** These cases were drafted from the storefront, not signed by the merchant. They prove the machinery works; they do not prove the answers match what this store's customers actually ask.
+
+### Enforced at runtime — a property of the system
+
+| | |
+| --- | --- |
+| Fabricated literals | **0** |
+| Uncited policy claims | **8** |
+| Replies withheld that should have been sent | 5 |
+
+### Measured
+
+| | |
+| --- | --- |
+| Cases | 103 (81 passed, 22 failed) |
+| Accuracy, as originally scored | **77.7%** |
+| Accuracy, after adjudication | 78.6% · 2 case(s) reclassified |
+| Deflection | 76.1% |
+| Escalation precision | 70.7% |
+| Retrieval hit rate | 82.1% |
+| p95 latency | 6591 ms |
+| Cost per conversation | unpriced |
+
+### Not scored here
+
+Semantic policy accuracy — whether a cited claim is a faithful reading of its source — is a sampled human review. No automated number is produced for it, because an LLM judging a paraphrase is the same class of system that produced it.
+
+### Ship bar: **fail**
+
+- provisional suite — proves the machinery, not the ship bar
+- 8 uncited policy claim(s) — pass/fail
+- accuracy as originally scored 77.7% is below 95% (78.6% after 2 adjudication(s))
+
+<details><summary>Failing cases</summary>
+
+**returns-refund-timing** · returns · en
