@@ -432,6 +432,11 @@ broken at least once, or nearly. They travel with the code.
 | Swap the chat model        | registry, run, diff, review suppressions                                                                                         | [runbook](docs/runbook.md#swapping-the-chat-model)              |
 | Re-index to a new embedder | backfill, then flip config                                                                                                       | [runbook](docs/runbook.md#re-indexing-to-a-new-embedding-model) |
 
+**Output paths:** `--out` and `--out-json` start at the repository root, whatever
+the working directory, and the directory must exist; a missing one fails before
+the run spends any quota. (Until 2026-10-12 they started at `packages/evals/`,
+so the documented command wrote to `packages/evals/packages/evals/history/`.)
+
 **Reading an eval report:** check `incompleteCases` before any other number. A
 run that runs out of quota or times out does not fail loudly; it scores the
 remaining cases as failures and understates everything.

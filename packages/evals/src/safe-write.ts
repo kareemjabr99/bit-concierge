@@ -1,4 +1,5 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { stripStatusUrls } from '@bitc/core';
 
 /**
@@ -12,4 +13,25 @@ import { stripStatusUrls } from '@bitc/core';
  */
 export const writeEvalFile = (path: string, text: string): void => {
   writeFileSync(path, stripStatusUrls(text));
+};
+
+/**
+ * Where `--out` and `--out-json` point, resolved from the repository root.
+ *
+ * `pnpm --filter` runs the runner with `packages/evals` as its working
+ * directory, so a path resolved from there put the first re-baseline in
+ * `packages/evals/packages/evals/history/` — after an hour of model requests,
+ * and only because someone had created the directory to stop the write from
+ * throwing. Every documented command names the path from the repository root,
+ * so that is what a relative path means. The directory must already exist, and
+ * is checked before the run starts rather than after it has spent the quota.
+ */
+export const resolveOutPath = (root: string, path: string): string => {
+  const full = resolve(root, path);
+  if (!existsSync(dirname(full))) {
+    throw new Error(
+      `--out directory does not exist: ${dirname(full)} (relative paths start at ${root})`,
+    );
+  }
+  return full;
 };

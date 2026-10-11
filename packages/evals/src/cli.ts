@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv, stripStatusUrls } from '@bitc/core';
-import { writeEvalFile } from './safe-write.ts';
+import { resolveOutPath, writeEvalFile } from './safe-write.ts';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig } from '@bitc/agent';
 import type { AdmissionPolicy } from '@bitc/models';
@@ -30,6 +30,7 @@ import { loadAdjudications } from './adjudication.ts';
 
 /**
  *   pnpm evals run   [--suite en-core] [--model KEY] [--baseline] [--out report.md]
+ *                    (--out and --out-json: relative paths start at the repository root)
  *   pnpm evals diff  [--suite en-core] --model KEY
  *
  * `run` executes the suite and prints a report. `--baseline` records the run as
@@ -44,6 +45,8 @@ import { loadAdjudications } from './adjudication.ts';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CASES_DIR = join(HERE, '..', 'cases');
 const BASELINE_DIR = join(HERE, '..', 'baselines');
+
+const REPO_ROOT = join(HERE, '..', '..', '..');
 
 const arg = (name: string, fallback = ''): string => {
   const i = process.argv.indexOf(`--${name}`);
@@ -78,6 +81,8 @@ const loadCases = (suite: string): EvalCase[] => {
 
 const build = async () => {
   const models = readEnv('models');
+  // Before any model request: a bad output path must not be discovered after the run.
+  for (const name of ['out', 'out-json']) if (arg(name)) resolveOutPath(REPO_ROOT, arg(name));
   // Which store answers is the factory's decision, as everywhere else. `--store
   // mock` hands it an empty environment so a run on the golden set's own mirror
   // does not depend on what .env.local happens to hold. A bad configuration
@@ -195,12 +200,12 @@ try {
     const { tenantId, result } = await execute();
     const markdown = reportRun(result);
     console.log(stripStatusUrls(markdown));
-    const out = arg('out');
+    const out = arg('out') && resolveOutPath(REPO_ROOT, arg('out'));
     if (out) writeEvalFile(out, `${markdown}\n`);
     // The full outcomes, for analysis the report does not carry — which cases
     // retrieved nothing, what each cited, the raw model text behind a
     // suppression. The report is for reading; this is for asking questions of.
-    const outJson = arg('out-json');
+    const outJson = arg('out-json') && resolveOutPath(REPO_ROOT, arg('out-json'));
     if (outJson) writeEvalFile(outJson, `${JSON.stringify(result, null, 2)}\n`);
     await persistRun(tenantId, result);
     if (has('baseline') && (result.incompleteCases ?? 0) > 0) {
