@@ -143,6 +143,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     conversationId: conversation.id,
     channel: input.channel,
     lang,
+    customerText: input.text,
     ...(input.ipHash ? { ipHash: input.ipHash } : {}),
     config,
     shopify: deps.shopify,

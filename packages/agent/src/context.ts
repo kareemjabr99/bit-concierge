@@ -74,6 +74,12 @@ export interface TurnContext {
   conversationId: string;
   channel: Channel;
   lang: Language;
+  /**
+   * What the customer wrote this turn. Read by the escalation-order check,
+   * which needs the customer's own words rather than the model's account of
+   * them; see guard/escalation-order.ts.
+   */
+  customerText: string;
   /** Blind index of the caller's IP, if the channel has one. */
   ipHash?: string;
   config: TenantRuntimeConfig;

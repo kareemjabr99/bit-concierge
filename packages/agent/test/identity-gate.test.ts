@@ -33,6 +33,7 @@ describe('identity gate', () => {
       conversationId: conversation.id,
       channel: 'web',
       lang: 'en',
+      customerText: '',
       ...(ipHash ? { ipHash } : {}),
       config: await loadTenantConfig(tenantId),
       shopify: new MockShopifyClient(),

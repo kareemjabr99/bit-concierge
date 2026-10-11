@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { stockLevel } from '@bitc/shopify';
 import { recorded, toolError, type ToolResult, type TurnContext } from '../context.ts';
 import { escalate } from '../escalation.ts';
+import { checkEscalationOrder, SEARCH_FIRST_CODE } from '../guard/escalation-order.ts';
 import { verifyOrderIdentity } from './identity-gate.ts';
 import { findShippingRule } from './shipping.ts';
 
@@ -278,6 +279,18 @@ export const makeTools = (ctx: TurnContext) => ({
     }),
     execute: (input) =>
       recorded(ctx, 'escalate_to_human', input, async () => {
+        const order = checkEscalationOrder({
+          reason: input.reason,
+          customerText: ctx.customerText,
+          toolCalls: ctx.recorder.toolCalls,
+        });
+        if (!order.allow)
+          return toolError(
+            SEARCH_FIRST_CODE,
+            'Not escalated. Search first: call search_knowledge for questions about the store, or lookup_order, search_products or check_availability for orders and products. Escalate after that if the results do not answer the customer.',
+          );
+        if (order.why === 'refusal_cap')
+          ctx.logger.warn('escalated without a search, after a refusal', { reason: input.reason });
         const record = await escalate(ctx, {
           reason: input.reason,
           summary: input.summary,

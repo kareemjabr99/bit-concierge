@@ -236,6 +236,8 @@ describe('agent turn', () => {
     await turn(
       'I want a refund',
       scripted([
+        // A refund is not an immediate category: the model looks first.
+        { tools: [{ name: 'search_knowledge', input: { query: 'refund policy' } }] },
         {
           tools: [
             {
