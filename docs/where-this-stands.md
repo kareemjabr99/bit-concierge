@@ -130,27 +130,64 @@ adjudication rules already forbid widening an `answer` case to accept
 `escalate` for exactly this reason. The cost lands in deflection, the number
 that decides whether the product is worth paying for.
 
-**What is not known.** Whether the corpus answers each of these four: the cases
-for two of them name no source, and nobody has checked by substring search.
-Whether it is the prompt, the tool descriptions or the model: unmeasured. No
-change has been made for it.
+### Does the corpus answer them? (checked offline, 2026-10-12)
 
-## The quality problem, isolated
+Direct search of the 91 ingested chunks, no model call, nothing changed. The
+three verdicts are the ones that matter: the agent gave up on questions the
+store has answers to, except where it says otherwise.
 
-After the metric fix, **four cases are the whole measurable quality problem**,
-and they are all the same shape: `returns-gift`, `returns-quality-check`,
-`shipping-track-how`, `sizing-true-to-size` flip between answering a question
-and handing it to a human — on questions the corpus _does_ answer.
+| case                        | verdict      | chunk and text                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `returns-refund-timing`     | **answered** | `14bb2416…` (refund-policy): "Refunds can take up to 15 business days, depending on your payment provider."                                                                                                                                                                                                                                       |
+| `shipping-cancel-by-store`  | **answered** | `d75cff7c…` (shipping-policy): "we may cancel any order without prior notice or contact", refunded in full. The question is ambiguous: if the customer means cancelling their own order, `81e9e039…` (terms) says it cannot be cancelled once confirmed. Both are in the corpus                                                                   |
+| `exchange-stock-dependent`  | **partly**   | `03ef35a2…`: "Exchanges are subject to stock availability and quality inspection." (in-store). `94cd10c4…`: the online replacement ships after the return is approved. **Missing:** anything about holding or reserving a size; the only "hold" hits are customs and unrelated terms. A correct reply says no hold is offered and cites those two |
+| `shipping-thursday-arrival` | **partly**   | `d75cff7c…`: "processed within 1-10 business days", none shipped or delivered on weekends or holidays; delivery 1 to 7 business days within KSA. **Missing:** a date, which days count as the weekend, and the destination. The case is right that the agent must not compute one; it can still give the ranges                                   |
 
-That is a usefulness failure, not a safety one. Nothing leaks and nothing is
-invented; the agent sometimes gives up on work it could do.
+**`returns-refund-timing`'s case note is wrong.** It says the corpus has "no
+bank-settlement figure". It has one: up to 15 business days. Not changed here;
+it is an adjudication candidate, and the case currently scores a grounded answer
+as a failure either way it goes.
 
-It is carried into Phase 5 rather than fixed now, for a reason worth stating:
-**there is currently no principled basis for preferring one behaviour over the
-other.** Both are defensible. A merchant-validated question set is what
-supplies the preference, and until it exists, "fix" would mean picking the
-answer the author likes — which is how three absence expectations came to be
-wrong in the first place.
+**Would retrieval have found them?** Only the lexical arm could be run offline
+(the vector arm and the reranker each need a model call), so this is half of
+the pipeline. With the customer's words verbatim as the query, which is what
+the tool description asks for, the lexical arm returns **nothing** for three of
+the four, and for the Thursday question only an unrelated chunk (`809f6f5e…`,
+working hours). `websearch_to_tsquery` requires every term, so a full sentence
+rarely matches. With short keyword rewrites (my guesses, not queries the agent
+issued, because it issued none): `d75cff7c…` ranks first for "cancel order
+without notice" and for "processing time business days weekends"; `03ef35a2…`
+ranks first for "exchange stock availability"; **`14bb2416…` never appears**
+for "refund timing" or "refund processing time", since the chunk says
+"Refunds" and "business days" but not "timing" or "processing". Whether any of
+them lands in the default top 4 depends on the vector arm and the reranker, and
+that is not known.
+
+### Who chose the hand-over?
+
+Of the 17 answer-expected cases that did not end in an answer on 2026-10-11:
+
+- **13 chosen by the model.** Each called `escalate_to_human` itself. The loop
+  discards the gate's verdict when the model has handed over, so the gate
+  cannot have forced any of them. The thirteen are the table above plus
+  `returns-refund-method`, `returns-quality-check`, `returns-partial-order`,
+  `shipping-customs-delay`, `shipping-track-how`, `sizing-no-chart-for-product`,
+  `care-material`, `order-status-partial-refund` and `stock-restock-promise`.
+  Four of those never looked first; nine did.
+- **4 forced by the gate** (status `suppressed`, not among the thirteen):
+  `returns-who-pays-pickup` (a correct URL missing its `#fragment`, a literal
+  miss, described below) and three citation-gate suppressions,
+  `shipping-lost-parcel`, `sizing-tee-chest` and `sizing-between-sizes`. For the
+  first two of those three, rebuilding the gate's input from the cited chunks
+  shows it flagging a sentence that offers help rather than states a fact ("let me
+  know and I can check the exact sizing"; a request for the order number) because
+  it mentions shipping or sizing without a citation. The third shows a
+  source mismatch, but only one of its two cited chunks could be rebuilt, so that
+  reading is weaker. None of this has been changed.
+
+**What is still not known:** why the model chose to hand over (prompt, tool
+descriptions or model), and what the full pipeline retrieves for these four
+questions.
 
 ## A correct URL the gate withheld
 
