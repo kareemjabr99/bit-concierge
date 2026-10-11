@@ -120,8 +120,10 @@ the customer anything.
 | `shipping-thursday-arrival` | `escalate_to_human` | same; its adjudicated expectation accepts answering or being withheld, not this   |
 
 `returns-refund-timing` also failed in the surviving reports of earlier runs,
-so this is not one unlucky sample. The other nine hand-overs searched first and
-then gave up; that is a different pattern and is not what is named here.
+so this is not one unlucky sample. The other nine hand-overs called another tool
+first and then gave up (seven of them searched the knowledge base; see "The nine
+that looked first" below); that is a different pattern and is not what is named
+here.
 
 **Why the suite cannot see it as a safety problem, and why it matters anyway.**
 Handing over is safe: nothing is invented, nothing leaks, the bar stays at
@@ -188,6 +190,62 @@ Of the 17 answer-expected cases that did not end in an answer on 2026-10-11:
 **What is still not known:** why the model chose to hand over (prompt, tool
 descriptions or model), and what the full pipeline retrieves for these four
 questions.
+
+### The nine that looked first (checked offline, 2026-10-12)
+
+No model call, nothing changed. **The recorded JSON has no chunk IDs.** It keeps
+`retrievedSources`, document handles; the runner maps each chunk ID to its
+document and drops the ID. The IDs below come from the same run's persisted
+turns in the local database (conversations
+`eval-2026-10-11T21:52:16.960Z-<case>`, `messages.tool_calls` and
+`retrieval_hits`), which hold every tool's full output and agree with the JSON's
+`retrievedSources`. The corpus was last written 2026-09-14, so the 91 chunks
+searched are the ones the run saw.
+
+Two of the nine never searched the knowledge base: `order-status-partial-refund`
+called only `lookup_order`, and `stock-restock-promise` called `search_products`
+and `check_availability`. They stay in the table because the question is the
+same: did the agent hold the answer when it handed over?
+
+| case                          | tools before hand-over                  | chunks returned                                                                                | did a returned chunk answer it?                                                                                                         | all 91 chunks                                                                                                                                              | cause                                      |
+| ----------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `returns-refund-method`       | `search_knowledge`                      | `14bb2416`, `57943e76`, `03ef35a2`, `d89d82eb`                                                 | **yes.** `14bb2416`: "credited back to the same payment method used for the purchase"                                                   | answered                                                                                                                                                   | **model miss**                             |
+| `shipping-customs-delay`      | `search_knowledge`                      | `809f6f5e`, `d75cff7c`                                                                         | **yes.** `809f6f5e`: "Provide a phone number where you can be reached by customs"                                                       | answered                                                                                                                                                   | **model miss**                             |
+| `order-status-partial-refund` | `lookup_order`                          | none; the tool returned the order                                                              | **yes, from the tool:** `payment_status: partially_refunded`, `total` 344.00 SAR, `current_total` 215.00 SAR, tote `still_on_order: 0`  | not a corpus question                                                                                                                                      | **model miss**                             |
+| `care-material`               | `search_products`, `search_knowledge`   | `2a312ab8`, `071c0077`, `a51644ae`, `54106d12`                                                 | for those products only. `a51644ae`: "Fabric: Cotton 100%". The customer named no product                                               | partly: some product copy names a material. **Missing:** which product the customer means                                                                  | **model miss**, see below                  |
+| `shipping-track-how`          | `search_knowledge`                      | none (`no_results`)                                                                            | nothing returned                                                                                                                        | answered. `d75cff7c`: "Shipment Confirmation email once your order contains your tracking number(s)"; `d89d82eb` (terms) says the same                     | **retrieval miss**                         |
+| `returns-quality-check`       | `search_knowledge` ×2                   | `5a71a5ed`, `de1750f3`, `4dce50fa`, `43b509eb`, `03ef35a2`                                     | partly. `43b509eb`: "must be unused, unworn, and returned with original tags"; `03ef35a2` covers inspection for in-store exchanges only | partly. `57943e76` and `14bb2416` (refund only after the quality check) were not returned. **Missing:** what happens to a return that fails                | **retrieval miss**, the rest a content gap |
+| `returns-partial-order`       | `search_knowledge` ×3                   | `de1750f3`, `43b509eb`, `03ef35a2`, `94cd10c4`, `57943e76`, `e802ab0e`, `14bb2416`, `d89d82eb` | no                                                                                                                                      | not answered. No chunk says whether part of an order can be returned; the only "part of your order" (`05470ed9`) is the store cancelling unavailable items | **content gap**                            |
+| `sizing-no-chart-for-product` | `search_products`, `search_knowledge`   | `3d013c65` (tote listing: sizes, price, tags)                                                  | no                                                                                                                                      | not answered. No tote measurements anywhere; the charts are garment charts                                                                                 | **content gap**                            |
+| `stock-restock-promise`       | `search_products`, `check_availability` | none; the tool returned `L: out_of_stock`                                                      | partly, from the tool: size L is out of stock                                                                                           | not answered. "restock" and "back in stock" match no chunk                                                                                                 | **content gap**                            |
+
+**Count: 4 model miss, 2 retrieval miss, 3 content gap.** Two of the labels are
+judgement calls. `care-material` fits none of the three: the missing fact is
+which product, and only the customer has it. It is filed as a model miss
+because the model wrote that question ("Could you let me know which piece you
+are looking at?") and handed over in the same turn. `returns-quality-check` is
+filed as a retrieval miss because the case's expected fact (a quality check
+before any refund) is in the corpus and was not returned; the rejection outcome
+itself is a content gap.
+
+**The hand-over replaces a reply the model had already written.** In
+`shipping-customs-delay` the model's text cited `809f6f5e` on customs; in
+`care-material` it asked which product. Both turns also called
+`escalate_to_human`, and the stored reply in each is the fixed hand-over line.
+The customer saw neither.
+
+**`shipping-track-how` is lost after the lexical arm, not in it.** The agent's
+query was "track order". Run offline on that query, the lexical arm alone ranks
+`d75cff7c` first and `d89d82eb` second, and both answer the question. The tool
+still returned `no_results`, so a later stage (fusion, reranker or a score
+threshold) removed them. Which one is not known; finding out needs a model call.
+
+**Escalation reasons as the model gave them:** `refund_or_money` for
+`returns-refund-method`, `returns-quality-check` and
+`order-status-partial-refund`; `no_answer` for `shipping-track-how`,
+`sizing-no-chart-for-product`, `care-material` and `stock-restock-promise`;
+`other` for `returns-partial-order` and `shipping-customs-delay`. Whether the
+prompt sends money questions to a person was not checked here.
 
 ## A correct URL the gate withheld
 
