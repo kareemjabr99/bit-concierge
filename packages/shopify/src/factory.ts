@@ -1,15 +1,14 @@
 import { ConfigError } from '@bitc/core';
-import {
-  AccessTokenCache,
-  AdminTransport,
-  MockShopifyClient,
-  ShopifyAdminClient,
-  type ShopifyReadClient,
-} from '@bitc/shopify';
+import { MockShopifyClient } from './mock/client.ts';
+import { AccessTokenCache } from './admin/auth.ts';
+import { AdminTransport } from './admin/transport.ts';
+import { ShopifyAdminClient } from './admin/client.ts';
+import type { ShopifyReadClient } from './types.ts';
 
 /**
  * Which store a conversation talks to — decided once, at the edge, from the
- * environment it is handed.
+ * environment it is handed. Shared by every entry point (the CLI, the eval
+ * runner) so none of them can choose differently.
  *
  * Credentials are arguments in `packages/shopify/src` and never `process.env`
  * reads, so the read happens here and the package stays ignorant of where

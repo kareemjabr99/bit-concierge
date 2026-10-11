@@ -7,3 +7,4 @@ export * from './admin/auth.ts';
 export * from './admin/map.ts';
 export { htmlToText } from './admin/html.ts';
 export { ShopifyAdminClient } from './admin/client.ts';
+export * from './factory.ts';

@@ -15,7 +15,7 @@ import {
   resolveReranker,
 } from '@bitc/models';
 import { PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
-import { MockShopifyClient } from '@bitc/shopify';
+import { createShopifyClient } from '@bitc/shopify';
 import {
   diffRuns,
   readBaseline,
@@ -78,6 +78,16 @@ const loadCases = (suite: string): EvalCase[] => {
 
 const build = async () => {
   const models = readEnv('models');
+  // Which store answers is the factory's decision, as everywhere else. `--store
+  // mock` hands it an empty environment so a run on the golden set's own mirror
+  // does not depend on what .env.local happens to hold. A bad configuration
+  // throws here, before any model request is spent.
+  const storeArg = arg('store', 'env');
+  if (storeArg !== 'env' && storeArg !== 'mock') {
+    throw new Error(`--store must be "env" or "mock", got "${storeArg}"`);
+  }
+  const store = await createShopifyClient(storeArg === 'mock' ? {} : process.env);
+  process.stderr.write(`store: ${store.label}\n`);
   const tenantId = await resolveTenantByWidgetKey(arg('tenant', 'pk_dev_1886'));
   if (!tenantId) throw new Error('No dev tenant. Run: pnpm db:seed');
   const config = await loadTenantConfig(asTenantId(tenantId));
@@ -119,13 +129,14 @@ const build = async () => {
   const reranker = rerankLog ? recordingReranker(cached, rerankLog, () => currentCase.id) : cached;
 
   return {
+    store,
     tenantId: asTenantId(tenantId),
     config,
     currentCase,
     embedder,
     deps: {
       chat,
-      shopify: new MockShopifyClient(),
+      shopify: store.client,
       knowledge: new PgKnowledgeSearcher(asTenantId(tenantId), embedder, reranker),
       gaps: new PgGapRecorder(asTenantId(tenantId)),
       // The partial-class experiment: admit the reranker's middle verdict, or
@@ -138,7 +149,7 @@ const build = async () => {
 };
 
 const execute = async () => {
-  const { tenantId, config, currentCase, embedder, deps } = await build();
+  const { store, tenantId, config, currentCase, embedder, deps } = await build();
   const only = arg('only')
     .split(',')
     .map((id) => id.trim())
@@ -171,6 +182,7 @@ const execute = async () => {
       ),
   });
   result.embeddingModel = config.embeddingModel;
+  result.store = store.label;
   result.reranker = config.reranker;
   process.stderr.write(
     `embedding cache: ${embedder.stats.hits} hits, ${embedder.stats.misses} misses\n`,

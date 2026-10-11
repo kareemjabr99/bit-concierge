@@ -142,7 +142,7 @@ same-organization credential source read from the environment. Not built yet.
 
 ## Preconditions for `apps/web` (decided 2026-10-12)
 
-- **Token refresh.** The factory (`apps/cli/src/shopify-client.ts`) mints one
+- **Token refresh.** The factory (`packages/shopify/src/factory.ts`) mints one
   24-hour access token at start and hands it to `AdminTransport` as a fixed
   string. That is correct for a CLI session and wrong for a server that stays
   up: on day two every lookup fails with an authentication error, which becomes
@@ -150,7 +150,7 @@ same-organization credential source read from the environment. Not built yet.
   factory, the transport must take a token _source_ (the `AccessTokenCache`
   already tracks expiry and exposes `invalidate`), renew before expiry, and on
   a rejected token invalidate and retry once. Needs a test with an injected
-  clock. Move the factory out of `apps/cli` at the same time.
+  clock.
 - **The status-link rules** in [ADR 0012](adr/0012-order-status-link.md) apply to
   every entry point; `apps/web` stores transcripts and is where the
   "database is not contained" caveat bites.

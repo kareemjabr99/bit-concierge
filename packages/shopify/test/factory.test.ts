@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MockShopifyClient, ShopifyAdminClient } from '@bitc/shopify';
-import { createShopifyClient } from '../src/shopify-client.ts';
+import { MockShopifyClient, ShopifyAdminClient, createShopifyClient } from '../src/index.ts';
 
 /**
  * The mock must never stand in for the real store unless nothing was asked

@@ -238,6 +238,8 @@ export interface RunResult {
   chatModel: string;
   embeddingModel: string;
   reranker: string;
+  /** Which store answered order and stock questions — the factory's label. */
+  store?: string;
   startedAt: string;
   metrics: RunMetrics;
   outcomes: CaseOutcome[];
