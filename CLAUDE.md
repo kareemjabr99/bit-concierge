@@ -16,18 +16,24 @@ says where the project stands, what is blocked and what to do next. Read
 
 ## Where it stands — keep this section current
 
-- Phases 0–3 closed. **Phase 4 (real Shopify) in progress**: the read client
-  works against the development store and is **not wired into a conversation**.
-  Nothing is deployed. No real merchant data has ever been touched.
-- **Blocked:** the seed app `bitc-seed` is not installed on the dev store
-  (`app_not_installed`); until it is, the re-seed waits, and `compare:store`
-  exits 1 on three product descriptions.
-- **Next:** HANDOVER.md section 8. Step 3 (re-seed, scenarios 7 and 8, four
-  golden cases) waits on the seed app. **Step 5 does not** — wiring the real
-  client into a conversation, starting from how `compare-store.ts` builds it —
-  and nor do webhooks or escalation email.
-- **Needs from the owner:** `.env.local` (values never come through chat), the
-  seed app installed, and the decisions in HANDOVER.md section 7.
+- Phases 0–3 closed. **Phase 4 (real Shopify) in progress**: the dev store is
+  seeded with 8 order scenarios (2026-10-11), and `apps/cli` builds the real
+  `ShopifyAdminClient` when the three runtime variables are set (mock only when
+  none are; half-set or a refused grant throws). Different-email and guest
+  cases verified through the CLI against the real store. `apps/web` and the
+  eval runner still construct the mock. Nothing is deployed.
+- **Open:** `compare:store` exits 1 on three product descriptions, and a
+  re-seed cannot fix it — the store's `descriptionHtml` has the line breaks but
+  Shopify's `description` field collapses whitespace. Needs an owner decision
+  (read `descriptionHtml` in the client, or flatten the mock). `bitc-seed`
+  stays installed until `compare:store` exits 0.
+- **Next:** HANDOVER.md section 8: the eval re-baseline (step 4, which also
+  exercises the four new golden cases — they have not met the model yet), then
+  `apps/web` and the eval runner onto the factory (note: the factory mints one
+  24-hour token at start; a long-running server needs refresh), webhooks,
+  escalation email.
+- **Needs from the owner:** the description decision above, and the decisions
+  in HANDOVER.md section 7.
 - Every eval number predates Phase 4. The next run re-baselines; commit its
   output to `packages/evals/history/`.
 
