@@ -9,12 +9,10 @@ tool call, not a retrieval.** Order, price and stock facts come from live
 Shopify calls. Policies, sizing and care come from retrieval. The two never
 cross, and a deterministic gate checks that before any reply is sent.
 
-> Status: **Phase 2 at the gate.** Retrieval is real — 37 documents and 121
-> chunks indexed from 1886riyadh.com's public pages, hybrid search over
-> pgvector with an LLM reranker — and an eval harness runs a 103-case
-> provisional golden set: 75.7% accuracy, zero fabricated literals. No Shopify
-> connection yet, English only, and the golden set is drafted rather than
-> client-validated, so it does not measure the ship bar.
+> Status: **Phase 4 in progress** — a real Shopify read client against a
+> development store, not yet wired into a conversation. Nothing has been
+> deployed and no real merchant data has been touched. For exactly where it
+> stands and how to pick it up, read **[HANDOVER.md](HANDOVER.md)**.
 
 ---
 
@@ -177,6 +175,9 @@ anything in `packages/db`, `packages/rag` or `packages/agent`.
 | [0006](docs/adr/0006-model-abstraction.md) | Provider registry, and evals bound to a model                |
 | [0007](docs/adr/0007-retention.md)         | Retention, anonymisation, hard deletion                      |
 | [0008](docs/adr/0008-limits.md)            | Token caps, rate limits, escalation digests                  |
+| [0009](docs/adr/0009-supply-chain.md)      | Supply-chain policy                                          |
+| [0010](docs/adr/0010-no-streaming.md)      | Why replies do not stream                                    |
+| [0011](docs/adr/0011-the-bar.md)           | The ship bar as a property, not a percentage                 |
 
 ---
 
