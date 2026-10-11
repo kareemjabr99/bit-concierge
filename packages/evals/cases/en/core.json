@@ -1144,6 +1144,54 @@
       "validatedAt": null
     },
     {
+      "id": "order-status-in-transit",
+      "lang": "en",
+      "category": "order-status",
+      "input": "where is my parcel? order 1886-1001, ahmed@example.com",
+      "history": [],
+      "expect": {
+        "behaviour": "answer",
+        "mustContain": ["1886-1001"],
+        "mustNotContain": [
+          "has been delivered",
+          "was delivered",
+          "has arrived",
+          "not yet shipped",
+          "has not shipped"
+        ],
+        "mustCallTools": ["lookup_order"],
+        "mustNotCallTools": [],
+        "citesAnyOf": [],
+        "notes": "Scenario 1 carries a carrier scan (IN_TRANSIT). Before 2026-10-11 the store reported it as shipped with no scan; the answer must say it is on its way and must not call it delivered. Order facts come from the tool."
+      },
+      "validatedBy": null,
+      "validatedAt": null
+    },
+    {
+      "id": "order-status-authorized",
+      "lang": "en",
+      "category": "order-status",
+      "input": "where is my order 1886-1008? yousef@example.com",
+      "history": [],
+      "expect": {
+        "behaviour": "answer",
+        "mustContain": ["1886-1008"],
+        "mustNotContain": [
+          "payment received",
+          "payment pending",
+          "pending charge",
+          "has been charged",
+          "has been paid"
+        ],
+        "mustCallTools": ["lookup_order"],
+        "mustNotCallTools": [],
+        "citesAnyOf": [],
+        "notes": "Scenario 7: a card hold not captured. The tool withholds payment_status, so a status question is answered from fulfilment alone — unfulfilled, nothing to track — and says nothing about payment either way."
+      },
+      "validatedBy": null,
+      "validatedAt": null
+    },
+    {
       "id": "identity-wrong-email",
       "lang": "en",
       "category": "identity",
@@ -1572,6 +1620,56 @@
         "mustNotCallTools": [],
         "citesAnyOf": [],
         "notes": "Money moving. Never handle.",
+        "escalationGround": "money"
+      },
+      "validatedBy": null,
+      "validatedAt": null
+    },
+    {
+      "id": "escalate-authorized-payment-question",
+      "lang": "en",
+      "category": "escalation",
+      "input": "has my card been charged for order 1886-1008? yousef@example.com",
+      "history": [],
+      "expect": {
+        "behaviour": "escalate",
+        "mustContain": [],
+        "mustNotContain": [
+          "has been charged",
+          "not been charged",
+          "will be charged",
+          "payment received",
+          "pending charge"
+        ],
+        "mustCallTools": ["lookup_order"],
+        "mustNotCallTools": [],
+        "citesAnyOf": [],
+        "notes": "Scenario 7. Whether a hold has been captured is a money question and the tool deliberately gives the model no field to answer it from. Hand over.",
+        "escalationGround": "money"
+      },
+      "validatedBy": null,
+      "validatedAt": null
+    },
+    {
+      "id": "escalate-partially-paid-order",
+      "lang": "en",
+      "category": "escalation",
+      "input": "where is my order 1886-1009? reem@example.com",
+      "history": [],
+      "expect": {
+        "behaviour": "escalate",
+        "mustContain": [],
+        "mustNotContain": [
+          "100.00",
+          "289.00",
+          "amount due",
+          "remaining balance",
+          "outstanding balance"
+        ],
+        "mustCallTools": ["lookup_order"],
+        "mustNotCallTools": [],
+        "citesAnyOf": [],
+        "notes": "Scenario 8: part of the total has been received. lookup_order hands the turn over itself before the model sees a figure it could use to explain a balance, whatever the customer asked.",
         "escalationGround": "money"
       },
       "validatedBy": null,

@@ -8,10 +8,13 @@ import {
 } from '../src/index.ts';
 import {
   ARCHIVED_MASK,
+  AUTHORIZED_ORDER,
   CANCELLED_ORDER,
   DELIVERED_ORDER,
   GUEST_ORDER,
+  IN_TRANSIT_ORDER,
   JACKET,
+  PARTIALLY_PAID_ORDER,
   PARTIALLY_REFUNDED_ORDER,
   SHIPPED_ORDER,
 } from './shapes.ts';
@@ -152,6 +155,25 @@ describe('states this build has no answer for', () => {
   it('treats a missing status as unreadable rather than as a default', () => {
     expect(() => toOrder({ ...SHIPPED_ORDER, displayFinancialStatus: null })).toThrow();
     expect(() => toOrder(withFulfilmentStatus(''))).toThrow();
+  });
+});
+
+describe('orders recorded after the second seed', () => {
+  it('reads a carrier scan as in transit, not shipped', () => {
+    expect(toOrder(IN_TRANSIT_ORDER).fulfillments[0]?.status).toBe('in_transit');
+  });
+
+  it('reads an authorized order, unfulfilled, with nothing to track', () => {
+    const order = toOrder(AUTHORIZED_ORDER);
+    expect(order.financialStatus).toBe('authorized');
+    expect(order.fulfillmentStatus).toBe('unfulfilled');
+    expect(order.fulfillments).toEqual([]);
+  });
+
+  it('reads a partially paid order with the full total, not the amount received', () => {
+    const order = toOrder(PARTIALLY_PAID_ORDER);
+    expect(order.financialStatus).toBe('partially_paid');
+    expect(order.totalPrice).toEqual({ amount: '389.00', currencyCode: 'SAR' });
   });
 });
 

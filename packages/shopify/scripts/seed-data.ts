@@ -194,6 +194,8 @@ export const CUSTOMERS = [
   { email: 'layla@example.com', firstName: 'Layla', lastName: 'Example', city: 'Dammam' },
   { email: 'omar@example.com', firstName: 'Omar', lastName: 'Example', city: 'Riyadh' },
   { email: 'nora@example.com', firstName: 'Nora', lastName: 'Example', city: 'Riyadh' },
+  { email: 'yousef@example.com', firstName: 'Yousef', lastName: 'Example', city: 'Riyadh' },
+  { email: 'reem@example.com', firstName: 'Reem', lastName: 'Example', city: 'Jeddah' },
 ] as const;
 
 export interface SeedOrder {
@@ -245,7 +247,7 @@ export const ORDERS: SeedOrder[] = [
       trackingNumber: 'SMSA1886204100',
       company: 'SMSA Express',
       url: 'https://track.example/SMSA1886204100',
-      carrierStatus: null,
+      carrierStatus: 'IN_TRANSIT',
     },
     cancel: false,
     refundSku: null,
@@ -333,6 +335,32 @@ export const ORDERS: SeedOrder[] = [
     refundSku: null,
     payment: { status: 'PAID' },
   },
+  {
+    key: 'order-7-authorized',
+    // Unfulfilled on purpose: fulfilling an authorized order may make Shopify
+    // capture it, which would quietly turn this scenario into scenario 1.
+    scenario: '7. Authorized, card hold not captured',
+    customerEmail: 'yousef@example.com',
+    orderEmail: 'yousef@example.com',
+    city: 'Riyadh',
+    lines: [{ sku: 'TFMC-BLUE-L', quantity: 1 }],
+    fulfil: null,
+    cancel: false,
+    refundSku: null,
+    payment: { status: 'AUTHORIZED' },
+  },
+  {
+    key: 'order-8-partially-paid',
+    scenario: '8. Partially paid, money still owed',
+    customerEmail: 'reem@example.com',
+    orderEmail: 'reem@example.com',
+    city: 'Jeddah',
+    lines: [{ sku: 'JP-ECRU-S', quantity: 1 }],
+    fulfil: null,
+    cancel: false,
+    refundSku: null,
+    payment: { status: 'PARTIALLY_PAID', amount: '100.00' },
+  },
 ];
 
 /** The description as the store holds it: the copy, plus the chart if there is one. */
@@ -344,7 +372,7 @@ export const describeProduct = (p: SeedProduct): string => {
 
 /**
  * The order numbers the store actually assigned, read back from it on
- * 2026-09-21.
+ * 2026-09-21 (scenarios 1-6) and 2026-10-11 (7 and 8).
  *
  * Shopify assigns these sequentially and `name` is read-only through the Admin
  * API, so they are discovered, never chosen. The gap is real: #1886-1005 was
@@ -363,4 +391,6 @@ export const ASSIGNED_ORDER_NUMBERS: Record<string, string> = {
   'order-4-different-email': '#1886-1004',
   'order-5-partial-refund': '#1886-1007',
   'order-6-guest': '#1886-1006',
+  'order-7-authorized': '#1886-1008',
+  'order-8-partially-paid': '#1886-1009',
 };

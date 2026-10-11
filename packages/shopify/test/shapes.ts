@@ -3,7 +3,7 @@ import type { OrderNode, ProductNode } from '../src/index.ts';
 /**
  * Admin GraphQL responses, exactly as the development store returned them.
  *
- * SOURCE: bit-concierge-dev-blb8x6ix.myshopify.com Admin GraphQL 2026-07 (checked 2026-09-21)
+ * SOURCE: bit-concierge-dev-blb8x6ix.myshopify.com Admin GraphQL 2026-07 (checked 2026-09-21; IN_TRANSIT, authorized and partially paid orders added 2026-10-11)
  *
  * Recorded rather than written, because three of the assumptions in the first
  * draft of the mapper were wrong and all three were wrong in the same
@@ -391,4 +391,145 @@ export const ARCHIVED_MASK: ProductNode = {
       },
     ],
   },
+};
+
+/** Scenario 1 after the carrier event: IN_TRANSIT, as the store reported it on 2026-10-11. */
+export const IN_TRANSIT_ORDER: OrderNode = {
+  id: 'gid://shopify/Order/7634244206814',
+  name: '#1886-1001',
+  email: 'ahmed@example.com',
+  createdAt: '2026-09-21T09:03:24Z',
+  cancelledAt: null,
+  displayFinancialStatus: 'PAID',
+  displayFulfillmentStatus: 'FULFILLED',
+  statusPageUrl: 'https://dev-store.example/orders/status/REDACTED',
+  customer: {
+    email: 'ahmed@example.com',
+  },
+  totalPriceSet: {
+    shopMoney: {
+      amount: '189.0',
+      currencyCode: 'SAR',
+    },
+  },
+  currentTotalPriceSet: {
+    shopMoney: {
+      amount: '189.0',
+      currencyCode: 'SAR',
+    },
+  },
+  shippingAddress: {
+    city: 'Riyadh',
+    countryCodeV2: 'SA',
+  },
+  lineItems: {
+    nodes: [
+      {
+        title: 'Riyadh Oversized Tee',
+        variantTitle: 'M',
+        sku: 'RT-SAND-M',
+        quantity: 1,
+        currentQuantity: 1,
+      },
+    ],
+  },
+  fulfillments: [
+    {
+      displayStatus: 'IN_TRANSIT',
+      updatedAt: '2026-10-11T21:31:13Z',
+      trackingInfo: [
+        {
+          company: 'SMSA Express',
+          number: 'SMSA1886204100',
+          url: 'https://track.example/SMSA1886204100',
+        },
+      ],
+    },
+  ],
+};
+
+/** A card hold nobody has captured. Unfulfilled; recorded 2026-10-11. */
+export const AUTHORIZED_ORDER: OrderNode = {
+  id: 'gid://shopify/Order/7710741561566',
+  name: '#1886-1008',
+  email: 'yousef@example.com',
+  createdAt: '2026-10-11T21:31:16Z',
+  cancelledAt: null,
+  displayFinancialStatus: 'AUTHORIZED',
+  displayFulfillmentStatus: 'UNFULFILLED',
+  statusPageUrl: 'https://dev-store.example/orders/status/REDACTED',
+  customer: {
+    email: 'yousef@example.com',
+  },
+  totalPriceSet: {
+    shopMoney: {
+      amount: '215.0',
+      currencyCode: 'SAR',
+    },
+  },
+  currentTotalPriceSet: {
+    shopMoney: {
+      amount: '215.0',
+      currencyCode: 'SAR',
+    },
+  },
+  shippingAddress: {
+    city: 'Riyadh',
+    countryCodeV2: 'SA',
+  },
+  lineItems: {
+    nodes: [
+      {
+        title: 'TFMC Logo Tee',
+        variantTitle: 'L',
+        sku: 'TFMC-BLUE-L',
+        quantity: 1,
+        currentQuantity: 1,
+      },
+    ],
+  },
+  fulfillments: [],
+};
+
+/** A sale for less than the total: money is still owed. Unfulfilled; recorded 2026-10-11. */
+export const PARTIALLY_PAID_ORDER: OrderNode = {
+  id: 'gid://shopify/Order/7710741594334',
+  name: '#1886-1009',
+  email: 'reem@example.com',
+  createdAt: '2026-10-11T21:31:17Z',
+  cancelledAt: null,
+  displayFinancialStatus: 'PARTIALLY_PAID',
+  displayFulfillmentStatus: 'UNFULFILLED',
+  statusPageUrl: 'https://dev-store.example/orders/status/REDACTED',
+  customer: {
+    email: 'reem@example.com',
+  },
+  totalPriceSet: {
+    shopMoney: {
+      amount: '389.0',
+      currencyCode: 'SAR',
+    },
+  },
+  currentTotalPriceSet: {
+    shopMoney: {
+      amount: '389.0',
+      currencyCode: 'SAR',
+    },
+  },
+  shippingAddress: {
+    city: 'Jeddah',
+    countryCodeV2: 'SA',
+  },
+  lineItems: {
+    nodes: [
+      {
+        title: 'Japanese Pants',
+        variantTitle: 'S',
+        sku: 'JP-ECRU-S',
+        quantity: 1,
+        currentQuantity: 1,
+      },
+    ],
+  },
+  fulfillments: [],
 };

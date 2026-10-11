@@ -337,7 +337,7 @@ export const orders: Order[] = [
     cancelledAt: null,
     fulfillments: [
       {
-        status: 'shipped',
+        status: 'in_transit',
         trackingCompany: 'SMSA Express',
         trackingNumber: 'SMSA1886204100',
         trackingUrl: 'https://track.example/SMSA1886204100',
@@ -527,5 +527,59 @@ export const orders: Order[] = [
     shippingCity: 'Riyadh',
     shippingCountryCode: 'SA',
     statusUrl: `${STORE}/orders/status/1007`,
+  },
+  {
+    // Scenario 7. Authorized: a card hold, not captured. Unfulfilled on
+    // purpose — fulfilling may make Shopify capture it. Mirrors #1886-1008.
+    id: 'gid://shopify/Order/1008',
+    name: '#1886-1008',
+    email: 'yousef@example.com',
+    customerEmail: 'yousef@example.com',
+    createdAt: '2026-10-11T21:31:16Z',
+    financialStatus: 'authorized',
+    fulfillmentStatus: 'unfulfilled',
+    cancelledAt: null,
+    fulfillments: [],
+    lineItems: [
+      {
+        title: 'TFMC Logo Tee',
+        variantTitle: 'L',
+        sku: 'TFMC-BLUE-L',
+        quantity: 1,
+        currentQuantity: 1,
+      },
+    ],
+    totalPrice: sar('215.00'),
+    currentTotalPrice: sar('215.00'),
+    shippingCity: 'Riyadh',
+    shippingCountryCode: 'SA',
+    statusUrl: `${STORE}/orders/status/1008`,
+  },
+  {
+    // Scenario 8. Partially paid: 100.00 of 389.00 received, the rest owed.
+    // Mirrors #1886-1009.
+    id: 'gid://shopify/Order/1009',
+    name: '#1886-1009',
+    email: 'reem@example.com',
+    customerEmail: 'reem@example.com',
+    createdAt: '2026-10-11T21:31:17Z',
+    financialStatus: 'partially_paid',
+    fulfillmentStatus: 'unfulfilled',
+    cancelledAt: null,
+    fulfillments: [],
+    lineItems: [
+      {
+        title: 'Japanese Pants',
+        variantTitle: 'S',
+        sku: 'JP-ECRU-S',
+        quantity: 1,
+        currentQuantity: 1,
+      },
+    ],
+    totalPrice: sar('389.00'),
+    currentTotalPrice: sar('389.00'),
+    shippingCity: 'Jeddah',
+    shippingCountryCode: 'SA',
+    statusUrl: `${STORE}/orders/status/1009`,
   },
 ];
