@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeEvalFile } from './safe-write.ts';
 import type { CaseOutcome, RunResult } from './types.ts';
 
 /**
@@ -64,7 +65,7 @@ export const toBaseline = (result: RunResult): BaselineFile => ({
 export const writeBaseline = (dir: string, result: RunResult): string => {
   mkdirSync(dir, { recursive: true });
   const path = join(dir, fileName(result.suite, result.chatModel));
-  writeFileSync(path, `${JSON.stringify(toBaseline(result), null, 2)}\n`);
+  writeEvalFile(path, `${JSON.stringify(toBaseline(result), null, 2)}\n`);
   return path;
 };
 

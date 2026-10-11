@@ -140,6 +140,21 @@ client credentials work at all. Per the owner's conditional decision on
 2026-09-24, the schema stays; client credentials become a development and
 same-organization credential source read from the environment. Not built yet.
 
+## Preconditions for `apps/web` (decided 2026-10-12)
+
+- **Token refresh.** The factory (`apps/cli/src/shopify-client.ts`) mints one
+  24-hour access token at start and hands it to `AdminTransport` as a fixed
+  string. That is correct for a CLI session and wrong for a server that stays
+  up: on day two every lookup fails with an authentication error, which becomes
+  a hand-over to a person for every order question. Before `apps/web` uses the
+  factory, the transport must take a token _source_ (the `AccessTokenCache`
+  already tracks expiry and exposes `invalidate`), renew before expiry, and on
+  a rejected token invalidate and retry once. Needs a test with an injected
+  clock. Move the factory out of `apps/cli` at the same time.
+- **The status-link rules** in [ADR 0012](adr/0012-order-status-link.md) apply to
+  every entry point; `apps/web` stores transcripts and is where the
+  "database is not contained" caveat bites.
+
 ## Carried to Phase 5, alongside the four unstable cases
 
 **Latency. p95 is 8–9 seconds and two cases in run 6 exceeded the 45-second

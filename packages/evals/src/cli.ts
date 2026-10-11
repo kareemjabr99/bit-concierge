@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { asTenantId, createLogger, readEnv } from '@bitc/core';
+import { asTenantId, createLogger, readEnv, stripStatusUrls } from '@bitc/core';
+import { writeEvalFile } from './safe-write.ts';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig } from '@bitc/agent';
 import type { AdmissionPolicy } from '@bitc/models';
@@ -181,14 +182,14 @@ try {
   if (command === 'run') {
     const { tenantId, result } = await execute();
     const markdown = reportRun(result);
-    console.log(markdown);
+    console.log(stripStatusUrls(markdown));
     const out = arg('out');
-    if (out) writeFileSync(out, `${markdown}\n`);
+    if (out) writeEvalFile(out, `${markdown}\n`);
     // The full outcomes, for analysis the report does not carry — which cases
     // retrieved nothing, what each cited, the raw model text behind a
     // suppression. The report is for reading; this is for asking questions of.
     const outJson = arg('out-json');
-    if (outJson) writeFileSync(outJson, `${JSON.stringify(result, null, 2)}\n`);
+    if (outJson) writeEvalFile(outJson, `${JSON.stringify(result, null, 2)}\n`);
     await persistRun(tenantId, result);
     if (has('baseline') && (result.incompleteCases ?? 0) > 0) {
       console.error(

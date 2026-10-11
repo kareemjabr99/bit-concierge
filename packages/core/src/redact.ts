@@ -7,6 +7,27 @@
  * customer's phone number in a log aggregator is a notifiable incident.
  */
 
+/**
+ * An order's status page, as Shopify emails it to the customer.
+ *
+ *   https://shop.myshopify.com/80752312542/orders/<hex>/authenticate?key=<hex>
+ *
+ * The URL is the credential: it opens the order — items, address, tracking —
+ * with no login. It is allowed to reach the customer who just verified the
+ * order, and nowhere else (docs/adr/0012). Matched by shape, anywhere in a
+ * string, whatever field carries it: the model can paste it into a summary the
+ * tool never labelled. Any host, because a custom domain serves the same path,
+ * and the mock's `/orders/status/<n>` form is covered so a fixture link cannot
+ * teach a log a different habit from a real one.
+ */
+export const STATUS_URL = /https?:\/\/[^\s<>()"'\]]*\/orders\/[^\s<>()"'\]]*/gi;
+
+export const STATUS_URL_PLACEHOLDER = '[status-link]';
+
+/** `text` with every order status URL replaced. The one place that does it. */
+export const stripStatusUrls = (text: string): string =>
+  text.replace(STATUS_URL, STATUS_URL_PLACEHOLDER);
+
 const EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/gu;
 
 // International and Gulf formats: +966 5X XXX XXXX, 05XXXXXXXX, +20 ..., etc.
@@ -42,6 +63,8 @@ const SENSITIVE_KEYS = new Set([
   'cookie',
   'ordernumber',
   'trackingnumber',
+  'statusurl',
+  'statuspageurl',
 ]);
 
 // Identifiers we trace by. A UUID group that happens to be all digits must
@@ -55,7 +78,7 @@ export const redactText = (value: string): string => {
     // Private-use characters: never in real text, and not control characters.
     return `\uE000${ids.length - 1}\uE001`;
   });
-  return shielded
+  return stripStatusUrls(shielded)
     .replace(EMAIL, '[email]')
     .replace(PHONE, '[phone]')
     .replace(LONG_DIGITS, '[number]')

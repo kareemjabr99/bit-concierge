@@ -16,7 +16,8 @@
  * otherwise from the outcomes: a case that admitted nothing is the only kind
  * whose behaviour a lower threshold can change.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { writeEvalFile } from '../src/safe-write.ts';
 
 const arg = (name: string, fallback = ''): string => {
   const i = process.argv.indexOf(`--${name}`);
@@ -105,7 +106,7 @@ if (outcomesPath && existsSync(outcomesPath)) {
     // The A/B population: every case that admitted nothing. A lower threshold
     // can only change these. Supersetting the 0.5 cases is deliberate — the
     // 0.0 cases are the control, and they must not move.
-    writeFileSync(
+    writeEvalFile(
       outJson,
       `${JSON.stringify(
         starved.map((o) => o.id),

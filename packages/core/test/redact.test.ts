@@ -92,3 +92,47 @@ describe('redaction', () => {
     expect(lines).toHaveLength(1);
   });
 });
+
+describe('order status links', () => {
+  // Shaped like the real one (an account id, an order hash, a key); invented.
+  const real =
+    'https://shop.myshopify.com/80752312542/orders/0123456789abcdef0123456789abcdef/authenticate?key=fedcba9876543210fedcba9876543210';
+  const mock = 'https://dev-store.example/orders/status/1001';
+
+  it('is a secret: the URL is the credential, so a log line never carries it', () => {
+    expect(redactText(`opened ${real} for the customer`)).toBe(
+      'opened [status-link] for the customer',
+    );
+    expect(redactText(mock)).toBe('[status-link]');
+    expect(redactText(`see (${real}).`)).toBe('see ([status-link]).');
+  });
+
+  it('is found in whatever field carries it, labelled or not', () => {
+    const out = redact({
+      status_page_url: real,
+      statusUrl: real,
+      summary: `customer asked; tool gave ${real}`,
+      nested: [{ note: real }],
+    }) as Record<string, unknown>;
+    expect(JSON.stringify(out)).not.toContain('0123456789abcdef');
+    expect(JSON.stringify(out)).not.toContain('fedcba98');
+    expect(out.status_page_url).toBe('[redacted]');
+  });
+
+  it('reaches the log line through the logger', () => {
+    const lines: string[] = [];
+    const log = createLogger({ level: 'info', write: (l) => lines.push(l) });
+    log.info(`withheld ${real}`, { literal: [{ kind: 'url', value: real }] });
+    expect(lines.join('\n')).not.toContain('authenticate');
+    expect(lines.join('\n')).not.toContain('key=');
+  });
+
+  it('leaves tracking and product links alone', () => {
+    expect(redactText('https://track.example/SMSA1886204100')).toBe(
+      'https://track.example/SMSA1886204100',
+    );
+    expect(redactText('https://1886riyadh.com/products/sadu-hoodie')).toBe(
+      'https://1886riyadh.com/products/sadu-hoodie',
+    );
+  });
+});
