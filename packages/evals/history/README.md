@@ -67,6 +67,14 @@ the first run after Phase 4, on commit `f9f35eb`, against the mock store
 model text. Prettier reformatted both files after the run; the JSON content is
 identical.
 
+The run file and `../baselines/` are **as scored on 2026-10-11**: 85 passed.
+Two adjudications dated 2026-10-12 (`order-status-in-transit`,
+`order-status-verified`: the requirement became the carrier's tracking number
+`SMSA1886204100`) change two verdicts. Re-scoring the recorded replies offline,
+with no model call, gives 87 of 108 (80.6% after adjudication; 71.3% as
+originally scored, unchanged); every other case's verdict is identical. That is
+a re-score of one run, not a second measurement.
+
 ## What was lost
 
 The runner writes one JSON file per run with every case's outcome, reply and

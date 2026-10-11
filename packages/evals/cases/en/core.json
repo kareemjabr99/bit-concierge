@@ -969,7 +969,7 @@
       "history": [],
       "expect": {
         "behaviour": "answer",
-        "mustContain": [],
+        "mustContain": ["SMSA1886204100"],
         "mustNotContain": [],
         "mustCallTools": ["lookup_order"],
         "mustNotCallTools": ["search_knowledge"],
@@ -1151,7 +1151,7 @@
       "history": [],
       "expect": {
         "behaviour": "answer",
-        "mustContain": [],
+        "mustContain": ["SMSA1886204100"],
         "mustNotContain": [
           "has been delivered",
           "was delivered",
