@@ -59,6 +59,14 @@ the time it was printed. Nothing in it has been edited.
   the database never recorded, so they are not numbered here rather than
   numbered from memory.
 
+## 2026-10-11 re-baseline
+
+[2026-10-11-run.md](2026-10-11-run.md) and [2026-10-11-run.json](2026-10-11-run.json):
+the first run after Phase 4, on commit `f9f35eb`, against the mock store
+(`--store mock`), 108 cases. The JSON holds every case's outcome, reply and raw
+model text. Prettier reformatted both files after the run; the JSON content is
+identical.
+
 ## What was lost
 
 The runner writes one JSON file per run with every case's outcome, reply and

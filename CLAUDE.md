@@ -27,11 +27,17 @@ says where the project stands, what is blocked and what to do next. Read
   Shopify's `description` field collapses whitespace. Needs an owner decision
   (read `descriptionHtml` in the client, or flatten the mock). `bitc-seed`
   stays installed until `compare:store` exits 0.
-- **Next:** HANDOVER.md section 8: the eval re-baseline (step 4, which also
-  exercises the four new golden cases — they have not met the model yet), then
-  `apps/web` and the eval runner onto the factory (note: the factory mints one
-  24-hour token at start; a long-running server needs refresh), webhooks,
-  escalation email.
+- **Re-baselined 2026-10-11** against the mock (`--store mock`): 108 cases,
+  85 pass; fabricated literals and uncited claims reaching a customer 0 and 0;
+  accuracy 71.3% as originally scored, 78.7% after adjudication. Files in
+  `packages/evals/history/2026-10-11-run.*`. Per-case outputs of the earlier
+  runs are lost, so there is no case-by-case diff against run 6. No `--baseline`
+  was recorded.
+- **Next:** `apps/web` onto the factory (it mints one 24-hour token at start; a
+  long-running server needs refresh first), the retention job (does not exist
+  yet — ADR 0007 says Phase 6; it must strip status links, ADR 0012), webhooks,
+  escalation email. The factory lives in `packages/shopify/src/factory.ts`; the
+  CLI and the eval runner both use it.
 - **Needs from the owner:** the description decision above, and the decisions
   in HANDOVER.md section 7.
 - Every eval number predates Phase 4. The next run re-baselines; commit its
