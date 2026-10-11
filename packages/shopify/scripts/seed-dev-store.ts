@@ -374,12 +374,11 @@ const applyInventory = async (
 /**
  * The description as HTML, for a store that will also render it as text.
  *
- * The newline after each `<br>` is load-bearing and was missing. Shopify's
- * `description` field is `descriptionHtml` with the tags removed and nothing
- * put in their place, so `sand.<br><br>Size chart` came back as
- * `sand.Size chart` — every API reader saw the size chart run into the copy
- * while the storefront looked fine. Found by comparing the store against the
- * fixtures rather than by looking at it.
+ * The store keeps this HTML as written, and the client reads it back through
+ * `htmlToText`, which turns `<br>` into a line break. (An earlier version of this
+ * comment said the newline after each `<br>` made Shopify's own `description`
+ * field keep the line breaks. It does not — that field collapses whitespace
+ * whatever the HTML says — which is why the client no longer reads it.)
  */
 const descriptionHtmlFor = (p: SeedProduct): string => describeProduct(p).replace(/\n/g, '<br>\n');
 

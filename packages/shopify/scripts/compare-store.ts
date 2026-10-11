@@ -181,11 +181,13 @@ const main = async (): Promise<void> => {
   /**
    * A difference that is only whitespace has one known cause, so it names it.
    *
-   * Shopify's `description` is `descriptionHtml` with the tags removed and
-   * nothing put in their place, so a `<br>` with no newline beside it closes
-   * the gap between two lines and runs them together. Worth saying out loud in
-   * the output: the two strings look identical at a glance and the diff is
-   * three missing characters in the middle of a paragraph.
+   * The client builds `description` from `descriptionHtml` (html.ts). If this
+   * fires, either the store's HTML lost its line breaks (re-seed), or the
+   * converter stopped keeping them. It once fired because the client read
+   * Shopify's own `description` field, which collapses whitespace whatever the
+   * HTML says; re-seeding could not fix that, and a note here claiming it
+   * could sat wrong for a day. The two strings look identical at a glance, so
+   * the output says so.
    */
   const whitespaceOnly = (d: Difference): boolean =>
     typeof d.mock === 'string' &&
@@ -198,10 +200,8 @@ const main = async (): Promise<void> => {
         `      mock  ${JSON.stringify(d.mock)}\n` +
         `      store ${JSON.stringify(d.store)}` +
         (whitespaceOnly(d)
-          ? `\n      ONLY WHITESPACE — the store's copy is missing line breaks. Shopify strips\n` +
-            `      HTML tags out of \`description\` without substituting anything, so a <br>\n` +
-            `      with no newline beside it joins two lines. Fixed in seed-dev-store.ts;\n` +
-            `      the store keeps the old copy until it is seeded again.`
+          ? `\n      ONLY WHITESPACE — line breaks differ. The client reads \`descriptionHtml\` and\n` +
+            `      converts it (src/admin/html.ts); check the store's HTML, then the converter.`
           : ''),
     );
 

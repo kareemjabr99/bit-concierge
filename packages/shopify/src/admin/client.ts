@@ -32,7 +32,7 @@ const ORDER_FIELDS = `
   }`;
 
 const PRODUCT_FIELDS = `
-  id handle title description productType status tags onlineStoreUrl
+  id handle title descriptionHtml productType status tags onlineStoreUrl
   priceRangeV2 {
     minVariantPrice { amount currencyCode }
     maxVariantPrice { amount currencyCode }

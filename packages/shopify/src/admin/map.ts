@@ -7,6 +7,7 @@ import type {
   Product,
   ProductVariant,
 } from '../types.ts';
+import { htmlToText } from './html.ts';
 
 /**
  * Admin GraphQL shapes into the domain, with nothing guessed.
@@ -227,7 +228,8 @@ export interface ProductNode {
   id: string;
   handle: string;
   title: string;
-  description: string;
+  /** The HTML. `description` is not requested: it loses table rows. See html.ts. */
+  descriptionHtml: string;
   productType: string;
   status: string;
   tags: string[];
@@ -272,7 +274,7 @@ export const toProduct = (node: ProductNode): Product => {
     id: node.id,
     handle: node.handle,
     title: node.title,
-    description: node.description,
+    description: htmlToText(node.descriptionHtml),
     productType: node.productType,
     tags: node.tags,
     // Null for anything not published to the Online Store channel. The agent
