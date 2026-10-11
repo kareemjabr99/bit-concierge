@@ -5,7 +5,7 @@ import { PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
 import { createLogger, readEnv } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { cachedEmbedder, resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
-import { MockShopifyClient } from '@bitc/shopify';
+import { createShopifyClient } from './shopify-client.ts';
 
 /**
  * Phase 1 conversation harness. Real model, synthetic store, fixture
@@ -61,9 +61,15 @@ const knowledge = useFixture
       embedder,
       resolveReranker(config.reranker, { model: chat.model }),
     );
+// Real store when the runtime variables are set, mock when none are, an error
+// for anything in between. See shopify-client.ts.
+const store = await createShopifyClient(process.env).catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});
 const deps = {
   chat,
-  shopify: new MockShopifyClient(),
+  shopify: store.client,
   knowledge,
   gaps: new PgGapRecorder(tenantId),
   logger,
@@ -76,6 +82,7 @@ console.log(
   bold(`${config.brandName} assistant`) +
     dim(`  ·  ${chat.spec.key}  ·  ${base.NODE_ENV}  ·  session ${externalId}`),
 );
+console.log(dim(`store: ${store.label}`));
 console.log(dim('commands: /new  /debug  /quit'));
 console.log();
 
