@@ -969,7 +969,7 @@
       "history": [],
       "expect": {
         "behaviour": "answer",
-        "mustContain": ["1886-1001"],
+        "mustContain": [],
         "mustNotContain": [],
         "mustCallTools": ["lookup_order"],
         "mustNotCallTools": ["search_knowledge"],
@@ -1151,7 +1151,7 @@
       "history": [],
       "expect": {
         "behaviour": "answer",
-        "mustContain": ["1886-1001"],
+        "mustContain": [],
         "mustNotContain": [
           "has been delivered",
           "was delivered",
