@@ -19,6 +19,7 @@
   "scripts": {
     "evals": "node --env-file-if-exists=../../.env.local src/cli.ts",
     "adjudicate": "node --env-file-if-exists=../../.env.local scripts/adjudicate.ts",
+    "rescore": "node --env-file-if-exists=../../.env.local scripts/rescore.ts",
     "distribution": "node --env-file-if-exists=../../.env.local scripts/rerank-distribution.ts",
     "middle": "node scripts/middle-class.ts",
     "corpus-diff": "node scripts/corpus-diff.ts",

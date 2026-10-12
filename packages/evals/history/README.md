@@ -75,6 +75,31 @@ with no model call, gives 87 of 108 (80.6% after adjudication; 71.3% as
 originally scored, unchanged); every other case's verdict is identical. That is
 a re-score of one run, not a second measurement.
 
+## 2026-10-12 re-scores of the 2026-10-11 run
+
+Offline, no model call: `pnpm --filter @bitc/evals run rescore -- --run
+packages/evals/history/2026-10-11-run.json [--cases-at <ref>]`. It takes the
+recorded model text and the tool outputs persisted in the database, puts them
+through the gate the loop calls (`gateReply`), and scores them with the runner's
+own `scoreTurn`. It needs the database the run wrote to.
+
+| File                                                                                       | Gate | Cases and adjudications     | Passed | As originally scored | After adjudication |
+| ------------------------------------------------------------------------------------------ | ---- | --------------------------- | ------ | -------------------- | ------------------ |
+| [2026-10-12-rescore-1-old-gate-run-cases.txt](2026-10-12-rescore-1-old-gate-run-cases.txt) | old  | as at `f9f35eb` (the run's) | 85     | 71.3%                | 78.7%              |
+| [2026-10-12-rescore-2-old-gate.txt](2026-10-12-rescore-2-old-gate.txt)                     | old  | `755254a`                   | 87     | 71.3%                | 80.6%              |
+| [2026-10-12-rescore-3-new-gate.txt](2026-10-12-rescore-3-new-gate.txt)                     | new  | `755254a`                   | 88     | 72.2%                | 81.5%              |
+
+The first is the check on the re-scorer: against the old gate and the run's own
+cases it reproduces every recorded field of all 108 outcomes. The second matches
+the 87 recorded above. The third is the fragment rule and the offer exemption
+(ADR 0005): one verdict changes, `returns-who-pays-pickup`, suppressed → answered,
+fail → pass; nothing goes from pass to fail. Of the four replies the run
+suppressed, that is the only one the new gate passes.
+
+These are re-scores of one set of replies, not measurements. A model told less
+often that its reply was withheld would not write differently here, because
+nothing here asks it to write.
+
 ## What was lost
 
 The runner writes one JSON file per run with every case's outcome, reply and

@@ -1,4 +1,5 @@
 import { normalizeForMatch } from './normalize.ts';
+import { urlGroundedBy } from './url-match.ts';
 
 /**
  * Half one of the hallucination bar — the literal check. Deterministic, no
@@ -144,7 +145,8 @@ export const checkGrounding = ({
   };
 
   for (const url of uniq((reply.match(URL) ?? []).map(trimUrl))) {
-    if (corpusUrls.has(url.toLowerCase())) matched += 1;
+    const cited = url.toLowerCase();
+    if ([...corpusUrls].some((returned) => urlGroundedBy(cited, returned))) matched += 1;
     else misses.push({ kind: 'url', value: url });
   }
   for (const ref of uniq(reply.match(ORDER_REF) ?? [])) require('order_number', ref);

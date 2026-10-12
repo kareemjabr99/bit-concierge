@@ -1,10 +1,11 @@
 import { normalizeForMatch } from './normalize.ts';
 import { conceptsIn, type Concept } from './concepts.ts';
+import { urlGroundedBy } from './url-match.ts';
 
 /**
  * Half one, part two of the hallucination bar — attribution.
  *
- * One rule, no exemptions:
+ * One rule:
  *
  *   A sentence that asserts something in a costly category must carry a
  *   citation, and the cited source must cover every category the sentence
@@ -14,11 +15,12 @@ import { conceptsIn, type Concept } from './concepts.ts';
  * concept check proves it came from somewhere *about that*. Citing the
  * shipping page for a returns claim resolves, and is still rejected.
  *
- * There are no sentence-level exemptions — not for questions, offers, quoted
- * tool values or embedded literals. An earlier version had five, and an
- * adversarial suite got fabricated policies past four of them by wrapping them
- * in something the gate trusted. See docs/adr/0005-grounding.md and
- * packages/agent/test/citations-adversarial.test.ts.
+ * Two narrow exemptions, both below: a decline or hand-off that grants
+ * nothing, and an offer of help that is word for word on a fixed list. None
+ * for questions in general, quoted tool values or embedded literals. An
+ * earlier version had five, and an adversarial suite got fabricated policies
+ * past four of them by wrapping them in something the gate trusted. See
+ * docs/adr/0005-grounding.md and packages/agent/test/citations-adversarial.test.ts.
  */
 
 export const CITATION_MARKER = /\[\[c:([A-Za-z0-9_:#.-]+)\]\]/g;
@@ -92,6 +94,61 @@ const DECLINE =
 const GRANT =
   /\b(?:you (?:can|may|are able to|are eligible|will be able|are entitled)|we (?:offer|provide|accept|allow|cover|will refund|will replace)|is eligible|are eligible|is accepted|are accepted|is free|are free|is included|are included)\b|تقدر|يمكنك|نوفر|نقبل|مجاني/iu;
 
+/**
+ * The second exemption: an offer of help, matched word for word.
+ *
+ * "Let me know if you have any other questions about returns." names a costly
+ * category and cites nothing, so the gate withheld it — a reply suppressed for
+ * its closing courtesy. It claims nothing a customer could act on.
+ *
+ * **A list of whole sentences, not a pattern and not a classifier.** The
+ * sentence, with markers removed, lowercased, whitespace collapsed and its
+ * closing punctuation dropped, must EQUAL an entry. Not start with one, not
+ * contain one: every exemption this gate ever had that matched part of a
+ * sentence was beaten by wrapping a claim around the part ("Returns are free —
+ * let me know if you have any other questions"). Extending the list is a code
+ * change with a test, which is the point.
+ *
+ * The entries without a topic assert no category, so the gate never flagged
+ * them; they are listed so the exemption says what an offer is, not only which
+ * offers happened to trip it.
+ */
+const OFFER_TOPICS = ['returns', 'exchanges', 'refunds', 'shipping', 'delivery', 'sizing'];
+export const OFFERS_OF_HELP: readonly string[] = [
+  'is there anything else i can help with',
+  'is there anything else i can help you with',
+  'can i help with anything else',
+  'can i help you with anything else',
+  'how else can i help',
+  'how else can i help you',
+  'let me know if there is anything else i can help with',
+  'let me know if there is anything else i can help you with',
+  'let me know if you have any other questions',
+  ...OFFER_TOPICS.map((topic) => `let me know if you have any other questions about ${topic}`),
+];
+
+/**
+ * A number, a date, a URL or a price. An offer carrying one is never exempt,
+ * whatever the list says — a guard against the list, should an entry ever be
+ * added that can carry a figure.
+ */
+const FIGURE =
+  /[\d٠-٩]|https?:\/\/|www\.|[$€£]|\b(?:sar|usd|aed|riyals?)\b|ريال|\b(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|tonight)\b/iu;
+
+const asOffer = (sentence: string): string =>
+  stripCitations(sentence)
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, ' ')
+    .replace(/[\s.!?؟]+$/u, '')
+    .trim();
+
+/** True only for a sentence that is, word for word, an offer on the list. */
+export const isOfferOfHelp = (
+  sentence: string,
+  offers: readonly string[] = OFFERS_OF_HELP,
+): boolean => !FIGURE.test(stripCitations(sentence)) && offers.includes(asOffer(sentence));
+
 const DURATION_IN =
   /(?:\d+\s*[–—-]\s*\d+|\b\d+)\s*(?:business\s|working\s)?(?:days?|hours?|weeks?)|\b\d+[–—-]day\b/giu;
 
@@ -143,16 +200,16 @@ export const checkCitations = ({
     byUrl.set(key, [...(byUrl.get(key) ?? []), source.id]);
   }
 
-  /** A link to a source's own page attributes the sentence, exactly as a marker does. */
+  /**
+   * A link to a source's own page attributes the sentence, exactly as a marker
+   * does. Which links count is url-match.ts: the bare page of a returned
+   * section, or the returned section itself — never a section nobody returned.
+   */
   const linkedIds = (sentence: string): string[] =>
     (sentence.match(URL_IN_TEXT) ?? [])
       .map(trimUrl)
       .flatMap((found) =>
-        [...byUrl.entries()]
-          .filter(
-            ([url]) => found === url || found.startsWith(`${url}#`) || found.startsWith(`${url}?`),
-          )
-          .flatMap(([, ids]) => ids),
+        [...byUrl.entries()].filter(([url]) => urlGroundedBy(found, url)).flatMap(([, ids]) => ids),
       );
 
   const misses: CitationMiss[] = [];
@@ -181,6 +238,7 @@ export const checkCitations = ({
     }
     if (asserted.size === 0 || unresolved) continue;
     if (ids.length === 0 && isDecline(sentence)) continue;
+    if (ids.length === 0 && isOfferOfHelp(sentence)) continue;
 
     if (ids.length === 0) {
       misses.push({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkCitations } from '../src/index.ts';
+import { OFFERS_OF_HELP, checkCitations, isOfferOfHelp } from '../src/index.ts';
 
 /**
  * Adversarial suite for the citation gate.
@@ -150,6 +150,89 @@ describe('citation gate under attack', () => {
       ]) {
         expect(attack(reply).ok, reply).toBe(true);
       }
+    });
+  });
+
+  describe('the offer-of-help exemption', () => {
+    // The second exemption: whole sentences on a fixed list, nothing partial.
+    // Each attack below is an offer with a claim or a figure attached.
+    it('accepts an offer on the list that names a category', () => {
+      for (const reply of [
+        'Let me know if you have any other questions about returns.',
+        'let me know if you have any other questions about SIZING!',
+        'Let me know if you have any other questions about   shipping?',
+        'Let me know if you have any other questions\u00a0about delivery.',
+      ]) {
+        const v = attack(reply);
+        expect(v.ok, reply).toBe(true);
+      }
+    });
+
+    it('accepts the offers that name nothing, as it always did', () => {
+      for (const reply of ['Is there anything else I can help with?', 'How else can I help you?']) {
+        expect(attack(reply).ok, reply).toBe(true);
+      }
+    });
+
+    it('rejects a commitment phrased as an offer', () => {
+      expect(attack('I can refund you within 3 days.').ok).toBe(false);
+      expect(attack('We can ship it tomorrow.').ok).toBe(false);
+      expect(attack('I can refund you.').ok).toBe(false);
+      expect(attack('We can ship it to you free of charge.').ok).toBe(false);
+    });
+
+    it('rejects an offer carrying a number, a date, a URL or a price', () => {
+      for (const reply of [
+        'Let me know if you have any other questions about returns within 7 days.',
+        'Let me know if you have any other questions about returns, which take 14 days.',
+        'Let me know if you have any other questions about delivery before 14 October.',
+        'Let me know if you have any other questions about delivery, arriving tomorrow.',
+        'Let me know if you have any other questions about returns: https://dev-store.example/pages/free-returns',
+        'Let me know if you have any other questions about shipping, which is 25 SAR.',
+        'Let me know if you have any other questions about shipping at $10.',
+      ]) {
+        expect(attack(reply).ok, reply).toBe(false);
+      }
+    });
+
+    it('rejects a claim wrapped around an offer on the list', () => {
+      for (const reply of [
+        'Returns are free — let me know if you have any other questions about returns.',
+        'Let me know if you have any other questions about returns, which are always free.',
+        'Exchanges cost nothing, so let me know if you have any other questions about exchanges.',
+        'Is there anything else I can help with, since refunds are automatic?',
+      ]) {
+        expect(attack(reply).ok, reply).toBe(false);
+      }
+    });
+
+    it('holds the figure guard even against an entry that carries one', () => {
+      // The list cannot license a figure: if someone adds an entry that does,
+      // the guard still refuses it.
+      for (const bad of [
+        'let me know if you have any other questions about returns within 7 days',
+        'let me know if you have any other questions about delivery on 14 october',
+        'let me know if you have any other questions about delivery on monday',
+        'let me know if you have any other questions about delivery in october',
+        'let me know if you have any other questions about delivery, arriving tomorrow',
+        'let me know if you have any other questions about https://dev-store.example/x',
+        'let me know if you have any other questions about the sar fee',
+      ]) {
+        expect(isOfferOfHelp(`${bad}.`, [...OFFERS_OF_HELP, bad]), bad).toBe(false);
+      }
+      expect(isOfferOfHelp('Let me know if you have any other questions about returns.')).toBe(
+        true,
+      );
+    });
+
+    it('still withholds an offer that is not on the list — real transcript', () => {
+      // sizing-tee-chest, 2026-10-11. An offer, but one naming a product and
+      // promising to check it; the list is literal, and this is not on it.
+      const v = attack(
+        'If you are looking at a particular t-shirt, let me know and I can check the exact sizing for it.',
+      );
+      expect(v.ok).toBe(false);
+      expect(v.misses[0]?.reason).toBe('no_citation');
     });
   });
 

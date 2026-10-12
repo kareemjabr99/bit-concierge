@@ -4,8 +4,9 @@ import { estimateCostUsd, providerOptionsFor, type ChatModelHandle } from '@bitc
 import type { ShopifyReadClient } from '@bitc/shopify';
 import type { TenantRuntimeConfig, TurnContext, TurnRecorder } from './context.ts';
 import { escalate } from './escalation.ts';
-import { checkCitations, sourcesFromToolCalls, type CitationVerdict } from './guard/citations.ts';
-import { checkGrounding, type GroundingVerdict } from './guard/grounding.ts';
+import type { CitationVerdict } from './guard/citations.ts';
+import { gateReply } from './guard/gate.ts';
+import type { GroundingVerdict } from './guard/grounding.ts';
 import type { GapRecorder, KnowledgeSearcher } from './knowledge/types.ts';
 import { detectLanguage } from './lang/detect.ts';
 import {
@@ -360,16 +361,11 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
   }
 
   // Both halves of the deterministic gate. ADR 0005.
-  const literal = checkGrounding({
-    reply: text,
-    toolResults: recorder.toolCalls.map((t) => t.output),
-    toolsCalled: recorder.toolCalls.map((t) => t.name),
-    alwaysGrounded: [config.brandName],
-  });
-  const citations = checkCitations({
-    reply: text,
-    sources: sourcesFromToolCalls(recorder.toolCalls),
+  const { literal, citations } = gateReply({
+    text,
+    toolCalls: recorder.toolCalls,
     customerText: input.text,
+    brandName: config.brandName,
   });
   const grounding = { literal, citations };
 

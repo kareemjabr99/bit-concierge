@@ -1,0 +1,50 @@
+Re-score of packages/evals/history/2026-10-11-run.json
+  run started 2026-10-11T21:52:16.960Z, 108 cases
+  gate: working tree at 755254a (uncommitted changes)
+  cases and adjudications: working tree (108 cases, 12 adjudications)
+
+Per case, against the recorded run
+  returns-who-pays-pickup  FAIL → PASS
+    passed: false
+          → true
+    behaviour: "suppressed"
+             → "answer"
+    failures: ["expected to answer, got suppressed","1 fabricated literal(s)"]
+            → []
+    reply: "I want to make sure I give you the right answer on this, so I have asked the team to reply to you directly."
+         → "For online purchases, a pickup can be arranged with an additional shipping fee depending on your location. Alternatively, returns and exchanges are free when done directly through 1886 store branches. You can read the full policy details at https://1886riyadh.com/policies/refund-policy."
+    hallucinations: 1
+                  → 0
+    falseSuppression: true
+                    → false
+  order-status-verified  FAIL → PASS
+    passed: false
+          → true
+    failures: ["reply is missing \"1886-1001\""]
+            → []
+  order-status-in-transit  FAIL → PASS
+    passed: false
+          → true
+    failures: ["reply is missing \"1886-1001\""]
+            → []
+  3 case(s) differ
+
+Replies the recorded run suppressed
+  returns-who-pays-pickup: gate passes now
+  shipping-lost-parcel: still withheld
+  sizing-tee-chest: still withheld
+  sizing-between-sizes: still withheld
+
+Metric                                recorded  re-scored
+  cases                                    108        108
+  passed                                    85         88
+  accuracy as originally scored          71.3%      72.2%
+  accuracy after adjudication            78.7%      81.5%
+  adjudicated cases                         10         12
+  fabricated literals delivered              0          0
+  uncited claims delivered                   0          0
+  false suppressions                         4          3
+  gate: literal misses (all turns)           1          0
+  gate: citation misses (all turns)          7          7
+  deflection                             77.0%      78.4%
+  escalation precision                   69.8%      69.8%
