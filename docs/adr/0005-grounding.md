@@ -43,6 +43,15 @@ escalates.
 This also contains prompt injection: a poisoned document that talks the model
 into inventing a refund link cannot produce a URL the tools never returned.
 
+**URLs and fragments (2026-10-12).** A URL with no fragment is grounded by a
+returned URL with its fragment stripped; a URL with a fragment must match a
+returned URL exactly. Retrieval returns sections, so the anchored URL is the
+only one a tool ever returns, and linking the page itself withheld a correct
+answer (`returns-who-pays-pickup`, 2026-10-11). A section nobody returned is
+still invented. The citation check reads link attribution by the same rule
+(`packages/agent/src/guard/url-match.ts`); it used to accept `page#anything`
+and `page?anything` when the bare page was returned.
+
 ### Citation check
 
 The literal check has a hole, and it is the one that matters most commercially.
@@ -255,6 +264,47 @@ Adversarially tested, and these stay suppressed:
 - "We do not currently have that, but returns are free for 60 days." — grant
 - "Since it has been 90 days, I want to check with the team." — figure the
   customer never mentioned
+
+### A second exemption: offers of help, word for word (2026-10-12)
+
+"Let me know if you have any other questions about returns." names a category
+and cites nothing, so the gate withheld it. It claims nothing a customer could
+act on. The exemption is a fixed list of whole sentences (`OFFERS_OF_HELP` in
+`packages/agent/src/guard/citations.ts`), not a pattern and not a classifier:
+
+- the sentence, with citation markers removed, lowercased, whitespace collapsed
+  and closing punctuation dropped, must **equal** an entry. A prefix or
+  substring match is exactly the shape that lost the five exemptions above —
+  "Returns are free — let me know if you have any other questions" — and the
+  adversarial suite now checks prefix, substring and suffix wrapping;
+- a sentence containing a number, a date word, a URL or a price is never exempt,
+  whatever the list says, so an entry added later cannot license a figure;
+- it applies only to a sentence that cites nothing, like the decline exemption.
+
+The entries:
+
+```
+is there anything else i can help with
+is there anything else i can help you with
+can i help with anything else
+can i help you with anything else
+how else can i help
+how else can i help you
+let me know if there is anything else i can help with
+let me know if there is anything else i can help you with
+let me know if you have any other questions
+let me know if you have any other questions about {returns | exchanges | refunds | shipping | delivery | sizing}
+```
+
+The entries with no topic assert no concept, so the gate never flagged them;
+the operative entries are the six with a topic. "If you are looking at a
+particular t-shirt, let me know and I can check the exact sizing for it"
+(`sizing-tee-chest`, 2026-10-11) is not on the list and stays withheld. Whether
+it should be is the owner's call, and a test pins the current answer.
+
+Re-scoring the 2026-10-11 run offline under both changes moved one verdict,
+`returns-who-pays-pickup` (the URL rule), and none from pass to fail
+([packages/evals/history/README.md](../../packages/evals/history/README.md)).
 
 ### Read a gate metric with the raw text beside it
 

@@ -144,8 +144,10 @@ fabricating:
   anywhere.
 - **A tracking activation window.** The seed question set asserted tracking
   becomes active within 72 hours. Not in the corpus.
-- **Refund settlement time.** The corpus gives the return transit time (up to 15
-  business days) and the approval step, but no bank-settlement figure.
+- ~~**Refund settlement time.**~~ Wrong, corrected 2026-10-12. The corpus does
+  give one: "Refunds can take up to 15 business days, depending on your payment
+  provider" (refund-policy, chunk `14bb2416…`), after the return transit time
+  (also up to 15 business days) and the approval step.
 - **Fit guidance.** Measurement charts exist; "runs large", "true to size" and
   equivalent advice do not.
 

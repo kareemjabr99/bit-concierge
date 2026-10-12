@@ -145,10 +145,12 @@ store has answers to, except where it says otherwise.
 | `exchange-stock-dependent`  | **partly**   | `03ef35a2…`: "Exchanges are subject to stock availability and quality inspection." (in-store). `94cd10c4…`: the online replacement ships after the return is approved. **Missing:** anything about holding or reserving a size; the only "hold" hits are customs and unrelated terms. A correct reply says no hold is offered and cites those two |
 | `shipping-thursday-arrival` | **partly**   | `d75cff7c…`: "processed within 1-10 business days", none shipped or delivered on weekends or holidays; delivery 1 to 7 business days within KSA. **Missing:** a date, which days count as the weekend, and the destination. The case is right that the agent must not compute one; it can still give the ranges                                   |
 
-**`returns-refund-timing`'s case note is wrong.** It says the corpus has "no
-bank-settlement figure". It has one: up to 15 business days. Not changed here;
-it is an adjudication candidate, and the case currently scores a grounded answer
-as a failure either way it goes.
+**`returns-refund-timing`'s case note was wrong.** It said the corpus has "no
+bank-settlement figure". It has one: up to 15 business days. The note was
+corrected on 2026-10-12; the case's expectations were not changed.
+`shipping-cancel-by-store` was reworded the same day to "can the store cancel my
+order without telling me?", so it no longer reads as the customer cancelling
+their own order.
 
 **Would retrieval have found them?** Only the lexical arm could be run offline
 (the vector arm and the reranker each need a model call), so this is half of

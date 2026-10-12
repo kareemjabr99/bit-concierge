@@ -110,6 +110,42 @@ What is **not built**, so nobody assumes it is:
 - Arabic — the schema and search configuration support it; nothing is
   validated. Phase 5.
 
+### Changes to the agent's guards, 2026-10-12
+
+**Escalation order (`755254a`, `packages/agent/src/guard/escalation-order.ts`).**
+The `escalate_to_human` tool refuses to hand over until a lookup tool has run
+earlier in the same turn: `search_knowledge`, `lookup_order`, `search_products`,
+`check_availability` or `get_shipping_estimate`, whatever it returned (a search
+that found nothing counts). A refused call writes no escalation row; the model
+gets a `search_first` tool error telling it to search. Enforced in the tool, not
+the prompt.
+
+- **Exemptions, and no others:** the customer's own message this turn asks for a
+  person (read from the customer's text, never from the model's stated reason;
+  English and a starting set of Gulf Arabic, unvalidated until Phase 5), and the
+  reason `complaint`, the only reason the system prompt escalates immediately.
+- **Cap:** after one refusal in a turn (`MAX_ESCALATION_REFUSALS = 1`), the next
+  escalation is let through and logged as a warning.
+- The loop's own escalations (caps, tool failure, step limit, the grounding
+  gate, an outstanding payment) call `escalate()` directly and are not checked.
+- **Not measured.** No eval run has happened since. An offline re-score cannot
+  show its effect, because it does not ask the model to write anything.
+
+**The citation gate (ADR 0005, two sections dated 2026-10-12).**
+
+- **URL fragments**, in both the literal and the citation check: a URL with no
+  fragment is grounded by a returned URL with its fragment stripped; a URL with
+  a fragment must match a returned URL exactly. No query strings, no prefixes.
+- **Offers of help** are exempt only when the whole sentence equals an entry on
+  `OFFERS_OF_HELP`, and never when it carries a number, date, URL or price.
+- Mutation-tested, 21 of 21 killed (commit `c3145fd`).
+- **Re-score of the 2026-10-11 run**, offline with the `rescore` script in
+  `@bitc/evals`: 88 of 108, 72.2% as originally scored, 81.5% after adjudication.
+  One verdict changed, `returns-who-pays-pickup` fail → pass. Nothing went from
+  pass to fail. `shipping-lost-parcel`, `sizing-tee-chest` and
+  `sizing-between-sizes` are still withheld. A re-score of one set of replies,
+  not a measurement — see [the history README](packages/evals/history/README.md).
+
 ### Numbers, and what they are worth
 
 | Measure                                   | Value                                                    | Worth quoting?                                      |

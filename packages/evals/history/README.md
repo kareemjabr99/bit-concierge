@@ -96,6 +96,12 @@ the 87 recorded above. The third is the fragment rule and the offer exemption
 fail → pass; nothing goes from pass to fail. Of the four replies the run
 suppressed, that is the only one the new gate passes.
 
+[2026-10-12-rescore-4-new-gate-part-b-cases.txt](2026-10-12-rescore-4-new-gate-part-b-cases.txt)
+is the third again after two case edits (`shipping-cancel-by-store` reworded,
+`returns-refund-timing`'s note corrected): identical, apart from the commit in
+its header. The reworded case is still scored on the reply to its old wording,
+because that is the only reply recorded.
+
 These are re-scores of one set of replies, not measurements. A model told less
 often that its reply was withheld would not write differently here, because
 nothing here asks it to write.
