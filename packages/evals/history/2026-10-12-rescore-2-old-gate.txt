@@ -1,0 +1,37 @@
+Re-score of packages/evals/history/2026-10-11-run.json
+  run started 2026-10-11T21:52:16.960Z, 108 cases
+  gate: working tree at 755254a (uncommitted changes)
+  cases and adjudications: working tree (108 cases, 12 adjudications)
+
+Per case, against the recorded run
+  order-status-verified  FAIL → PASS
+    passed: false
+          → true
+    failures: ["reply is missing \"1886-1001\""]
+            → []
+  order-status-in-transit  FAIL → PASS
+    passed: false
+          → true
+    failures: ["reply is missing \"1886-1001\""]
+            → []
+  2 case(s) differ
+
+Replies the recorded run suppressed
+  returns-who-pays-pickup: still withheld
+  shipping-lost-parcel: still withheld
+  sizing-tee-chest: still withheld
+  sizing-between-sizes: still withheld
+
+Metric                                recorded  re-scored
+  cases                                    108        108
+  passed                                    85         87
+  accuracy as originally scored          71.3%      71.3%
+  accuracy after adjudication            78.7%      80.6%
+  adjudicated cases                         10         12
+  fabricated literals delivered              0          0
+  uncited claims delivered                   0          0
+  false suppressions                         4          4
+  gate: literal misses (all turns)           1          1
+  gate: citation misses (all turns)          7          7
+  deflection                             77.0%      77.0%
+  escalation precision                   69.8%      69.8%

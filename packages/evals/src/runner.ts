@@ -70,7 +70,7 @@ const contains = (haystack: string | null, needle: string): boolean =>
   (haystack ?? '').toLowerCase().includes(needle.toLowerCase());
 
 /** Chunk ids are opaque; a case names the document it expects to be cited. */
-const sourceIdsFor = async (tenantId: TenantId, chunkIds: string[]): Promise<string[]> => {
+export const sourceIdsFor = async (tenantId: TenantId, chunkIds: string[]): Promise<string[]> => {
   const ids = chunkIds.filter((id) => !id.startsWith('t:'));
   const toolSources = chunkIds.filter((id) => id.startsWith('t:'));
   if (ids.length === 0) return toolSources;
@@ -84,20 +84,29 @@ const sourceIdsFor = async (tenantId: TenantId, chunkIds: string[]): Promise<str
   return [...new Set([...toolSources, ...rows.map((row) => row.sourceId)])];
 };
 
-const evaluate = async (
-  tenantId: TenantId,
-  testCase: EvalCase,
-  turn: TurnResult,
-): Promise<CaseOutcome> => {
-  const failures: string[] = [];
-  const reply = turn.reply;
-  const toolsCalled = turn.recorder.toolCalls.map((call) => call.name);
+/** What a turn produced, reduced to what a case is scored on. */
+export interface ObservedTurn {
+  status: TurnResult['status'];
+  reply: string | null;
+  rawModelText: string | null;
+  toolsCalled: string[];
+  /** Document source ids, not chunk ids: see sourceIdsFor. */
+  citedSources: string[];
+  retrievedSources: string[];
+  grounding: TurnResult['grounding'];
+  errorKind?: TurnResult['errorKind'];
+  latencyMs: number;
+  inputTokens: number;
+  outputTokens: number;
+}
 
-  const citedSources = await sourceIdsFor(tenantId, turn.grounding?.citations.cited ?? []);
-  const retrievedSources = await sourceIdsFor(
-    tenantId,
-    turn.recorder.retrievalHits.map((hit) => hit.chunkId),
-  );
+/**
+ * Scores one turn against its case. Pure, so a recorded run can be re-scored
+ * offline by exactly the rules a live run uses (scripts/rescore.ts).
+ */
+export const scoreTurn = (testCase: EvalCase, turn: ObservedTurn): CaseOutcome => {
+  const failures: string[] = [];
+  const { reply, toolsCalled, citedSources, retrievedSources } = turn;
 
   const behaviour =
     turn.status === 'answered' ? 'answer' : turn.status === 'escalated' ? 'escalate' : turn.status;
@@ -161,13 +170,35 @@ const evaluate = async (
     ...(turn.errorKind ? { errorKind: turn.errorKind } : {}),
     falseSuppression,
     latencyMs: turn.latencyMs,
-    inputTokens: turn.usage.inputTokens,
-    outputTokens: turn.usage.outputTokens,
+    inputTokens: turn.inputTokens,
+    outputTokens: turn.outputTokens,
     // Priced by the caller, which knows the model key. Left null here so a
-    // direct call to evaluate() reports "unpriced" rather than a wrong zero.
+    // direct call to scoreTurn() reports "unpriced" rather than a wrong zero.
     costUsd: null,
   };
 };
+
+const evaluate = async (
+  tenantId: TenantId,
+  testCase: EvalCase,
+  turn: TurnResult,
+): Promise<CaseOutcome> =>
+  scoreTurn(testCase, {
+    status: turn.status,
+    reply: turn.reply,
+    rawModelText: turn.rawModelText,
+    toolsCalled: turn.recorder.toolCalls.map((call) => call.name),
+    citedSources: await sourceIdsFor(tenantId, turn.grounding?.citations.cited ?? []),
+    retrievedSources: await sourceIdsFor(
+      tenantId,
+      turn.recorder.retrievalHits.map((hit) => hit.chunkId),
+    ),
+    grounding: turn.grounding,
+    errorKind: turn.errorKind,
+    latencyMs: turn.latencyMs,
+    inputTokens: turn.usage.inputTokens,
+    outputTokens: turn.usage.outputTokens,
+  });
 
 const percentile = (values: number[], p: number): number => {
   if (values.length === 0) return 0;

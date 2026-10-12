@@ -42,6 +42,15 @@ says where the project stands, what is blocked and what to do next. Read
   in HANDOVER.md section 7.
 - Every eval number predates Phase 4. The next run re-baselines; commit its
   output to `packages/evals/history/`.
+- **Guards changed 2026-10-12** (HANDOVER.md section 1). `escalate_to_human`
+  refuses until a lookup tool has run earlier in the turn, unless the
+  customer's own text asks for a person or the reason is `complaint`. After one
+  refusal it lets the next escalation through (`755254a`, not yet measured).
+  Citation gate: a bare page URL is grounded by a returned `page#section`; a
+  fragment must match exactly. A whole sentence on `OFFERS_OF_HELP` with no
+  figure is not a claim. The offline re-score of the 2026-10-11 run
+  (`pnpm --filter @bitc/evals run rescore`) gives 88/108, 72.2% / 81.5%; one
+  verdict changed, none went from pass to fail.
 
 ## Rules that do not bend
 

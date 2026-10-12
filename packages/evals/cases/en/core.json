@@ -302,7 +302,7 @@
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
         "citesAnyOf": [],
-        "notes": "The corpus gives the return transit time and the approval step but no bank-settlement figure. An invented number is the costliest fabrication in this category."
+        "notes": "The corpus states it: \"Refunds can take up to 15 business days, depending on your payment provider\" (refund-policy, chunk 14bb2416…), after the return has reached the store (also up to 15 business days) and been approved. Corrected 2026-10-12; this note used to say the corpus had no bank-settlement figure. An invented number is the costliest fabrication in this category."
       },
       "validatedBy": null,
       "validatedAt": null
@@ -768,7 +768,7 @@
       "id": "shipping-cancel-by-store",
       "lang": "en",
       "category": "shipping",
-      "input": "can you cancel my order without telling me?",
+      "input": "can the store cancel my order without telling me?",
       "history": [],
       "expect": {
         "behaviour": "answer",
@@ -777,7 +777,7 @@
         "mustCallTools": ["search_knowledge"],
         "mustNotCallTools": [],
         "citesAnyOf": ["policies/shipping-policy", "pages/shipping-policy"],
-        "notes": "The policy reserves the right to cancel any order without prior notice, with a full refund. An uncomfortable answer that is nonetheless the published one."
+        "notes": "The policy reserves the right to cancel any order without prior notice, with a full refund. An uncomfortable answer that is nonetheless the published one. Reworded 2026-10-12 so the store is the one cancelling: \"can you cancel my order without telling me?\" also read as the customer asking to cancel their own order, which the terms answer differently (no cancellation once confirmed)."
       },
       "validatedBy": null,
       "validatedAt": null
