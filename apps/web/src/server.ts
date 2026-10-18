@@ -6,7 +6,7 @@ import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
 import { loadTenantConfig, runTurn } from '@bitc/agent';
 import { resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
 import { citationSources, PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
-import { MockShopifyClient } from '@bitc/shopify';
+import { createShopifyClient } from '@bitc/shopify';
 import { handleChat } from './chat-api.ts';
 import { deriveSigningKey } from './session.ts';
 import { SlidingWindowLimiter } from './rate-limit.ts';
@@ -30,6 +30,16 @@ const port = Number(process.env.PORT ?? 8787);
 const trustProxy = process.env.TRUST_PROXY === 'true';
 const isProduction = process.env.NODE_ENV === 'production';
 const logger = createLogger({ level: 'info' });
+
+// Which store every conversation in this process talks to, decided once:
+// real when the three runtime variables are set, mock when none are, an error
+// for anything in between or for no store in production. The factory hands
+// the client a renewing token source, so a server that stays up past the
+// token's 24 hours keeps answering (phase-4-plan, preconditions for apps/web).
+// One store per process: Phase 4 is one tenant. Per-tenant credentials from
+// shopify_installs replace this read when a second store exists.
+const store = await createShopifyClient(process.env);
+logger.info('store', { store: store.label });
 
 const sessionKey = deriveSigningKey(env.ENCRYPTION_KEY);
 // Per visitor, per hour. The tenant's own lookupLimits govern tool use inside
@@ -157,7 +167,7 @@ const server = createServer((req, res) => {
         const { config, chat, embedder } = await chatModelFor(input.tenantId);
         return runTurn(input, {
           chat,
-          shopify: new MockShopifyClient(),
+          shopify: store.client,
           knowledge: new PgKnowledgeSearcher(
             input.tenantId,
             embedder,
