@@ -175,10 +175,12 @@ export; the history's README says exactly what survives.
 
 ### Blocked right now
 
-| Blocker                                                                                           | Who                            | Unblock                                                                     |
-| ------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| **Seed app not installed.** Shopify returns `app_not_installed` for `bitc-seed` on the dev store. | Shopify org admin              | Install `bitc-seed` on the dev store specifically; `seed:diagnose` confirms |
-| **`compare:store` exits 1** — three product descriptions lost their line breaks in the store.     | Fixed in code; needs a re-seed | Re-seed (needs the line above)                                              |
+Nothing in Phase 4 is blocked on Shopify. The two blockers recorded here on
+2026-10-11 are cleared: the seed app was installed and the store re-seeded with
+eight scenarios, and `compare:store` exits 0 since the client reads
+`descriptionHtml` (`e858d87`; kept by the owner 2026-10-18). **Uninstall
+`bitc-seed` from the dev store** — it was kept installed only until
+`compare:store` passed.
 
 ---
 
@@ -361,8 +363,8 @@ pnpm --filter @bitc/cli chat -- --debug                 # talk to it
 pnpm --filter @bitc/shopify run compare:store           # the store still matches the mock
 ```
 
-`compare:store` will exit 1 on three product descriptions until the store is
-re-seeded. That is expected, and it says why in its output.
+`compare:store` exits 0 when the store matches the mock; anything else it
+prints is a real difference.
 
 ---
 
@@ -668,6 +670,7 @@ outside the repository and they do not travel. Everything below was true on
 | 2026-09-21 | Do not request `read_all_orders`; it goes in the design-partner agreement                           | [where-this-stands.md](docs/where-this-stands.md#a-pilot-limitation-with-a-name-orders-older-than-60-days) |
 | 2026-09-24 | Authorized → treat as confirmed, payment questions handed over; partially paid → always handed over | [where-this-stands.md](docs/where-this-stands.md#1886s-capture-mode-is-unverified)                         |
 | 2026-09-24 | Keep `shopify_installs`; client credentials are a dev and same-org source read from env             | [phase-4-plan.md](docs/phase-4-plan.md#the-decision-the-wiring-needs--what-shopifys-docs-say)              |
+| 2026-10-18 | Product descriptions: "Keep descriptionHtml" — the client converts `descriptionHtml`; no flattening | [CLAUDE.md](CLAUDE.md), `packages/shopify/src/admin/html.ts`                                               |
 
 ### Facts not written anywhere else
 

@@ -20,13 +20,13 @@ says where the project stands, what is blocked and what to do next. Read
   seeded with 8 order scenarios (2026-10-11), and `apps/cli` builds the real
   `ShopifyAdminClient` when the three runtime variables are set (mock only when
   none are; half-set or a refused grant throws). Different-email and guest
-  cases verified through the CLI against the real store. `apps/web` and the
-  eval runner still construct the mock. Nothing is deployed.
-- **Open:** `compare:store` exits 1 on three product descriptions, and a
-  re-seed cannot fix it — the store's `descriptionHtml` has the line breaks but
-  Shopify's `description` field collapses whitespace. Needs an owner decision
-  (read `descriptionHtml` in the client, or flatten the mock). `bitc-seed`
-  stays installed until `compare:store` exits 0.
+  cases verified through the CLI against the real store. The eval runner uses
+  the factory too (`--store mock` for runs); `apps/web` still constructs the
+  mock. Nothing is deployed.
+- **Descriptions decided 2026-10-18:** the owner chose "Keep descriptionHtml".
+  The client reads `descriptionHtml` and converts it to text (`e858d87`);
+  `compare:store` exits 0 against the store. `bitc-seed` can be uninstalled
+  (an owner action in the Dev Dashboard).
 - **Re-baselined 2026-10-11** against the mock (`--store mock`): 108 cases,
   85 pass; fabricated literals and uncited claims reaching a customer 0 and 0;
   accuracy 71.3% as originally scored, 78.7% after adjudication. Files in
@@ -38,8 +38,7 @@ says where the project stands, what is blocked and what to do next. Read
   yet — ADR 0007 says Phase 6; it must strip status links, ADR 0012), webhooks,
   escalation email. The factory lives in `packages/shopify/src/factory.ts`; the
   CLI and the eval runner both use it.
-- **Needs from the owner:** the description decision above, and the decisions
-  in HANDOVER.md section 7.
+- **Needs from the owner:** the decisions in HANDOVER.md section 7.
 - Every eval number predates Phase 4. The next run re-baselines; commit its
   output to `packages/evals/history/`.
 - **Guards changed 2026-10-12** (HANDOVER.md section 1). `escalate_to_human`
