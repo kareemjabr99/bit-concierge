@@ -1,6 +1,6 @@
 import { ConfigError } from '@bitc/core';
 import { MockShopifyClient } from './mock/client.ts';
-import { AccessTokenCache } from './admin/auth.ts';
+import { AccessTokenCache, type RequestAccessToken } from './admin/auth.ts';
 import { AdminTransport } from './admin/transport.ts';
 import { ShopifyAdminClient } from './admin/client.ts';
 import type { ShopifyReadClient } from './types.ts';
@@ -42,7 +42,10 @@ export interface ShopifyConnection {
 
 export interface ShopifyFactoryOptions {
   /** Injected in tests so the real path never touches the network. */
-  mintToken?: (shop: string, clientId: string, clientSecret: string) => Promise<string>;
+  requestToken?: RequestAccessToken;
+  fetchImpl?: typeof fetch;
+  /** Injected in tests so token expiry can be crossed without waiting a day. */
+  now?: () => number;
 }
 
 /** `.env` files collect whitespace and quotes, and neither is part of a value. */
@@ -81,18 +84,25 @@ export const createShopifyClient = async (
   }
 
   const shop = values.SHOPIFY_STORE_DOMAIN!;
-  const mint =
-    options.mintToken ?? ((s, id, secret) => new AccessTokenCache().token(s, id, secret));
-  // A refused grant propagates. There is deliberately no catch here.
-  const accessToken = await mint(
+  // The transport holds a source, not a string: the token lasts 24 hours and
+  // a server does not stop. The cache renews it before expiry and after a 401.
+  const accessToken = new AccessTokenCache(options.now, undefined, options.requestToken).source(
     shop,
     values.SHOPIFY_RUNTIME_CLIENT_ID!,
     values.SHOPIFY_RUNTIME_CLIENT_SECRET!,
   );
+  // Minted once now so a refused grant fails the start, not the first
+  // customer's question. It propagates; there is deliberately no catch here.
+  await accessToken.token();
 
   return {
     client: new ShopifyAdminClient(
-      new AdminTransport({ shop, accessToken, apiVersion: API_VERSION }),
+      new AdminTransport({
+        shop,
+        accessToken,
+        apiVersion: API_VERSION,
+        ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      }),
     ),
     kind: 'real',
     label: `REAL store ${shop} (Admin API ${API_VERSION}, read-only)`,
