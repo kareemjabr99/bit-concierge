@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv } from '@bitc/core';
-import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
+import { disconnect, resolveTenantByShop, resolveTenantByWidgetKey } from '@bitc/db';
+import { connectQueue } from '@bitc/db/queue';
 import { loadTenantConfig, runTurn } from '@bitc/agent';
 import { resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
 import { citationSources, PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
-import { MockShopifyClient } from '@bitc/shopify';
+import { createShopifyClient } from '@bitc/shopify';
 import { handleChat } from './chat-api.ts';
+import { handleShopifyWebhook } from './webhooks.ts';
 import { deriveSigningKey } from './session.ts';
 import { SlidingWindowLimiter } from './rate-limit.ts';
 
@@ -30,6 +32,20 @@ const port = Number(process.env.PORT ?? 8787);
 const trustProxy = process.env.TRUST_PROXY === 'true';
 const isProduction = process.env.NODE_ENV === 'production';
 const logger = createLogger({ level: 'info' });
+
+// Which store every conversation in this process talks to, decided once:
+// real when the three runtime variables are set, mock when none are, an error
+// for anything in between or for no store in production. The factory hands
+// the client a renewing token source, so a server that stays up past the
+// token's 24 hours keeps answering (phase-4-plan, preconditions for apps/web).
+// One store per process: Phase 4 is one tenant. Per-tenant credentials from
+// shopify_installs replace this read when a second store exists.
+const store = await createShopifyClient(process.env);
+logger.info('store', { store: store.label });
+
+// Escalations are emailed by the worker; this process only enqueues, in the
+// same transaction as the escalation row (packages/agent/src/escalation.ts).
+const queue = await connectQueue(readEnv('base').DATABASE_URL, { role: 'producer' });
 
 const sessionKey = deriveSigningKey(env.ENCRYPTION_KEY);
 // Per visitor, per hour. The tenant's own lookupLimits govern tool use inside
@@ -127,6 +143,26 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/webhooks/shopify') {
+    // Signed with the runtime app's client secret, the app that subscribes.
+    // Unset means every delivery fails verification (401), never that
+    // unsigned ones are accepted.
+    handleShopifyWebhook(req, res, {
+      secret: (process.env.SHOPIFY_RUNTIME_CLIENT_SECRET ?? '').trim(),
+      resolveTenant: async (shop) => (shop ? ((await resolveTenantByShop(shop)) ?? null) : null),
+      queue: queue.queue,
+      logger,
+    }).catch((error: unknown) => {
+      // A client that hangs up mid-body. Never left as an unhandled
+      // rejection, which would take the whole server down.
+      logger.warn('webhook_request_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (!res.headersSent) res.writeHead(400, { 'content-type': 'text/plain' }).end('bad request');
+    });
+    return;
+  }
+
   if (url.pathname !== '/api/chat') {
     res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":"not_found"}');
     return;
@@ -157,13 +193,14 @@ const server = createServer((req, res) => {
         const { config, chat, embedder } = await chatModelFor(input.tenantId);
         return runTurn(input, {
           chat,
-          shopify: new MockShopifyClient(),
+          shopify: store.client,
           knowledge: new PgKnowledgeSearcher(
             input.tenantId,
             embedder,
             resolveReranker(config.reranker, { model: chat.model }),
           ),
           gaps: new PgGapRecorder(input.tenantId),
+          jobs: queue.queue,
           logger,
           onStage,
         });
@@ -183,6 +220,12 @@ server.listen(port, () => logger.info('storefront chat listening', { port, trust
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    server.close(() => void disconnect().then(() => process.exit(0)));
+    server.close(
+      () =>
+        void queue
+          .stop()
+          .then(() => disconnect())
+          .then(() => process.exit(0)),
+    );
   });
 }

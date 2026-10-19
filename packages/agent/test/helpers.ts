@@ -10,7 +10,7 @@ import { FixtureKnowledge, type TurnDeps } from '../src/index.ts';
 // test database whatever the shell or CI has exported, so this is unconditional.
 process.env.DATABASE_URL = APP_URL;
 
-export { ADMIN_URL, prepareDatabase };
+export { ADMIN_URL, APP_URL, prepareDatabase };
 export const admin = () => postgres(ADMIN_URL, { max: 1, onnotice: () => {} });
 
 export interface TestTenantOptions {

@@ -262,3 +262,30 @@ is not simply too high: the remaining work is real and is listed at the gate.
   test that was vacuous because of a typo in its own fixture.
 - Estimates: Phase 0 2 d → 1.1 h; Phase 1 4 d → 1.0 h; Phase 2 5 d → 9.3 h;
   Phase 3 5 d → 5.8 h and not yet closed.
+
+---
+
+## Phase 4 — the close (at the gate, not yet approved)
+
+Two sittings, 2026-10-18 and 19. Earlier Phase 4 work (the read client, the
+seed, `compare:store`, the status link) is recorded in its commits and in
+[phase-4-plan.md](phase-4-plan.md); hours for it were not logged.
+
+### Notes
+
+- **The CLAUDE.md "open" item was already closed in code.** The description
+  decision it said was pending had been implemented (`e858d87`) and
+  `compare:store` exited 0. The owner kept it; the docs had lagged a day.
+- **Token renewal was a precondition, not a feature.** A server on a fixed
+  24-hour token turns every order question on day two into a hand-over. The
+  fixed-string mutant first survived because the mutant itself was wrong.
+- **pg-boss: a key alone does not deduplicate** on a standard queue; a key and
+  a window does. Found by reading the types before trusting the name, and
+  pinned by a test against the real queue.
+- **pnpm skipped resolution and linked a drizzle variant that was not in the
+  store** when a dependency was added to a new workspace. Pointing the lockfile
+  at the variant every other workspace uses fixed it; no version changed.
+- **The definition-of-done turns found real nondeterminism on real data**: two
+  of eight replies withheld for a mis-cited tool on the first run, both fine
+  on the second. Same pattern as the eval history; reported, not tuned away.
+- 38 mutants at the close, 38 killed.

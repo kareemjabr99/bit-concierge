@@ -53,7 +53,14 @@ const web = z.object({
     ),
 });
 
-const schemas = { base, migrator, encryption, security, models, web } as const;
+/** Escalation email. Read by the worker only; nothing else sends mail. */
+const email = z.object({
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required to send escalation email'),
+  // A bare address or `Name <address>`, on a domain verified in Resend.
+  ESCALATION_FROM_EMAIL: z.string().min(3, 'ESCALATION_FROM_EMAIL is required'),
+});
+
+const schemas = { base, migrator, encryption, security, models, web, email } as const;
 
 export type EnvLayer = keyof typeof schemas;
 export type BaseEnv = z.infer<typeof base>;
@@ -62,6 +69,7 @@ export type EncryptionEnv = z.infer<typeof encryption>;
 export type SecurityEnv = z.infer<typeof security>;
 export type ModelsEnv = z.infer<typeof models>;
 export type WebEnv = z.infer<typeof web>;
+export type EmailEnv = z.infer<typeof email>;
 
 interface EnvTypes {
   base: BaseEnv;
@@ -70,6 +78,7 @@ interface EnvTypes {
   security: SecurityEnv;
   models: ModelsEnv;
   web: WebEnv;
+  email: EmailEnv;
 }
 
 /**

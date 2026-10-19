@@ -1,5 +1,5 @@
 import type { AdmissionPolicy } from '@bitc/models';
-import type { Channel, Language, Logger, TenantId } from '@bitc/core';
+import type { Channel, JobQueue, Language, Logger, TenantId } from '@bitc/core';
 import type { ShopifyReadClient } from '@bitc/shopify';
 import type { GapRecorder, KnowledgeSearcher } from './knowledge/types.ts';
 
@@ -87,6 +87,12 @@ export interface TurnContext {
   knowledge: KnowledgeSearcher;
   /** Optional: without it, unanswerable questions are simply not reported. */
   gaps?: GapRecorder | undefined;
+  /**
+   * Optional: without it, an escalation row is written and nothing is sent.
+   * Only the storefront server passes one. The CLI and the eval runner never
+   * do, so a test conversation can never email a merchant.
+   */
+  jobs?: JobQueue | undefined;
   recorder: TurnRecorder;
   logger: Logger;
   now: () => Date;

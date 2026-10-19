@@ -1,5 +1,5 @@
 import { and, eq, gte, sql } from 'drizzle-orm';
-import { stripStatusUrls } from '@bitc/core';
+import { JOBS, stripStatusUrls } from '@bitc/core';
 import { schema, withTenant } from '@bitc/db';
 import type { EscalationRecord, TurnContext } from './context.ts';
 
@@ -11,11 +11,20 @@ export interface EscalationRequest {
     | undefined;
 }
 
+/** One digest per tenant per hour, sent when the hour is out. */
+const DIGEST_WINDOW_SECONDS = 60 * 60;
+
 /**
  * Writes the escalation, marks the conversation, and records it on the turn.
  * Above the tenant's hourly cap the row is marked `digested` rather than
- * dropped; the digest email itself is assembled by the worker (Phase 4/6).
- * Email sending is not wired in Phase 1 — the row is the contract.
+ * dropped, and the worker sends one digest for the hour instead.
+ *
+ * The row is the contract; the email is built from it by the worker
+ * (apps/worker/src/jobs/escalation-email.ts). The job that tells the worker is
+ * enqueued in the same transaction, so a row is never written without its job
+ * or a job without its row — but in a savepoint, so a queue that is down
+ * costs the email, never the escalation. The row then stays `pending`, which
+ * is true.
  */
 export const escalate = async (
   ctx: TurnContext,
@@ -61,6 +70,38 @@ export const escalate = async (
         deliveryStatus,
       })
       .returning({ id: schema.escalations.id });
+
+    const jobs = ctx.jobs;
+    if (jobs) {
+      try {
+        await tx.transaction(async (savepoint) => {
+          if (deliveryStatus === 'pending') {
+            await jobs.enqueue(
+              JOBS.escalationEmail,
+              { tenantId: ctx.tenantId, escalationId: row!.id },
+              { transaction: savepoint },
+            );
+          } else {
+            await jobs.enqueue(
+              JOBS.escalationDigest,
+              { tenantId: ctx.tenantId },
+              {
+                transaction: savepoint,
+                singletonKey: ctx.tenantId,
+                singletonSeconds: DIGEST_WINDOW_SECONDS,
+                startAfterSeconds: DIGEST_WINDOW_SECONDS,
+              },
+            );
+          }
+        });
+      } catch (error) {
+        ctx.logger.error('escalation_enqueue_failed', {
+          escalationId: row!.id,
+          deliveryStatus,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     await tx
       .update(schema.conversations)

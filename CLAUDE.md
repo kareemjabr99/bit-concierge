@@ -16,32 +16,34 @@ says where the project stands, what is blocked and what to do next. Read
 
 ## Where it stands — keep this section current
 
-- Phases 0–3 closed. **Phase 4 (real Shopify) in progress**: the dev store is
-  seeded with 8 order scenarios (2026-10-11), and `apps/cli` builds the real
-  `ShopifyAdminClient` when the three runtime variables are set (mock only when
-  none are; half-set or a refused grant throws). Different-email and guest
-  cases verified through the CLI against the real store. `apps/web` and the
-  eval runner still construct the mock. Nothing is deployed.
-- **Open:** `compare:store` exits 1 on three product descriptions, and a
-  re-seed cannot fix it — the store's `descriptionHtml` has the line breaks but
-  Shopify's `description` field collapses whitespace. Needs an owner decision
-  (read `descriptionHtml` in the client, or flatten the mock). `bitc-seed`
-  stays installed until `compare:store` exits 0.
+- Phases 0–3 closed. **Phase 4 (real Shopify) is at its gate, awaiting the
+  owner's review** ([gate report](docs/phase-4-gate-report.md)); work stops
+  until it is approved. Every entry point (`apps/web`, `apps/cli`, the eval
+  runner) takes its store from `packages/shopify/src/factory.ts`: real with a
+  renewing token when the three runtime variables are set, mock when none are,
+  an error otherwise. The definition-of-done turns ran on the real dev store
+  2026-10-19 ([evidence](docs/evidence/2026-10-19-phase-4-dod.md)). Nothing is
+  deployed.
+- **Queue, worker, email, webhooks (2026-10-18/19).** pg-boss in the `pgboss`
+  schema (migration 0008); jobs carry ids only. `escalate()` enqueues email in
+  the row's transaction; `apps/worker` sends through Resend and marks rows
+  `sent`/`failed`; hourly digests over the cap. No Resend account exists, so no
+  email has ever been delivered. `POST /webhooks/shopify` verifies and queues
+  `product-changed`; **nothing consumes it** until the owner decides on
+  re-indexing (embedding quota). No store is subscribed.
+- **Descriptions decided 2026-10-18:** the owner chose "Keep descriptionHtml".
+  `compare:store` exits 0. `bitc-seed` should now be uninstalled (an owner
+  action in the Dev Dashboard).
 - **Re-baselined 2026-10-11** against the mock (`--store mock`): 108 cases,
   85 pass; fabricated literals and uncited claims reaching a customer 0 and 0;
   accuracy 71.3% as originally scored, 78.7% after adjudication. Files in
-  `packages/evals/history/2026-10-11-run.*`. Per-case outputs of the earlier
-  runs are lost, so there is no case-by-case diff against run 6. No `--baseline`
-  was recorded.
-- **Next:** `apps/web` onto the factory (it mints one 24-hour token at start; a
-  long-running server needs refresh first), the retention job (does not exist
-  yet — ADR 0007 says Phase 6; it must strip status links, ADR 0012), webhooks,
-  escalation email. The factory lives in `packages/shopify/src/factory.ts`; the
-  CLI and the eval runner both use it.
-- **Needs from the owner:** the description decision above, and the decisions
-  in HANDOVER.md section 7.
-- Every eval number predates Phase 4. The next run re-baselines; commit its
-  output to `packages/evals/history/`.
+  `packages/evals/history/2026-10-11-run.*`, recorded as the `en-core`
+  baseline (`bcd195e`). Nothing since has been measured by a run.
+- **Next, after approval:** the decisions in HANDOVER.md section 7, then one
+  eval run to measure the 2026-10-12 guards, then Phase 5. The retention job
+  (ADR 0007) is Phase 6 and must strip status links (ADR 0012).
+- **Needs from the owner:** the gate review, and the decisions in HANDOVER.md
+  section 7.
 - **Guards changed 2026-10-12** (HANDOVER.md section 1). `escalate_to_human`
   refuses until a lookup tool has run earlier in the turn, unless the
   customer's own text asks for a person or the reason is `complaint`. After one

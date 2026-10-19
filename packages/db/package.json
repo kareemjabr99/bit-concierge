@@ -7,18 +7,20 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
     "./unsafe": "./src/unsafe.ts",
-    "./migrate": "./src/migrate.ts"
+    "./migrate": "./src/migrate.ts",
+    "./queue": "./src/queue.ts"
   },
   "scripts": {
-    "migrate": "node src/cli.ts up",
-    "rollback": "node src/cli.ts down",
-    "status": "node src/cli.ts status",
-    "reset": "node src/cli.ts reset",
-    "seed": "node src/seed.ts"
+    "migrate": "node --env-file-if-exists=../../.env.local src/cli.ts up",
+    "rollback": "node --env-file-if-exists=../../.env.local src/cli.ts down",
+    "status": "node --env-file-if-exists=../../.env.local src/cli.ts status",
+    "reset": "node --env-file-if-exists=../../.env.local src/cli.ts reset",
+    "seed": "node --env-file-if-exists=../../.env.local src/seed.ts"
   },
   "dependencies": {
     "@bitc/core": "workspace:*",
     "drizzle-orm": "0.45.2",
+    "pg-boss": "12.30.0",
     "postgres": "3.4.9",
     "zod": "4.5.4"
   },

@@ -1,5 +1,6 @@
 import { BitcError } from '@bitc/core';
 import { assertAgentAccessToken } from './guard.ts';
+import type { AccessTokenSource } from './auth.ts';
 
 /**
  * HTTP for the Admin GraphQL API: retries, throttling, and knowing when to stop.
@@ -25,7 +26,13 @@ export interface ThrottleState {
 
 export interface AdminTransportOptions {
   shop: string;
-  accessToken: string;
+  /**
+   * A fixed token (a CLI session, a script, a test) or a source that renews
+   * (anything that stays up longer than the token lasts). Only a source is
+   * retried after a 401: asking again for the same fixed string gets the same
+   * refusal.
+   */
+  accessToken: string | AccessTokenSource;
   apiVersion: string;
   fetchImpl?: typeof fetch;
   /** Injected in tests so retry delays do not actually sleep. */
@@ -54,7 +61,8 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
 export class AdminTransport {
   private readonly shop: string;
-  private readonly accessToken: string;
+  private readonly tokens: AccessTokenSource;
+  private readonly renewable: boolean;
   private readonly apiVersion: string;
   private readonly fetchImpl: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -63,9 +71,17 @@ export class AdminTransport {
 
   constructor(options: AdminTransportOptions) {
     // Before anything else: the agent is read-only, and the seed token is not.
-    assertAgentAccessToken(options.accessToken);
+    // A source's tokens are checked as they arrive, in send().
+    const fixed = options.accessToken;
+    if (typeof fixed === 'string') {
+      assertAgentAccessToken(fixed);
+      this.tokens = { token: async () => fixed, invalidate: () => {} };
+      this.renewable = false;
+    } else {
+      this.tokens = fixed;
+      this.renewable = true;
+    }
     this.shop = options.shop;
-    this.accessToken = options.accessToken;
     this.apiVersion = options.apiVersion;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.sleep = options.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
@@ -77,19 +93,41 @@ export class AdminTransport {
     return `https://${this.shop}/admin/api/${this.apiVersion}/graphql.json`;
   }
 
+  private async post(body: string): Promise<Response> {
+    const token = await this.tokens.token();
+    assertAgentAccessToken(token);
+    return this.fetchImpl(this.endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-shopify-access-token': token,
+        accept: 'application/json',
+      },
+      body,
+    });
+  }
+
+  /**
+   * One request, and one more if a renewable token was refused. Shopify can
+   * revoke a token before the expiry it announced (an app reinstalled, a
+   * secret rotated); the cache would keep handing it out until that expiry,
+   * so a 401 discards it and mints once. A second 401 is a real refusal and
+   * falls through to the caller as one. Kept out of the retry loop so it never
+   * spends one of the throttle attempts.
+   */
+  private async send(body: string): Promise<Response> {
+    const response = await this.post(body);
+    if (response.status !== 401 || !this.renewable) return response;
+    this.tokens.invalidate();
+    return this.post(body);
+  }
+
   async query<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
     let lastError = '';
+    const payload = JSON.stringify({ query, variables });
 
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
-      const response = await this.fetchImpl(this.endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-shopify-access-token': this.accessToken,
-          accept: 'application/json',
-        },
-        body: JSON.stringify({ query, variables }),
-      });
+      const response = await this.send(payload);
 
       if (RETRYABLE_STATUS.has(response.status)) {
         lastError = `HTTP ${response.status}`;
@@ -104,8 +142,8 @@ export class AdminTransport {
       }
 
       if (!response.ok) {
-        // 401, 403, 404 and the rest. Retrying a revoked token only revokes it
-        // more slowly.
+        // 401 (after send() renewed once), 403, 404 and the rest. Retrying a
+        // revoked token only revokes it more slowly.
         throw new BitcError(
           `shopify_http_${response.status}`,
           `Shopify returned ${response.status}`,

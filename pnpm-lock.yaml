@@ -190,6 +190,9 @@ importers:
       '@bitc/db':
         specifier: workspace:*
         version: link:../../packages/db
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(pg@8.23.0)(postgres@3.4.9)
       pg-boss:
         specifier: 12.30.0
         version: 12.30.0
@@ -249,6 +252,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(pg@8.23.0)(postgres@3.4.9)
+      pg-boss:
+        specifier: 12.30.0
+        version: 12.30.0
       postgres:
         specifier: 3.4.9
         version: 3.4.9

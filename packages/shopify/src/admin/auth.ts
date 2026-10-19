@@ -79,6 +79,27 @@ interface CacheEntry {
   expiresAt: number;
 }
 
+/** The exchange, injectable so a test can mint without a network. */
+export type RequestAccessToken = (
+  shop: string,
+  clientId: string,
+  clientSecret: string,
+) => ReturnType<typeof requestAccessToken>;
+
+/**
+ * Where a long-lived caller gets its token from, each time it needs one.
+ *
+ * A string is right for a CLI session and wrong for a server: the token lasts
+ * 24 hours and the process does not, so on day two every order lookup fails
+ * with an authentication error and every order question becomes a hand-over.
+ * A source renews before expiry, and can be told a token was rejected.
+ */
+export interface AccessTokenSource {
+  token(): Promise<string>;
+  /** The API rejected the last token; the next `token()` mints a fresh one. */
+  invalidate(): void;
+}
+
 /**
  * Tokens, minted on demand and reused until they are nearly stale.
  *
@@ -92,12 +113,20 @@ interface CacheEntry {
  */
 export class AccessTokenCache {
   private readonly entries = new Map<string, CacheEntry>();
+  /** One grant at a time per app: concurrent lookups at expiry share it. */
+  private readonly inflight = new Map<string, Promise<string>>();
   private readonly now: () => number;
   private readonly marginMs: number;
+  private readonly request: RequestAccessToken;
 
-  constructor(now: () => number = Date.now, marginMs = 5 * 60 * 1000) {
+  constructor(
+    now: () => number = Date.now,
+    marginMs = 5 * 60 * 1000,
+    request: RequestAccessToken = requestAccessToken,
+  ) {
     this.now = now;
     this.marginMs = marginMs;
+    this.request = request;
   }
 
   /** Discards a token the API has just rejected, so the next call mints one. */
@@ -105,12 +134,35 @@ export class AccessTokenCache {
     this.entries.delete(`${shop}:${clientId}`);
   }
 
+  /** This cache bound to one app on one store, for a transport to hold. */
+  source(shop: string, clientId: string, clientSecret: string): AccessTokenSource {
+    return {
+      token: () => this.token(shop, clientId, clientSecret),
+      invalidate: () => this.invalidate(shop, clientId),
+    };
+  }
+
   async token(shop: string, clientId: string, clientSecret: string): Promise<string> {
     const key = `${shop}:${clientId}`;
     const cached = this.entries.get(key);
     if (cached && cached.expiresAt > this.now() + this.marginMs) return cached.token;
 
-    const result = await requestAccessToken(shop, clientId, clientSecret);
+    const pending = this.inflight.get(key);
+    if (pending) return pending;
+    const minting = this.mint(key, shop, clientId, clientSecret).finally(() =>
+      this.inflight.delete(key),
+    );
+    this.inflight.set(key, minting);
+    return minting;
+  }
+
+  private async mint(
+    key: string,
+    shop: string,
+    clientId: string,
+    clientSecret: string,
+  ): Promise<string> {
+    const result = await this.request(shop, clientId, clientSecret);
     if (!result.ok) {
       // The OAuth code alone has repeatedly cost hours, so it is carried; the
       // credential never is.

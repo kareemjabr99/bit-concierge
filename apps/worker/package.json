@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --packages=external --outfile=dist/index.js",
-    "dev": "node --experimental-strip-types --watch src/index.ts"
+    "dev": "node --env-file-if-exists=../../.env.local --watch src/index.ts",
+    "start": "node src/index.ts"
   },
   "dependencies": {
     "@bitc/core": "workspace:*",
     "@bitc/db": "workspace:*",
+    "drizzle-orm": "0.45.2",
     "pg-boss": "12.30.0"
   },
   "devDependencies": {
