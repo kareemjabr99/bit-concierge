@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv } from '@bitc/core';
-import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
+import { disconnect, resolveTenantByShop, resolveTenantByWidgetKey } from '@bitc/db';
 import { connectQueue } from '@bitc/db/queue';
 import { loadTenantConfig, runTurn } from '@bitc/agent';
 import { resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
 import { citationSources, PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
 import { createShopifyClient } from '@bitc/shopify';
 import { handleChat } from './chat-api.ts';
+import { handleShopifyWebhook } from './webhooks.ts';
 import { deriveSigningKey } from './session.ts';
 import { SlidingWindowLimiter } from './rate-limit.ts';
 
@@ -139,6 +140,19 @@ const server = createServer((req, res) => {
 
   if (url.pathname === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
+    return;
+  }
+
+  if (url.pathname === '/webhooks/shopify') {
+    // Signed with the runtime app's client secret, the app that subscribes.
+    // Unset means every delivery fails verification (401), never that
+    // unsigned ones are accepted.
+    void handleShopifyWebhook(req, res, {
+      secret: (process.env.SHOPIFY_RUNTIME_CLIENT_SECRET ?? '').trim(),
+      resolveTenant: async (shop) => (shop ? ((await resolveTenantByShop(shop)) ?? null) : null),
+      queue: queue.queue,
+      logger,
+    });
     return;
   }
 

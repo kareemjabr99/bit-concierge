@@ -63,7 +63,8 @@ if (email) {
   );
 }
 
-logger.info('worker started', { email: email !== undefined });
+// Not `email:` — the redactor treats any field by that name as an address.
+logger.info('worker started', { sendsEscalations: email !== undefined });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
