@@ -6,13 +6,23 @@ Work stops here until Phase 4 is approved.
 ## Pipeline
 
 ```text
-CI_STATUS_PLACEHOLDER
+NO RUN — branch phase-4-close not pushed yet. CI runs on pull requests and
+pushes to main; push and a PR wait on the owner. `pnpm gate --report` goes here
+once CI has run on the PR head. A phase does not close over a red or absent
+pipeline.
 ```
 
 `pnpm verify:clean` (fresh clone, fresh `HOME`, fresh Postgres volume):
 
 ```text
-VERIFY_CLEAN_PLACEHOLDER
+commit 1f5489a, 2026-10-19
+→ clean clone, fresh HOME, fresh pnpm store, no cached verdicts
+→ release-age margin on pinned dependencies
+→ fresh Postgres on port 55433 (throwaway volume)
+→ the README sequence
+ Test Files  53 passed (53)
+      Tests  965 passed (965)
+verify: all steps passed
 ```
 
 ## What failed, first
