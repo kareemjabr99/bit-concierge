@@ -6,11 +6,13 @@ Work stops here until Phase 4 is approved.
 ## Pipeline
 
 ```text
-NO RUN — branch phase-4-close not pushed yet. CI runs on pull requests and
-pushes to main; push and a PR wait on the owner. `pnpm gate --report` goes here
-once CI has run on the PR head. A phase does not close over a red or absent
-pipeline.
+CI at HEAD (5b2302e): green — 1/1 run(s) passed
 ```
+
+`pnpm gate --report` on 2026-10-19, PR
+[#2](https://github.com/kareemjabr99/bit-concierge/pull/2). `5b2302e` is the
+last commit with code or tests in it; the commit that records this line
+changes this file only and has its own CI run on the PR.
 
 `pnpm verify:clean` (fresh clone, fresh `HOME`, fresh Postgres volume):
 
