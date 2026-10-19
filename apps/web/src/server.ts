@@ -147,11 +147,18 @@ const server = createServer((req, res) => {
     // Signed with the runtime app's client secret, the app that subscribes.
     // Unset means every delivery fails verification (401), never that
     // unsigned ones are accepted.
-    void handleShopifyWebhook(req, res, {
+    handleShopifyWebhook(req, res, {
       secret: (process.env.SHOPIFY_RUNTIME_CLIENT_SECRET ?? '').trim(),
       resolveTenant: async (shop) => (shop ? ((await resolveTenantByShop(shop)) ?? null) : null),
       queue: queue.queue,
       logger,
+    }).catch((error: unknown) => {
+      // A client that hangs up mid-body. Never left as an unhandled
+      // rejection, which would take the whole server down.
+      logger.warn('webhook_request_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (!res.headersSent) res.writeHead(400, { 'content-type': 'text/plain' }).end('bad request');
     });
     return;
   }

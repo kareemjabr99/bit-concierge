@@ -125,8 +125,8 @@ before their gate closes and the results are recorded. Twenty-five mutants
 across this phase's first components; twenty-four killed, one survived and was
 answered by deleting the code rather than by writing a test for it. The status
 link (ADR 0012, six of six) and the 2026-10-12 gate changes (21 of 21) are
-recorded with their commits. The close added the last four rows: 37 mutants,
-37 killed, one of them only after the mutant itself was corrected.
+recorded with their commits. The close added the last four rows: 38 mutants,
+38 killed, one of them only after the mutant itself was corrected.
 
 | Component                             | Mutants | Killed | Note                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------------------------- | ------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,7 +138,7 @@ recorded with their commits. The close added the last four rows: 37 mutants,
 | Token renewal (2026-10-18)            | 12      | 12     | fixed string wired in, no mint at start, 401 without invalidate, static token retried, no retry, unbounded retry, source token unchecked, margin ignored, no shared grant, failed grant stuck in flight, invalidate a no-op, cache keyed by app only. The fixed-string mutant first survived because the mutant was written wrong (it never reached the transport); corrected, killed                |
 | Store choice guard                    | 1       | 1      | apps/web constructing the mock again                                                                                                                                                                                                                                                                                                                                                                 |
 | Escalation email and queue            | 15      | 15     | no row lock (two deliveries both send), non-pending sent, empty recipients sent, refusal retried, last attempt left pending, status link forwarded, idempotency key per attempt, digest keyed by its own row, digested rows re-sent, failed digest row kept, 429 not retried, every 409 retried, enqueue outside the transaction, queue failure failing the escalation, digested rows emailed singly |
-| Webhook receiver                      | 9       | 9      | signature skipped, empty secret accepted, digest prefix accepted, every topic queued, failed enqueue acknowledged, no body limit, any gid accepted, no delivery dedupe, dedupe key without a window                                                                                                                                                                                                  |
+| Webhook receiver                      | 10      | 10     | signature skipped, empty secret accepted, digest prefix accepted, every topic queued, failed enqueue acknowledged, no body limit, any gid accepted, no delivery dedupe, dedupe key without a window                                                                                                                                                                                                  |
 
 ### The decision the wiring needs — what Shopify's docs say
 

@@ -102,7 +102,18 @@ export const handleShopifyWebhook = async (
     return answer(res, 200, 'ignored');
   }
 
-  const tenantId = await deps.resolveTenant(shop);
+  let tenantId: string | null;
+  try {
+    tenantId = await deps.resolveTenant(shop);
+  } catch (error) {
+    // The database, not the delivery. 5xx so Shopify retries — and caught
+    // here because the server does not await this handler: a rejection
+    // escaping it would be unhandled, and Node exits on that.
+    log.error('webhook_tenant_lookup_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return answer(res, 503, 'try again');
+  }
   if (!tenantId) {
     // Signed by our app, for a store with no active tenant: uninstalled, or
     // not onboarded. Acknowledged so Shopify stops; logged so someone looks.

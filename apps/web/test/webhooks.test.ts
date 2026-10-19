@@ -182,6 +182,16 @@ describe('the receiver', () => {
     expect((await run(delivery(PRODUCT))).status).toBe(503);
   });
 
+  it('answers 503 rather than rejecting when the tenant lookup fails', async () => {
+    const { run, queued } = setup({
+      resolveTenant: async () => {
+        throw new Error('connection refused');
+      },
+    });
+    expect((await run(delivery(PRODUCT))).status).toBe(503);
+    expect(queued).toHaveLength(0);
+  });
+
   it('refuses a body over the limit without verifying or reading it', async () => {
     const big = 'x'.repeat(1_000_001);
     const { run, queued } = setup();

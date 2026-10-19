@@ -164,7 +164,7 @@ the prompt.
 | Latency                                   | 3.2s median, 8.1s p95, 33s worst                | Yes, and it is a known weakness                     |
 | Model cost                                | $4.70 per 1,000 three-turn conversations        | Yes, at Google's published paid rate                |
 | Platform floor                            | ~$53/month shared, before any tenant            | Yes — price with a floor, not only per conversation |
-| Tests                                     | 942 passing, 51 files on 2026-10-19 — re-verify | —                                                   |
+| Tests                                     | 965 passing, 53 files on 2026-10-19 — re-verify | —                                                   |
 
 **Accuracy, deflection and escalation precision above are run 6, before
 Phase 4.** The 2026-10-11 re-baseline against the mock (108 cases) passed 85:
