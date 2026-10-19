@@ -1,5 +1,5 @@
 import { ToolLoopAgent, isStepCount, type ModelMessage } from 'ai';
-import type { Channel, Language, Logger, TenantId } from '@bitc/core';
+import type { Channel, JobQueue, Language, Logger, TenantId } from '@bitc/core';
 import { estimateCostUsd, providerOptionsFor, type ChatModelHandle } from '@bitc/models';
 import type { ShopifyReadClient } from '@bitc/shopify';
 import type { TenantRuntimeConfig, TurnContext, TurnRecorder } from './context.ts';
@@ -44,6 +44,8 @@ export interface TurnDeps {
   configOverrides?: Partial<TenantRuntimeConfig> | undefined;
   /** Optional. Without it, unanswerable questions go unreported. */
   gaps?: GapRecorder | undefined;
+  /** Optional. Without it, escalations are written and not emailed. */
+  jobs?: JobQueue | undefined;
   logger: Logger;
   now?: () => Date;
   /** Wall-clock budget for the model loop. */
@@ -150,6 +152,7 @@ export const runTurn = async (input: TurnInput, deps: TurnDeps): Promise<TurnRes
     shopify: deps.shopify,
     knowledge: deps.knowledge,
     gaps: deps.gaps,
+    jobs: deps.jobs,
     recorder,
     logger,
     now,

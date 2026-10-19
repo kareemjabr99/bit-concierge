@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { asTenantId, createLogger, readEnv } from '@bitc/core';
 import { disconnect, resolveTenantByWidgetKey } from '@bitc/db';
+import { connectQueue } from '@bitc/db/queue';
 import { loadTenantConfig, runTurn } from '@bitc/agent';
 import { resolveChatModel, resolveEmbedder, resolveReranker } from '@bitc/models';
 import { citationSources, PgGapRecorder, PgKnowledgeSearcher } from '@bitc/rag';
@@ -40,6 +41,10 @@ const logger = createLogger({ level: 'info' });
 // shopify_installs replace this read when a second store exists.
 const store = await createShopifyClient(process.env);
 logger.info('store', { store: store.label });
+
+// Escalations are emailed by the worker; this process only enqueues, in the
+// same transaction as the escalation row (packages/agent/src/escalation.ts).
+const queue = await connectQueue(readEnv('base').DATABASE_URL, { role: 'producer' });
 
 const sessionKey = deriveSigningKey(env.ENCRYPTION_KEY);
 // Per visitor, per hour. The tenant's own lookupLimits govern tool use inside
@@ -174,6 +179,7 @@ const server = createServer((req, res) => {
             resolveReranker(config.reranker, { model: chat.model }),
           ),
           gaps: new PgGapRecorder(input.tenantId),
+          jobs: queue.queue,
           logger,
           onStage,
         });
@@ -193,6 +199,12 @@ server.listen(port, () => logger.info('storefront chat listening', { port, trust
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    server.close(() => void disconnect().then(() => process.exit(0)));
+    server.close(
+      () =>
+        void queue
+          .stop()
+          .then(() => disconnect())
+          .then(() => process.exit(0)),
+    );
   });
 }
