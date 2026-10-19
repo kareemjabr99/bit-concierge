@@ -16,6 +16,7 @@
     "db:generate": "pnpm --filter @bitc/db run generate",
     "db:migrate": "pnpm --filter @bitc/db run migrate",
     "db:rollback": "pnpm --filter @bitc/db run rollback",
+    "db:status": "pnpm --filter @bitc/db run status",
     "db:reset": "pnpm --filter @bitc/db run reset",
     "verify": "bash scripts/verify.sh",
     "verify:clean": "bash scripts/verify-clean.sh",

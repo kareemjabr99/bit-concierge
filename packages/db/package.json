@@ -11,11 +11,11 @@
     "./queue": "./src/queue.ts"
   },
   "scripts": {
-    "migrate": "node src/cli.ts up",
-    "rollback": "node src/cli.ts down",
-    "status": "node src/cli.ts status",
-    "reset": "node src/cli.ts reset",
-    "seed": "node src/seed.ts"
+    "migrate": "node --env-file-if-exists=../../.env.local src/cli.ts up",
+    "rollback": "node --env-file-if-exists=../../.env.local src/cli.ts down",
+    "status": "node --env-file-if-exists=../../.env.local src/cli.ts status",
+    "reset": "node --env-file-if-exists=../../.env.local src/cli.ts reset",
+    "seed": "node --env-file-if-exists=../../.env.local src/seed.ts"
   },
   "dependencies": {
     "@bitc/core": "workspace:*",

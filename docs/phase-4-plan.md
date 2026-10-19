@@ -81,32 +81,64 @@ principled basis for choosing.
 
 ## Where it stands
 
-| Definition-of-done item                                                    | State                                        |
-| -------------------------------------------------------------------------- | -------------------------------------------- |
-| Real order fetched and answered, literal gate passing on Admin API figures | client done, not yet wired into a turn       |
-| Mismatched-email and guest-checkout cases against real data                | read and compared; not yet through the agent |
-| A throttled request escalating, under test                                 | done                                         |
-| The mock client still passing the full suite                               | done — 687 tests                             |
-| The bar unchanged                                                          | unchanged                                    |
+Updated 2026-10-19, at the gate.
 
-The store was seeded, the 16 cases were remapped, and four more moved with
-them. `ShopifyAdminClient` reads it. What is left is the wiring: which client a
-turn gets, and where a tenant's credentials come from.
+| Definition-of-done item                                                    | State                                                                                                                                      |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Real order fetched and answered, literal gate passing on Admin API figures | **met** 2026-10-19 — [evidence](evidence/2026-10-19-phase-4-dod.md)                                                                        |
+| Mismatched-email and guest-checkout cases against real data                | **met** — both verify on real shapes and refuse a wrong email; two first-run replies withheld for a mis-cited tool, both answered re-asked |
+| A throttled request escalating, under test                                 | done                                                                                                                                       |
+| The mock client still passing the full suite                               | done — the eval runner is on the factory with `--store mock`                                                                               |
+| The bar unchanged                                                          | unchanged                                                                                                                                  |
+
+Plan items 1, 3 and 5 are done. Item 4, webhooks, is half done by choice: the
+receiver verifies and queues; nothing consumes the job yet, because re-indexing
+spends embedding quota on every merchant edit and that is the owner's call
+(below). Item 2, credentials sealed in `shopify_installs`, stays unbuilt: the
+owner's 2026-09-24 decision makes environment credentials the development
+source, and the installs path is first needed by a second store (Phase 6).
+
+### Built at the close (2026-10-18 and 19)
+
+- **Token renewal** (`1b8fbb0`). The transport takes a token source; the cache
+  renews inside its five-minute margin, shares one grant between concurrent
+  lookups, and a 401 discards the token and mints once without spending a
+  throttle attempt. The precondition below.
+- **`apps/web` on the factory** (`446b265`), the last entry point that built the
+  mock itself. A repo guard (`test/store-choice.test.ts`) fails if anything but
+  the factory constructs `MockShopifyClient`.
+- **Escalation email** (`71c24f3`). `escalate()` enqueues an id-only job in the
+  row's transaction (in a savepoint, so a failed queue costs the email, never
+  the escalation); the worker sends it through Resend and marks the row `sent`
+  or `failed`; over the hourly cap, one digest per tenant per hour. The queue
+  is pg-boss in its own schema (migration 0008). Not delivered for real: no
+  Resend account exists.
+- **Webhook receiver** (`a0474e3`). `POST /webhooks/shopify`, signature checked
+  over the raw body before anything is read, product topics queued as
+  `product-changed` with the product id only. Not subscribed: nothing is
+  deployed and there is no public URL.
 
 ### Mutation results, for the gate report
 
 Standing policy is that correctness-critical components are mutation-tested
 before their gate closes and the results are recorded. Twenty-five mutants
-across this phase's components; twenty-four killed, one survived and was
-answered by deleting the code rather than by writing a test for it.
+across this phase's first components; twenty-four killed, one survived and was
+answered by deleting the code rather than by writing a test for it. The status
+link (ADR 0012, six of six) and the 2026-10-12 gate changes (21 of 21) are
+recorded with their commits. The close added the last four rows: 37 mutants,
+37 killed, one of them only after the mutant itself was corrected.
 
-| Component                             | Mutants | Killed | Note                                                                                                                                                    |
-| ------------------------------------- | ------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mock/store mirror + golden-set guards | 8       | 8      | stock drift, continue-selling flag, both email bugs, a store-side price change, a stale order number, an email that verifies when a refusal is expected |
-| Credential guard                      | 3       | 2      | the survivor was an early return `matches` already covered — dead code, removed                                                                         |
-| Stock level                           | 4       | 4      | the old in_stock behaviour, policy ignored, availability veto removed, threshold off by one                                                             |
-| Read client and mapper                | 6       | 6      | exact-match filter dropped, two matches accepted, customer text unquoted, drafts surfaced, money truncated, FULFILLED read as in transit                |
-| Payment states in lookup_order        | 3       | 3      | partially paid no longer handed over, payment field exposed on an authorized order, the second total dropped                                            |
+| Component                             | Mutants | Killed | Note                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mock/store mirror + golden-set guards | 8       | 8      | stock drift, continue-selling flag, both email bugs, a store-side price change, a stale order number, an email that verifies when a refusal is expected                                                                                                                                                                                                                                              |
+| Credential guard                      | 3       | 2      | the survivor was an early return `matches` already covered — dead code, removed                                                                                                                                                                                                                                                                                                                      |
+| Stock level                           | 4       | 4      | the old in_stock behaviour, policy ignored, availability veto removed, threshold off by one                                                                                                                                                                                                                                                                                                          |
+| Read client and mapper                | 6       | 6      | exact-match filter dropped, two matches accepted, customer text unquoted, drafts surfaced, money truncated, FULFILLED read as in transit                                                                                                                                                                                                                                                             |
+| Payment states in lookup_order        | 3       | 3      | partially paid no longer handed over, payment field exposed on an authorized order, the second total dropped                                                                                                                                                                                                                                                                                         |
+| Token renewal (2026-10-18)            | 12      | 12     | fixed string wired in, no mint at start, 401 without invalidate, static token retried, no retry, unbounded retry, source token unchecked, margin ignored, no shared grant, failed grant stuck in flight, invalidate a no-op, cache keyed by app only. The fixed-string mutant first survived because the mutant was written wrong (it never reached the transport); corrected, killed                |
+| Store choice guard                    | 1       | 1      | apps/web constructing the mock again                                                                                                                                                                                                                                                                                                                                                                 |
+| Escalation email and queue            | 15      | 15     | no row lock (two deliveries both send), non-pending sent, empty recipients sent, refusal retried, last attempt left pending, status link forwarded, idempotency key per attempt, digest keyed by its own row, digested rows re-sent, failed digest row kept, 429 not retried, every 409 retried, enqueue outside the transaction, queue failure failing the escalation, digested rows emailed singly |
+| Webhook receiver                      | 9       | 9      | signature skipped, empty secret accepted, digest prefix accepted, every topic queued, failed enqueue acknowledged, no body limit, any gid accepted, no delivery dedupe, dedupe key without a window                                                                                                                                                                                                  |
 
 ### The decision the wiring needs — what Shopify's docs say
 
@@ -140,7 +172,7 @@ client credentials work at all. Per the owner's conditional decision on
 2026-09-24, the schema stays; client credentials become a development and
 same-organization credential source read from the environment. Not built yet.
 
-## Preconditions for `apps/web` (decided 2026-10-12)
+## Preconditions for `apps/web` (decided 2026-10-12, met 2026-10-18)
 
 - **Token refresh.** The factory (`packages/shopify/src/factory.ts`) mints one
   24-hour access token at start and hands it to `AdminTransport` as a fixed
@@ -150,7 +182,8 @@ same-organization credential source read from the environment. Not built yet.
   factory, the transport must take a token _source_ (the `AccessTokenCache`
   already tracks expiry and exposes `invalidate`), renew before expiry, and on
   a rejected token invalidate and retry once. Needs a test with an injected
-  clock.
+  clock. **Done** in `1b8fbb0`; tests in `factory.test.ts` and
+  `token-source.test.ts`.
 - **The status-link rules** in [ADR 0012](adr/0012-order-status-link.md) apply to
   every entry point; `apps/web` stores transcripts and is where the
   "database is not contained" caveat bites.

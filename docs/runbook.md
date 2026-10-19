@@ -40,6 +40,72 @@ The worker must never scale to zero — a suspended worker looks exactly like
 ingestion silently not working. Check `fly status -a bit-concierge-worker`
 before looking at pg-boss.
 
+Locally:
+
+```bash
+pnpm db:migrate                       # 0008 creates the pgboss schema
+pnpm --filter @bitc/worker dev        # reads .env.local
+```
+
+The queue is pg-boss in the `pgboss` schema (migration 0008, ADR 0001/0002).
+The app role installs and upgrades pg-boss's tables there on start. Jobs carry
+ids only — a tenant id and a row id — and read the row under `withTenant()`.
+What is queued, by name:
+
+```sql
+SELECT name, state, count(*) FROM pgboss.job GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+`product-changed` has no consumer yet (see "Shopify webhooks" below); those
+jobs wait and expire after pg-boss's retention. That is expected.
+
+## Escalation email
+
+The storefront server enqueues `escalation-email` in the same transaction as
+the escalation row; the worker sends it through Resend and marks the row. The
+row is the record: `delivery_status` is `pending` until sent, then `sent`, or
+`failed` when Resend refused it or the last retry (about an hour of backoff)
+failed. Over the tenant's hourly cap rows are `digested` and go out together
+an hour later; `digest_id` links them to `escalation_digests`.
+
+**Rows stuck in `pending`:** first, is the worker running with
+`RESEND_API_KEY` and `ESCALATION_FROM_EMAIL` set? Without them it logs
+"escalation email not configured" at start and leaves the jobs queued
+(development) or refuses to start (production). Second, did the enqueue fail?
+The server logs `escalation_enqueue_failed` with the escalation id; the row
+was still written, and no job exists for it.
+
+```sql
+-- as the migrator; per tenant
+SELECT id, created_at, delivery_status, reason FROM escalations
+WHERE delivery_status IN ('pending', 'failed') ORDER BY created_at DESC LIMIT 20;
+```
+
+**Rows `failed`:** the worker logs `escalation_email_failed` with Resend's
+error name. A 403 `validation_error` is almost always the sending domain: the
+from address must be on a domain verified in Resend. To resend once fixed, set
+the row back to `pending` and enqueue the job again — there is no button yet.
+
+Escalation emails carry the customer's contact details to Resend, a
+sub-processor that the merchant agreement must name (ADR 0007). The CLI and the
+eval runner never pass a queue, so they cannot email anyone.
+
+## Shopify webhooks
+
+`POST /webhooks/shopify` on the storefront server. The signature
+(`X-Shopify-Hmac-SHA256`) is checked over the raw body with
+`SHOPIFY_RUNTIME_CLIENT_SECRET` before anything is read; unset, every delivery
+is refused with 401. Product topics are queued as `product-changed` with the
+product id only, throttled per `X-Shopify-Webhook-Id`; other topics and unknown
+shops get 200 so Shopify stops retrying, and a failed enqueue gets 503 so it
+retries (eight times over four hours, then an Admin-API subscription is
+deleted).
+
+**Not subscribed anywhere.** Nothing is deployed, so there is no public URL.
+The shop is matched to a tenant by `tenants.shopify_domain`, which the local
+seed does not set; a delivery from the dev store would be answered "unknown
+shop" until it is.
+
 ## A tenant has hit its daily token cap
 
 Expected behaviour: a graceful message, not an error. Raise
@@ -51,7 +117,8 @@ Expected behaviour: a graceful message, not an error. Raise
 ## The merchant is getting escalation digests instead of individual emails
 
 The tenant is above `max_escalations_per_hour` (default 20). Nothing was
-dropped — every escalation is in the digest, with `delivery_status = 'digested'`.
+dropped — every escalation is in the digest, with `delivery_status = 'digested'`
+and `digest_id` set once the digest has gone.
 Either the cap is too low for their volume or something upstream is
 over-escalating. Check the escalation rate in the dashboard before raising it.
 

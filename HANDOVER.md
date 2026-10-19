@@ -46,15 +46,15 @@ See [ADR 0011](docs/adr/0011-the-bar.md).
 
 ### Phases
 
-| Phase | Scope                                           | State                                             |
-| ----- | ----------------------------------------------- | ------------------------------------------------- |
-| 0     | Foundation: monorepo, Postgres + RLS, CI        | ✅ closed                                         |
-| 1     | Core agent loop over a mocked store             | ✅ closed                                         |
-| 2     | Retrieval (RAG) and the eval harness            | ✅ closed                                         |
-| 3     | Storefront widget; the ship bar redefined       | ✅ closed                                         |
-| 4     | **Real Shopify** — against a development store  | 🔶 **in progress** — read client built, not wired |
-| 5     | Arabic, and validation with the client          | not started                                       |
-| 6     | Multi-tenant hardening, admin UI, IG + WhatsApp | not started                                       |
+| Phase | Scope                                           | State                                       |
+| ----- | ----------------------------------------------- | ------------------------------------------- |
+| 0     | Foundation: monorepo, Postgres + RLS, CI        | ✅ closed                                   |
+| 1     | Core agent loop over a mocked store             | ✅ closed                                   |
+| 2     | Retrieval (RAG) and the eval harness            | ✅ closed                                   |
+| 3     | Storefront widget; the ship bar redefined       | ✅ closed                                   |
+| 4     | **Real Shopify** — against a development store  | 🔶 **at the gate** — built; awaiting review |
+| 5     | Arabic, and validation with the client          | not started                                 |
+| 6     | Multi-tenant hardening, admin UI, IG + WhatsApp | not started                                 |
 
 The full history, phase by phase, is in [docs/build-log.md](docs/build-log.md).
 The honest assessment written for someone who has to represent this to a client
@@ -63,48 +63,54 @@ quoting any number.
 
 ### Phase 4, item by item
 
-From the definition of done in [docs/phase-4-plan.md](docs/phase-4-plan.md#definition-of-done):
+From the definition of done in [docs/phase-4-plan.md](docs/phase-4-plan.md#definition-of-done),
+updated 2026-10-19:
 
-| Definition-of-done item                                           | State                                                                |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| A real order fetched from the dev store and answered by the agent | **Not yet.** The client reads the store; it is not wired into a turn |
-| Mismatched-email and guest-checkout cases against real data       | Read and compared; not yet through the agent                         |
-| A throttled request escalating, under test                        | ✅ done                                                              |
-| The mock client still passing the full suite                      | ✅ done                                                              |
-| The bar unchanged                                                 | ✅ unchanged                                                         |
+| Definition-of-done item                                           | State                                                                                                                                                 |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A real order fetched from the dev store and answered by the agent | ✅ met — [evidence](docs/evidence/2026-10-19-phase-4-dod.md); literal gate passed on the store's tracking number                                      |
+| Mismatched-email and guest-checkout cases against real data       | ✅ met — both verify, wrong emails refused. Two first-run replies on the cancelled order were withheld (model mis-cited the tool); re-asked, answered |
+| A throttled request escalating, under test                        | ✅ done                                                                                                                                               |
+| The mock client still passing the full suite                      | ✅ done                                                                                                                                               |
+| The bar unchanged                                                 | ✅ unchanged                                                                                                                                          |
+
+The gate report is [docs/phase-4-gate-report.md](docs/phase-4-gate-report.md).
 
 What exists and works:
 
-- **The development store is seeded** — 7 products, 5 customers, 6 order
-  scenarios (shipped, unshipped, delivered, different email on the order,
-  partial refund, guest checkout), verified by reading them back. Scenario 1
-  was meant to be _in transit_; the store reports it as shipped with no carrier
-  scan, because creating a shipment does not make Shopify believe a carrier has
-  it. Adding the carrier event is part of step 3 below.
-- **The payment-state decisions are tested against constructed orders only.**
-  No authorized or partially paid order exists in the store yet; step 3 adds
-  them.
+- **The development store is seeded** — 7 products, 7 customers, 8 order
+  scenarios (in transit, unshipped, delivered, different email on the order,
+  partial refund, guest checkout, authorized, partially paid), and
+  `compare:store` exits 0 against the mock.
 - **`ShopifyAdminClient`** — the real read client, Admin GraphQL 2026-07, same
-  interface as the mock, written from recorded responses, mutation-tested.
-- **`compare:store`** — reads the live store and diffs it field by field
-  against the mock the eval suite runs on. It has found four divergences that
-  nothing else could have.
-- **The mock mirrors the store**, and a test fails if it drifts from the seed
-  data. The golden set is remapped onto the order numbers the store assigned.
+  interface as the mock, mutation-tested. Its token **renews** in a process that
+  stays up: the transport takes a token source, renews before expiry, and
+  re-mints once after a 401.
+- **One factory chooses the store** for every entry point (`apps/web`,
+  `apps/cli`, the eval runner): real when the three runtime variables are set,
+  mock when none are, an error otherwise. A repo guard fails if anything else
+  constructs the mock.
+- **The queue and the worker.** pg-boss in its own schema (migration 0008).
+  `apps/worker` sends escalation email and hourly digests; jobs carry ids only.
+- **Escalation email**, built and tested against a fake provider. Enqueued in
+  the escalation row's transaction; sent through Resend; rows end `sent` or
+  `failed`. **Never delivered for real** — there is no Resend account.
+- **A Shopify webhook receiver** (`POST /webhooks/shopify`) that verifies the
+  signature and queues product changes. **Nothing consumes the job**, by
+  decision pending (section 7), and no store is subscribed.
 - **Decided answers** for zero-stock-still-selling, authorized payments and
-  partially paid orders.
+  partially paid orders, now with real orders in the store for both.
 
 What is **not built**, so nobody assumes it is:
 
-- The agent does not yet use the real client in a conversation. Every entry
-  point (`apps/web`, `apps/cli`, the eval runner) still constructs
-  `MockShopifyClient`.
 - **No deployment exists.** Fly.io config is in the repo, but `apps/web`'s build
-  script is a placeholder that writes an empty file, `apps/worker` is a
-  two-line stub, and no Fly app has been created from this machine.
-- **Escalation emails are not sent.** An escalation writes a database row; that
-  row is the contract until email delivery (Resend) is wired.
-- Webhooks for incremental re-indexing — not built.
+  script is a placeholder that writes an empty file, and no Fly app has been
+  created. The worker runs locally only.
+- **Re-indexing on product change** — the receiver queues it; no consumer.
+- **Per-tenant Shopify credentials** from `shopify_installs` — the environment
+  is the credential source (the owner's 2026-09-24 decision). First needed by a
+  second store; Phase 6.
+- The retention job (ADR 0007) — Phase 6. It must strip status links (ADR 0012).
 - `packages/channels` (Instagram, WhatsApp) — a stub. Phase 6.
 - The embedded Shopify admin UI — Phase 6.
 - Arabic — the schema and search configuration support it; nothing is
@@ -148,30 +154,32 @@ the prompt.
 
 ### Numbers, and what they are worth
 
-| Measure                                   | Value                                                    | Worth quoting?                                      |
-| ----------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
-| Fabricated literals reaching a customer   | 0                                                        | **Yes** — a property, enforced by the gate          |
-| Uncited policy claims reaching a customer | 0                                                        | **Yes** — same                                      |
-| Accuracy                                  | ~79% on 103 cases, ±3.3 points                           | No — drafted suite, not client-validated            |
-| Deflection                                | 77.5%                                                    | No — same; this is the number that would sell it    |
-| Escalation precision                      | 73.8%                                                    | No — same                                           |
-| Latency                                   | 3.2s median, 8.1s p95, 33s worst                         | Yes, and it is a known weakness                     |
-| Model cost                                | $4.70 per 1,000 three-turn conversations                 | Yes, at Google's published paid rate                |
-| Platform floor                            | ~$53/month shared, before any tenant                     | Yes — price with a floor, not only per conversation |
-| Tests                                     | 691 passing, 39 files — as of the last commit, re-verify | —                                                   |
+| Measure                                   | Value                                           | Worth quoting?                                      |
+| ----------------------------------------- | ----------------------------------------------- | --------------------------------------------------- |
+| Fabricated literals reaching a customer   | 0                                               | **Yes** — a property, enforced by the gate          |
+| Uncited policy claims reaching a customer | 0                                               | **Yes** — same                                      |
+| Accuracy                                  | ~79% on 103 cases, ±3.3 points                  | No — drafted suite, not client-validated            |
+| Deflection                                | 77.5%                                           | No — same; this is the number that would sell it    |
+| Escalation precision                      | 73.8%                                           | No — same                                           |
+| Latency                                   | 3.2s median, 8.1s p95, 33s worst                | Yes, and it is a known weakness                     |
+| Model cost                                | $4.70 per 1,000 three-turn conversations        | Yes, at Google's published paid rate                |
+| Platform floor                            | ~$53/month shared, before any tenant            | Yes — price with a floor, not only per conversation |
+| Tests                                     | 942 passing, 51 files on 2026-10-19 — re-verify | —                                                   |
 
-**Every eval number above predates Phase 4's changes.** Since the last run the
-system prompt gained a stock section and a payment rule, `lookup_order`'s output
-changed, the golden set was remapped to new order numbers, and a 104th case was
-added. Nothing has been re-measured. **The next eval run re-baselines
-everything** — see [step 4 of what to do next](#8-what-to-do-next-in-order).
+**Accuracy, deflection and escalation precision above are run 6, before
+Phase 4.** The 2026-10-11 re-baseline against the mock (108 cases) passed 85:
+71.3% as scored, 78.7% after adjudication, zero fabricated literals and zero
+uncited claims — files in [packages/evals/history/](packages/evals/history/README.md),
+recorded as the `en-core` baseline in `packages/evals/baselines/`. The
+2026-10-12 guard changes are re-scored offline only, and nothing since has been
+measured; the closing work (token renewal, the queue, email, webhooks) changes
+no prompt and no tool output, but that is a reason to expect no change, not a
+measurement of one.
 
-**No baseline is recorded on disk** (`packages/evals/baselines/` is empty). The
-**run history is exported** to [packages/evals/history/](packages/evals/history/README.md):
-all 11 run summaries, six printed reports, and the run 4/5/6 comparisons with
-the twelve flips and their replies — the evidence behind
-`where-this-stands.md`. Per-case outputs for each run were lost before the
-export; the history's README says exactly what survives.
+The **run history is exported** to the same folder: the run summaries, printed
+reports, and the run 4/5/6 comparisons behind `where-this-stands.md`. Per-case
+outputs from before 2026-10-11 were lost; the history's README says what
+survives.
 
 ### Blocked right now
 
@@ -230,7 +238,7 @@ ask for the values again; on a new machine, copy the file from that backup.
 | `SHOPIFY_RUNTIME_CLIENT_ID`, `_SECRET`              | The read-only runtime app (`bit-concierge`)     | From `bit-concierge` → App settings in the Dev Dashboard. Seven read scopes, listed in section 2.3; installed on the dev store |
 | `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`        | The **seeding** app (`bitc-seed`), write scopes | From `bitc-seed` → App settings in the Dev Dashboard. Never read by the runtime — a test enforces it                           |
 | `SHOPIFY_API_KEY`, `_SECRET`, `_APP_URL`, `_SCOPES` | Reserved for the embedded admin app             | Reserved for the future production OAuth app, which does not exist yet. Phase 6                                                |
-| `RESEND_API_KEY`, `ESCALATION_FROM_EMAIL`           | Escalation email                                | Not wired yet                                                                                                                  |
+| `RESEND_API_KEY`, `ESCALATION_FROM_EMAIL`           | Escalation email, read by the worker only       | Wired; **no Resend account yet**. The from address must be on a domain verified in Resend                                      |
 | `META_*`, `INSTAGRAM_*`, `WHATSAPP_*`               | Channels                                        | Phase 6                                                                                                                        |
 
 **Rotate when ownership changes.** If this moves to people who should not hold
@@ -374,7 +382,7 @@ prints is a real difference.
 apps/web          widget chat API (HMAC-signed sessions, SSE progress); embedded admin later
 apps/widget       Shadow DOM storefront widget
 apps/cli          conversation harness — the fastest way to talk to the agent
-apps/worker       pg-boss consumer — a stub
+apps/worker       pg-boss consumer: escalation email and digests (product re-index: not yet)
 
 packages/core     env, redacting logger, errors, AES-256-GCM key ring
 packages/db       Drizzle schema, hand-written migrations, RLS, withTenant()
@@ -466,6 +474,7 @@ broken at least once, or nearly. They travel with the code.
 | Ingest a storefront        | `pnpm --filter @bitc/rag ingest`                                                                                                 | spends embedding quota                                          |
 | Seed the dev store         | `seed:check` → `seed:dry-run` → `seed` (in `@bitc/shopify`)                                                                      | [runbook](docs/runbook.md#seeding-the-development-store)        |
 | Compare store against mock | `pnpm --filter @bitc/shopify run compare:store`                                                                                  | exits non-zero on any unexplained difference                    |
+| Run the worker             | `pnpm db:migrate`, then `pnpm --filter @bitc/worker dev`                                                                         | [runbook](docs/runbook.md#escalation-email)                     |
 | Close a phase              | `pnpm verify:clean`, then `pnpm gate`                                                                                            | [runbook](docs/runbook.md#closing-a-phase)                      |
 | Swap the chat model        | registry, run, diff, review suppressions                                                                                         | [runbook](docs/runbook.md#swapping-the-chat-model)              |
 | Re-index to a new embedder | backfill, then flip config                                                                                                       | [runbook](docs/runbook.md#re-indexing-to-a-new-embedding-model) |
@@ -483,16 +492,18 @@ remaining cases as failures and understates everything.
 
 ## 7. Decisions still open
 
-| Decision                                                                                                                                | Whose                               | Source                                                                                                     |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| How the agent gets Shopify credentials at runtime                                                                                       | Owner — conditionally decided       | [phase-4-plan.md](docs/phase-4-plan.md#the-decision-the-wiring-needs--what-shopifys-docs-say)              |
-| Custom distribution per merchant, or a public app — **cannot be changed once chosen**                                                   | Bit68                               | same                                                                                                       |
-| 1886's payment capture mode (automatic or manual)                                                                                       | Confirm in 1886's admin             | [where-this-stands.md](docs/where-this-stands.md#1886s-capture-mode-is-unverified)                         |
-| Requesting `read_all_orders` (older than 60 days)                                                                                       | Bit68 with 1886, in the agreement   | [where-this-stands.md](docs/where-this-stands.md#a-pilot-limitation-with-a-name-orders-older-than-60-days) |
-| Who at 1886 signs the golden set                                                                                                        | 1886                                | [ADR 0011](docs/adr/0011-the-bar.md)                                                                       |
-| Cross-border transfer to Frankfurt under PDPL, sub-processors, offboarding, embeddings on termination, backup retention                 | Bit68 and counsel                   | [agreement-inputs.md](docs/agreement-inputs.md) — the eight lines marked GAP                               |
-| Which behaviour the four unstable cases should have                                                                                     | 1886, through a signed question set | [where-this-stands.md](docs/where-this-stands.md#the-quality-problem-isolated)                             |
-| What to tell a customer about an expired authorization, and about eight carrier states (delayed, attempted delivery, ready for pickup…) | Owner                               | [map.ts](packages/shopify/src/admin/map.ts) — each hands over until decided                                |
+| Decision                                                                                                                                         | Whose                               | Source                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| How the agent gets Shopify credentials at runtime                                                                                                | Owner — conditionally decided       | [phase-4-plan.md](docs/phase-4-plan.md#the-decision-the-wiring-needs--what-shopifys-docs-say)              |
+| Custom distribution per merchant, or a public app — **cannot be changed once chosen**                                                            | Bit68                               | same                                                                                                       |
+| 1886's payment capture mode (automatic or manual)                                                                                                | Confirm in 1886's admin             | [where-this-stands.md](docs/where-this-stands.md#1886s-capture-mode-is-unverified)                         |
+| Requesting `read_all_orders` (older than 60 days)                                                                                                | Bit68 with 1886, in the agreement   | [where-this-stands.md](docs/where-this-stands.md#a-pilot-limitation-with-a-name-orders-older-than-60-days) |
+| Who at 1886 signs the golden set                                                                                                                 | 1886                                | [ADR 0011](docs/adr/0011-the-bar.md)                                                                       |
+| Cross-border transfer to Frankfurt under PDPL, sub-processors, offboarding, embeddings on termination, backup retention                          | Bit68 and counsel                   | [agreement-inputs.md](docs/agreement-inputs.md) — the eight lines marked GAP                               |
+| Which behaviour the four unstable cases should have                                                                                              | 1886, through a signed question set | [where-this-stands.md](docs/where-this-stands.md#the-quality-problem-isolated)                             |
+| What to tell a customer about an expired authorization, and about eight carrier states (delayed, attempted delivery, ready for pickup…)          | Owner                               | [map.ts](packages/shopify/src/admin/map.ts) — each hands over until decided                                |
+| Re-index on product change: consume `product-changed`, which spends embedding quota on every merchant edit (free-tier key, one-use-per-day rule) | Owner                               | [phase-4-plan.md](docs/phase-4-plan.md#built-at-the-close-2026-10-18-and-19), `apps/web/src/webhooks.ts`   |
+| A Resend account and a verified sending domain, and naming Resend as a sub-processor in the agreement                                            | Bit68; counsel for the agreement    | [runbook](docs/runbook.md#escalation-email), [ADR 0007](docs/adr/0007-retention.md)                        |
 
 On credentials, Shopify's docs settle the facts: client credentials only work
 when the app and the store share an organization, so a merchant's store is
@@ -505,68 +516,23 @@ development, same-organization source read from the environment. **Not built.**
 
 ## 8. What to do next, in order
 
-1. ~~Push and confirm.~~ Done 2026-10-11; CI green.
-2. **Transfer the repository** to Bit68's organization if that is the move;
-   update the remote; keep push protection on.
-3. **Re-seed the development store.** Install `bitc-seed` on the dev store, then:
-   - scenario 1 gets an in-transit carrier event (`carrierStatus: 'IN_TRANSIT'`
-     in `seed-data.ts`);
-   - add scenario 7, an **authorized** order, and scenario 8, a **partially
-     paid** one — the seed mechanism for both is built and checked by
-     `seed:check`; the data is not added yet, because their order numbers are
-     assigned by the store. The data proposed for them, never written down
-     until now:
+Steps 1–8 of the 2026-10-11 list are done or decided: the store was re-seeded
+with eight scenarios, the suite re-baselined, the real client wired into every
+entry point, escalation email and the webhook receiver built, and Phase 4 is at
+its gate ([report](docs/phase-4-gate-report.md)). The repository has not moved
+to Bit68's organization.
 
-     | Scenario          | Customer (new)       | City   | Line             | Payment                                          |
-     | ----------------- | -------------------- | ------ | ---------------- | ------------------------------------------------ |
-     | 7. Authorized     | `yousef@example.com` | Riyadh | `TFMC-BLUE-L` ×1 | `{ status: 'AUTHORIZED' }`                       |
-     | 8. Partially paid | `reem@example.com`   | Jeddah | `JP-ECRU-S` ×1   | `{ status: 'PARTIALLY_PAID', amount: '100.00' }` |
-
-     Both unfulfilled on purpose: fulfilling an authorized order may make
-     Shopify capture it, depending on store settings, which would quietly turn
-     scenario 7 into scenario 1. Expect `#1886-1008` and `#1886-1009`, and
-     **record what the store actually assigns** — the last batch had a gap;
-
-   - `seed:check`, `seed:dry-run`, `seed` — which runs `compare:store`;
-   - record the assigned numbers in `ASSIGNED_ORDER_NUMBERS`, mirror the new
-     orders in `packages/shopify/src/mock/fixtures.ts`, refresh the recorded
-     shapes in `packages/shopify/test/shapes.ts`;
-   - write four golden cases: in transit, an authorized order's status, an
-     authorized order's payment question (escalate, `escalationGround: 'money'`),
-     and a partially paid order (escalate, `'money'`). `mustNotContain` is a
-     substring check — `"delivered"` matches "not delivered yet" and `"in stock"`
-     matches "not in stock", so pick phrases a correct reply cannot contain.
-     `suite.test.ts` fails if an order number is not in the fixtures or an
-     email cannot verify, so mirror the orders first;
-   - when `compare:store` exits 0, **uninstall `bitc-seed` again.**
-4. **Run the eval suite once** to re-baseline after Phase 4's prompt, tool and
-   case changes, and record a baseline — none exists on disk. Write
-   `--out`/`--out-json` into `packages/evals/history/` and commit them: the
-   per-case files from every earlier run were lost because they were written to
-   a temporary directory.
-5. **Wire the real client into a turn**, from environment credentials, for the
-   dev store. Then meet the first two Phase 4 definition-of-done items end to end:
-   a real order answered with the literal gate passing on Admin API figures, and
-   the different-email and guest cases through the agent. Where to start:
-   - three places construct `MockShopifyClient` today —
-     `apps/cli/src/chat.ts`, `apps/web/src/server.ts`, `packages/evals/src/cli.ts`;
-   - `packages/shopify/scripts/compare-store.ts` already builds the real client
-     from `SHOPIFY_STORE_DOMAIN` and `SHOPIFY_RUNTIME_CLIENT_ID`/`_SECRET`:
-     `AccessTokenCache` → `AdminTransport` (API version `2026-07`) →
-     `ShopifyAdminClient`. That construction, behind one factory that falls back
-     to the mock when the variables are absent, is most of the work;
-   - credentials are arguments in `packages/shopify/src`, never `process.env`
-     reads — the factory belongs at the app edge;
-   - the eval suite stays on the mock. It is free and deterministic; the real
-     client is checked by `compare:store` and by the definition-of-done turns.
-6. **Webhooks for incremental ingest** (`apps/worker` is where they go).
-7. **Escalation email delivery.**
-8. **Close Phase 4:** `verify:clean`, `gate`, and a gate report carrying the
-   mutation table from the phase plan. Then stop for review.
-
-**While step 3 waits on the seed app,** steps 5, 6 and 7 do not depend on it
-and can go first. Step 4 can too, but a baseline taken before step 3 will not
-include the four new cases.
+1. **Owner review of the Phase 4 gate.** Work stops here until it is approved.
+2. **Uninstall `bitc-seed`** from the dev store (Dev Dashboard). It has no
+   reason to hold write scopes now that `compare:store` exits 0.
+3. **The decisions in section 7** that block work: the re-index consumer, and a
+   Resend account if escalation email should be seen working end to end.
+4. **Transfer the repository** if that is the move; update the remote; keep
+   push protection on.
+5. **One eval run** on a day nothing else uses the model key, to measure the
+   2026-10-12 guard changes (`755254a`, `c3145fd`). Write `--out`/`--out-json`
+   into `packages/evals/history/` and commit them.
+6. Then Phase 5, below.
 
 Carried to **Phase 5**: Arabic; a golden set validated and signed by 1886; the
 four unstable cases; latency (p95 8–9s, two cases over a 45-second budget);
@@ -575,7 +541,8 @@ merchant-configurable backorder phrasing.
 Carried to **Phase 6**: production deployment (a real `apps/web` build, the
 worker), the production Shopify app and OAuth install flow, the embedded admin
 UI, provenance for configured facts, an ingestion allowlist by path, the
-retention job, escalation digests, Instagram and WhatsApp.
+retention job, per-tenant Shopify credentials from `shopify_installs`,
+Instagram and WhatsApp.
 
 ---
 
